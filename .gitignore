@@ -1,0 +1,10 @@
+*.pyc
+__pycache__
+.*.swp
+.env*
+
+csrc/*.o
+csrc/*.so
+.idea
+dist
+build
