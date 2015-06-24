@@ -1,5 +1,6 @@
+#version 330
 
-varying vec2 pos;
+in vec2 pos;
 
 uniform sampler2D tex1;
 

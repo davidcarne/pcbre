@@ -1,7 +1,9 @@
+#version 330
+
 uniform mat3 mat;
-attribute vec2 vertex;
-attribute vec4 color;
-varying vec4 color_vtx;
+in vec2 vertex;
+in vec4 color;
+out vec4 color_vtx;
 
 void main(void)
 {

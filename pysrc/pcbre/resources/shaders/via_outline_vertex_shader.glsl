@@ -3,13 +3,13 @@
 
 uniform mat3 mat;
 
-attribute vec2 vertex;
+in vec2 vertex;
 
-attribute vec2 pos;
-attribute float r;
-attribute vec4 color;
+in vec2 pos;
+in float r;
+in vec4 color;
 
-varying vec4 color_vtx;
+out vec4 color_vtx;
 
 void main() {
 

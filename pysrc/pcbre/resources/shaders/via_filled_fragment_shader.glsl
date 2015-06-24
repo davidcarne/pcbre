@@ -1,10 +1,10 @@
 #version 330
 
-varying float ax;
-varying float ay;
+in float ax;
+in float ay;
 
-varying float _r_inside_frac_sq;
-varying vec4 _color;
+in float _r_inside_frac_sq;
+in vec4 _color;
 
 void main() {
 

@@ -1,8 +1,10 @@
-uniform mat3 mat;
-attribute vec2 vertex;
-attribute vec2 texpos;
+#version 330
 
-varying vec2 pos;
+uniform mat3 mat;
+in vec2 vertex;
+in vec2 texpos;
+
+out vec2 pos;
 
 void main(void)
 {

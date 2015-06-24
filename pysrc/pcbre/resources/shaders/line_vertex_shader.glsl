@@ -8,10 +8,10 @@ INPUT_TYPE float thickness;
 uniform vec4 color;
 
 
-attribute vec2 vertex;
-attribute int ptid;
+in vec2 vertex;
+in int ptid;
 
-varying vec4 color_vtx;
+out vec4 color_vtx;
 
 void main(void)
 {

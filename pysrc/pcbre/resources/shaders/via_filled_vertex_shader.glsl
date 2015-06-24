@@ -3,19 +3,19 @@
 
 uniform mat3 mat;
 
-attribute vec2 vertex;
+in vec2 vertex;
 
-attribute vec2 pos;
-attribute float r;
+in vec2 pos;
+in float r;
 
-varying float ax;
-varying float ay;
+out float ax;
+out float ay;
 
-attribute vec4 color;
-attribute float r_inside_frac_sq;
+in vec4 color;
+in float r_inside_frac_sq;
 
-varying vec4 _color;
-varying float _r_inside_frac_sq;
+out vec4 _color;
+out float _r_inside_frac_sq;
 
 void main() {
 

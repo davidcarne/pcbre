@@ -34,7 +34,7 @@ class TraceRender:
         # (no additional bound instance info), and one for rendering instanced geometry
 
         self.__uniform_shader = gls.shader_cache.get("line_vertex_shader","frag1", defines={"INPUT_TYPE":"uniform"})
-        self.__attribute_shader = gls.shader_cache.get("line_vertex_shader","frag1", defines={"INPUT_TYPE":"attribute"})
+        self.__attribute_shader = gls.shader_cache.get("line_vertex_shader","frag1", defines={"INPUT_TYPE":"in"})
 
         # Generate geometry for trace and endcaps
         # ptid is a variable with value 0 or 1 that indicates which endpoint the geometry is associated with
