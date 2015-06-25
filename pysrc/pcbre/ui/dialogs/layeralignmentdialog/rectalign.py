@@ -18,6 +18,8 @@ import numpy
 import math
 import cv2
 
+from pcbre.units import MM
+
 corners = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
 
 
@@ -202,7 +204,7 @@ class RectAlignmentModel(GenModel):
 
 
     def save(self, project):
-        align = RectAlignment(self.__align_handles, self.__dim_handles, self.__dim_values, self.dims_locked,
+        align = RectAlignment(self.__align_handles, self.__dim_handles, self.__active_dims(), self.dims_locked,
                               Point2(self.translate_x, self.translate_y), self.origin_idx, self.flip_x, self.flip_y)
         self.__image.set_alignment(align)
 
@@ -323,6 +325,10 @@ class RectAlignmentModel(GenModel):
         base = 2 * idx + PERIM_HANDLE_MAX
         return [i for i in self.align_handles[base:base + 2] if i is not None]
 
+    def __active_dims(self):
+        if self.dim_values[0] is not None and self.dim_values[1] is not None:
+            return self.dim_values
+        return self.placeholder_dim_values
 
     def __update_line_pos(self, h_idx, pos):
         """
@@ -441,12 +447,10 @@ class RectAlignmentModel(GenModel):
 
         sf = 100.0/max(ma, mb)
 
-        self.placeholder_dim_values[0] = sf * ma
-        self.placeholder_dim_values[1] = sf * mb
+        self.placeholder_dim_values[0] = sf * ma * MM
+        self.placeholder_dim_values[1] = sf * mb * MM
 
-        dims = self.dim_values
-        if None in self.dim_values:
-            dims = self.placeholder_dim_values
+        dims = self.__active_dims()
 
         # Perspective transform handles - convert to
         handles_pp = []
@@ -957,8 +961,8 @@ class RectAlignSettingsWidget(QtGui.QWidget):
         self.update_controls_ra()
 
     def update_controls_ra(self):
-        self.dims_1.setPlaceholderText("%f" % self.model.placeholder_dim_values[0])
-        self.dims_2.setPlaceholderText("%f" % self.model.placeholder_dim_values[1])
+        self.dims_1.setPlaceholderValue(self.model.placeholder_dim_values[0])
+        self.dims_2.setPlaceholderValue(self.model.placeholder_dim_values[1])
 
         self.dims_1.setValue(self.model.dim_values[0])
         self.dims_2.setValue(self.model.dim_values[1])

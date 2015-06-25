@@ -53,6 +53,8 @@ class UnitLineEdit(QtGui.QWidget):
         self.__unitDropDown = QtGui.QComboBox()
         self.__unitDropDown.currentIndexChanged.connect(self.indexChanged)
 
+        self._placeholder_value = None
+
         self.setLayout(self.layout)
         self.layout.addWidget(self.__lineEdit, 0)
         self.layout.addWidget(self.__unitDropDown, 1)
@@ -61,6 +63,10 @@ class UnitLineEdit(QtGui.QWidget):
 
     def setPlaceholderText(self, text):
         self.__lineEdit.setPlaceholderText(text)
+
+    def setPlaceholderValue(self, value):
+        self._placeholder_value = value
+        self.update_field_value()
 
     def resize(self, w, h):
         super(UnitLineEdit, self).resize(w, h)
@@ -92,11 +98,16 @@ class UnitLineEdit(QtGui.QWidget):
         self.update_field_value()
 
     def update_field_value(self):
+        scale = self.__unitGroup.get_scale(self.unit_idx)
         if self._value is None:
             self.__lineEdit.setText("")
         else:
-            scale = self.__unitGroup.get_scale(self.unit_idx)
             self.__lineEdit.setText("%s" % (self._value / float(scale)))
+
+        if self._placeholder_value is None:
+            self.__lineEdit.setPlaceholderText("")
+        else:
+            self.__lineEdit.setPlaceholderText("%s" % (self._placeholder_value / float(scale)))
 
     def text_changed(self):
         v = self.__lineEdit.text()
