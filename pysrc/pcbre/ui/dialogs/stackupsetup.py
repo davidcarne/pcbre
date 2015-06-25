@@ -341,7 +341,7 @@ class MyTableModel(QAbstractTableModel):
     def addLayer(self, idx):
         self.emit(SIGNAL("layoutAboutToBeChanged()"))
 
-        col = numpy.array(colorsys.hsv_to_rgb(random.random(), 1, 1)) * 255
+        col = numpy.array(colorsys.hsv_to_rgb(random.random(), 1, 1))
 
         l = EditableLayer(self, None, "New Layer", col)
         self._layers.insert(idx, l)
