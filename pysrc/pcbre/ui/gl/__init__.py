@@ -21,9 +21,6 @@ def translate_dtype(dt):
 
     return t, n
 
-def get_offset(dtype, name):
-    _, offs = dtype.fields[name]
-    return ctypes.c_void_p(offs)
 
 class vbobind(object):
     def __init__(self, program, dtype, name, shader_name=None, div=0):
@@ -35,18 +32,19 @@ class vbobind(object):
 
         self.t, self.n = translate_dtype(dtype.fields[name][0])
 
-        self.offset = get_offset(dtype, name)
+        _, self.offset = dtype.fields[name]
         self.stride = dtype.itemsize
 
         self.div = div
 
-    def assign(self):
+    def assign(self, base=0):
         assert GL.glGetError() == 0
+        offset = ctypes.c_void_p(self.offset + base * self.stride)
         GL.glEnableVertexAttribArray(self.loc)
         if self.t in [GL.GL_BYTE, GL.GL_UNSIGNED_BYTE, GL.GL_SHORT, GL.GL_UNSIGNED_SHORT, GL.GL_INT, GL.GL_UNSIGNED_INT]:
-            GL.glVertexAttribIPointer(self.loc, self.n, self.t, self.stride, self.offset)
+            GL.glVertexAttribIPointer(self.loc, self.n, self.t, self.stride, offset)
         else:
-            GL.glVertexAttribPointer(self.loc, self.n, self.t, False, self.stride, self.offset)
+            GL.glVertexAttribPointer(self.loc, self.n, self.t, False, self.stride, offset)
         GL.glVertexAttribDivisor(self.loc, self.div)
 
 class Texture(int):

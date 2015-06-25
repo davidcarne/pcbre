@@ -91,14 +91,20 @@ class TraceRender:
             vbobind(self.__attribute_shader, self.trace_vbo.dtype, "ptid").assign()
 
         with self.__attribute_shader_vao, self.instance_vbo:
-            vbobind(self.__attribute_shader, self.instance_dtype, "pos_a", div=1).assign()
-            vbobind(self.__attribute_shader, self.instance_dtype, "pos_b", div=1).assign()
-            vbobind(self.__attribute_shader, self.instance_dtype, "thickness", div=1).assign()
+            self.__bind_pos_a = vbobind(self.__attribute_shader, self.instance_dtype, "pos_a", div=1)
+            self.__bind_pos_b =  vbobind(self.__attribute_shader, self.instance_dtype, "pos_b", div=1)
+            self.__bind_thickness = vbobind(self.__attribute_shader, self.instance_dtype, "thickness", div=1)
             #vbobind(self.__attribute_shader, self.instance_dtype, "color", div=1).assign()
+            self.__base_rebind(0)
 
             self.index_vbo.bind()
 
         self.__last_prepared = weakref.WeakKeyDictionary()
+
+    def __base_rebind(self, base):
+        self.__bind_pos_a.assign(base)
+        self.__bind_pos_b.assign(base)
+        self.__bind_thickness.assign(base)
 
     def restart(self):
         self.__deferred_layer = defaultdict(list)
@@ -212,6 +218,7 @@ class TraceRender:
         color_a = self.parent.color_for_layer(layer) + [1]
         color_sel = self.parent.sel_colormod(True, color_a)
 
+        has_base_instance = False
         with self.__attribute_shader, self.__attribute_shader_vao:
             # Setup overall calls
             GL.glUniformMatrix3fv(self.__attribute_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
@@ -224,18 +231,33 @@ class TraceRender:
 
                 GL.glUniform4f(self.__attribute_shader.uniforms.color, *color)
 
-                if not is_outline:
-                    for first, last in ranges:
-                        # filled traces come first in the array
-                        GL.glDrawElementsInstancedBaseInstance(GL.GL_TRIANGLES, TRIANGLES_SIZE, GL.GL_UNSIGNED_INT,
-                                                               ctypes.c_void_p(0), last - first, first)
-                        GL.glDrawArraysInstancedBaseInstance(GL.GL_LINE_LOOP, 2, NUM_ENDCAP_SEGMENTS * 2,
-                                                             last - first, first)
+                if has_base_instance:
+                    # Many instances backport glDrawElementsInstancedBaseInstance
+                    # This is faster than continually rebinding, so support if possible
+                    if not is_outline:
+                        for first, last in ranges:
+                            # filled traces come first in the array
+                            GL.glDrawElementsInstancedBaseInstance(GL.GL_TRIANGLES, TRIANGLES_SIZE, GL.GL_UNSIGNED_INT,
+                                                                   ctypes.c_void_p(0), last - first, first)
+                    else:
+                        for first, last in ranges:
+                            # Then outline traces. We reuse the vertex data for the outside
+                            GL.glDrawArraysInstancedBaseInstance(GL.GL_LINE_LOOP, 2, NUM_ENDCAP_SEGMENTS * 2,
+                                                                 last - first, first)
                 else:
-                    for first, last in ranges:
-                        # Then outline traces. We reuse the vertex data for the outside
-                        GL.glDrawArraysInstancedBaseInstance(GL.GL_LINE_LOOP, 2, NUM_ENDCAP_SEGMENTS * 2,
-                                                             last - first, first)
+                    with self.instance_vbo:
+                        if not is_outline:
+                            for first, last in ranges:
+                                # filled traces come first in the array
+                                self.__base_rebind(first)
+                                GL.glDrawElementsInstanced(GL.GL_TRIANGLES, TRIANGLES_SIZE, GL.GL_UNSIGNED_INT,
+                                                                       ctypes.c_void_p(0), last - first)
+                        else:
+                            for first, last in ranges:
+                                self.__base_rebind(first)
+                                # Then outline traces. We reuse the vertex data for the outside
+                                GL.glDrawArraysInstanced(GL.GL_LINE_LOOP, 2, NUM_ENDCAP_SEGMENTS * 2,
+                                                                     last - first)
 
     # Immediate-mode render of a single trace
     # SLOW (at least for bulk-rendering)
