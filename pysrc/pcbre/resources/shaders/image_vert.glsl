@@ -1,6 +1,6 @@
-#version 330
-
+#version 150
 uniform mat3 mat;
+
 in vec2 vertex;
 in vec2 texpos;
 
