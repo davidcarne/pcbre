@@ -1,19 +1,12 @@
-import math
-from OpenGL import GL as GL
-from OpenGL.arrays.vbo import VBO
 from PySide import QtGui, QtCore
-import numpy
 from pcbre.matrix import Point2, rotate, Vec2, projectPoint, translate, project_point_line
 from pcbre.model.const import SIDE
 from pcbre.model.smd4component import SMD4Component
-from pcbre.ui.gl import glimports as GLI
-from pcbre import matrix as matrix
-import pcbre.matrix
 from pcbre.ui.dialogs.settingsdialog import AutoSettingsWidget, LineEditable, FloatTrait, IntTrait, UnitEditable
-from pcbre.ui.gl import VAO, vbobind, glimports, glimports, glimports
 from pcbre.ui.tools.multipoint import MultipointEditFlow, EditablePoint, OffsetDefaultPoint
 from pcbre.ui.uimodel import mdlacc, GenModel
 from pcbre.ui.widgets.unitedit import UNIT_GROUP_MM
+import math
 
 
 class BodyCornerPoint:

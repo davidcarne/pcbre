@@ -4,7 +4,6 @@ from OpenGL.arrays.vbo import VBO
 import ctypes
 import numpy
 from pcbre.matrix import Point2
-from pcbre.ui.gl import VAO, vbobind, glimports as GLI
 from pcbre.view.rendersettings import RENDER_STANDARD, RENDER_OUTLINES, RENDER_SELECTED, RENDER_HINT_NORMAL
 from pcbre.view.util import get_consolidated_draws
 

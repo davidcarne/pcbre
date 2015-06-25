@@ -3,7 +3,6 @@ __author__ = 'davidc'
 import OpenGL.GL as GL
 import numpy
 import ctypes
-from . import glimports as GLI
 import contextlib
 
 def translate_dtype(dt):
