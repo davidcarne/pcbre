@@ -37,7 +37,9 @@ import pcbre.matrix as M
 from pcbre.view.componentview import PadRender, DIPRender, SMDRender, PassiveRender
 
 
-MOVE_MOUSE_BUTTON = QtCore.Qt.RightButton
+MOVE_MODIFIER_KEY = QtCore.Qt.Key_Space
+MOVE_MOUSE_BUTTON = QtCore.Qt.LeftButton
+
 
 def fixed_center_dot(viewState, m, view_center=None):
 
@@ -159,6 +161,7 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
         self.viewState.changed.connect(self.update)
 
         # Nav Handling
+        self.move_key_pressed = False
         self.move_dragging = False
         self.move_dragged = False
         self.mwemu = False
@@ -180,7 +183,15 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
         if self.interactionDelegate is None:
             return False
 
+        if (event.type() == QtCore.QEvent.ShortcutOverride and
+                MOVE_MODIFIER_KEY and
+                event.key() == MOVE_MODIFIER_KEY):
+            self.move_key_pressed = True
+
         if event.type() == QtCore.QEvent.KeyRelease:
+            if MOVE_MODIFIER_KEY and event.key() == MOVE_MODIFIER_KEY:
+                self.move_key_pressed = False
+
             s = self.interactionDelegate.keyReleaseEvent(event)
             self.update()
             return s
@@ -235,13 +246,15 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
         self.lastPoint = event.pos()
         self.move_dragged = False
 
-
-        if event.button() == MOVE_MOUSE_BUTTON:
+        if (event.button() == MOVE_MOUSE_BUTTON and
+                (MOVE_MODIFIER_KEY is None or self.move_key_pressed)):
             self.move_dragging = True
             return
+
         elif event.button() == QtCore.Qt.MiddleButton:
             self.mwemu = True
             return
+
         elif not self.move_dragging and not self.mwemu:
             if self.interactionDelegate is not None:
                 self.interactionDelegate.mousePressEvent(event)
