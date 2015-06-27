@@ -1,10 +1,8 @@
-from OpenGL.GL.shaders import ShaderProgram
-import pkg_resources
-
 __author__ = 'davidc'
 
-import OpenGL.GL.shaders as GLS
+import pkg_resources
 import OpenGL.GL as GL
+from pcbre.ui.gl.shader import compileProgram, compileShader
 
 class UniformProxy(object):
     def __init__(self, parent):
@@ -64,9 +62,9 @@ class ShaderCache(object):
             frag_version, frag1s = self.extract_version(frag1s)
             vert_version, vert1s = self.extract_version(vert1s)
             try:
-                frag = GLS.compileShader([frag_version, frag_prepend, frag1s], GL.GL_FRAGMENT_SHADER)
-                vert = GLS.compileShader([vert_version, vert_prepend, vert1s], GL.GL_VERTEX_SHADER)
-                obj = GLS.compileProgram(vert, frag)
+                frag = compileShader([frag_version, frag_prepend, frag1s], GL.GL_FRAGMENT_SHADER)
+                vert = compileShader([vert_version, vert_prepend, vert1s], GL.GL_VERTEX_SHADER)
+                obj = compileProgram(vert, frag)
             except RuntimeError as e:
                 print("During Shader Compilation: ", e)
                 raise e

@@ -41,27 +41,28 @@ void main(void)
 if QtGui.qApp == None: QtGui.QApplication([])
 
 class test_shader_stuff(unittest.TestCase):
+    ctx = None
 
     def setUp(self):
 
-        f = QtOpenGL.QGLFormat()
-        f.setVersion(3, 3)
-        f.setProfile(QtOpenGL.QGLFormat.CoreProfile)
+        if self.ctx is None:
+            f = QtOpenGL.QGLFormat()
+            f.setVersion(3, 2)
+            f.setProfile(QtOpenGL.QGLFormat.CoreProfile)
 
-        c = QtOpenGL.QGLContext(f)
-        self.mockWidget = QtOpenGL.QGLWidget(c)
+            self.ctx = QtOpenGL.QGLContext(f)
+            self.mockWidget = QtOpenGL.QGLWidget(self.ctx)
 
-        self.assertTrue(self.mockWidget.isValid())
+        self.assertTrue(self.ctx.isValid())
+        self.ctx.makeCurrent()
 
-        self.mockWidget.makeCurrent()
 
+        # Compile the two shaders individually
         s1 = S.compileShader(VERT_1, GL.GL_VERTEX_SHADER)
         s2 = S.compileShader(FRAG_1, GL.GL_FRAGMENT_SHADER)
 
+        # now build the whole program
         self.prog = S.compileProgram(s1, s2)
-
-
-
 
     # Basic tests
     def test_fetches_names(self):
@@ -94,20 +95,30 @@ class test_shader_stuff(unittest.TestCase):
         self.prog._update_bindings()
 
         def _():
-            with self.prog:
-                pass
+            self.prog.check_bindings()
 
         self.assertRaises(S.UnboundUniformException, _)
+
+        ar = numpy.identity(3, dtype=numpy.float32)
+        self.prog.glUniformMatrix3fv("mat", 1, False, ar)
+        self.prog.glUniform4f("col", 1,1,1,1)
+        self.prog.glUniform1i("tex1", 0)
+
+        self.assertRaises(S.UnboundAttributeException, _)
 
     def test_binding_bound(self):
         self.prog._update_bindings()
 
+        # Now setup all the bindings, and validate
         self.prog.glUniform4f("col", 1,1,1,1)
         self.prog.glUniform1i("tex1", 0)
 
         ar = numpy.identity(3, dtype=numpy.float32)
         self.prog.glUniformMatrix3fv("mat", 1, False, ar)
+        i = self.prog.attributes.vertex
+        i = self.prog.attributes.texpos
 
-        with self.prog:
-            pass
+
+        self.prog.check_bindings()
+
 

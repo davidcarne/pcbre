@@ -12,6 +12,22 @@ class UnboundUniformException(Exception):
 class UnboundAttributeException(Exception):
     pass
 
+class UniformProxy(object):
+    def __init__(self, parent):
+        self._prog = parent
+
+    def __getattr__(self, key):
+        self._prog._uniforms_to_be.discard(key)
+        return self._prog._uniforms[key].index
+
+class AttributeProxy(object):
+    def __init__(self, parent):
+        self._prog = parent
+
+    def __getattr__(self, key):
+        self._prog._attribs_to_be.discard(key)
+        return self._prog._attribs[key].index
+
 class EnhShaderProgram(ShaderProgram):
     def _get_uniforms(self):
         _active_uniform = GL.glGetProgramiv(self, GL.GL_ACTIVE_UNIFORMS)
@@ -19,7 +35,7 @@ class EnhShaderProgram(ShaderProgram):
         _uniforms = {}
 
         for unif_index in range(_active_uniform):
-            name, size, type =  GL.glGetActiveUniform(self, +unif_index)
+            name, size, type =  GL.glGetActiveUniform(self, unif_index)
 
             # in python3 shader names are bytestrings. Upconvert to UTF8 to play nice
             name = name.decode("ascii")
@@ -30,6 +46,8 @@ class EnhShaderProgram(ShaderProgram):
     def _get_attribs(self):
         _active_attrib = GL.glGetProgramiv(self, GL.GL_ACTIVE_ATTRIBUTES)
 
+        # For some reason the PyOpenGL Binding is sorta broken
+        # use the full ctypes-style access
         bufSize = 50
         ct_nameSize = GL.GLsizei()
         ct_size = GL.GLint()
@@ -55,6 +73,11 @@ class EnhShaderProgram(ShaderProgram):
         self._uniforms = self._get_uniforms()
 
         self._uniforms_to_be = set(self._uniforms.keys())
+        self._attribs_to_be = set(self._attribs.keys())
+
+
+        self.uniforms = UniformProxy(self)
+        self.attributes = AttributeProxy(self)
 
 
     def __getattr__(self, fname):
@@ -71,10 +94,11 @@ class EnhShaderProgram(ShaderProgram):
 
         raise AttributeError
 
-    def __enter__(self):
-        super(EnhShaderProgram, self).__enter__()
+    def check_bindings(self):
         if len(self._uniforms_to_be):
             raise UnboundUniformException(", ".join(self._uniforms_to_be))
+        if len(self._attribs_to_be):
+            raise UnboundAttributeException(", ".join(self._uniforms_to_be))
 
 def compileProgram(*shaders):
     program = GL.glCreateProgram()
@@ -86,8 +110,12 @@ def compileProgram(*shaders):
 
     GL.glLinkProgram(program)
 
-    program.check_validate()
+    # Do not perform shader validity checking at compile time.
+    # On some platforms (OSX), the FBO doesn't exist at initializeGL time, or is not bound
+    #program.check_validate()
+
     program.check_linked()
+    program._update_bindings()
     for shader in shaders:
         GL.glDeleteShader(shader)
     return program
