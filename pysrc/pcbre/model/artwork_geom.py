@@ -5,7 +5,12 @@ from pcbre.model.const import IntersectionClass, TFF
 from shapely.geometry import Polygon as ShapelyPolygon, Point as ShapelyPoint, LineString as ShapelyLineString
 import shapely.speedups
 import p2t
-assert shapely.speedups.available
+
+if shapely.speedups.available:
+    shapely.speedups.enable()
+else:
+    print("Shapely was compiled without GEOS development headers available; therefore, speedups are not available!")
+    print("Please install GEOS development headers and reinstall Shapely for improved performance.")
 
 __author__ = 'davidc'
 
