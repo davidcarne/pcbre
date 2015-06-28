@@ -14,7 +14,7 @@ setup(  name="pcbre",
         package_dir = {'': 'pysrc'},
 
         package_data = {
-            '': ['*.svg', '*.glsl', '*.capnp']
+            '': ['*.svg', '*.glsl', '*.capnp', '*.ttf']
         },
 
         entry_points = { 'console_scripts': [
