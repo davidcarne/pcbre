@@ -181,11 +181,15 @@ class MainWindow(QtGui.QMainWindow):
         self.rotate90R = QtGui.QAction("Rotate 90 (CW)", self, triggered=rotater(90))
         self.rotate90R.setShortcut(QtGui.QKeySequence("ctrl+r"))
 
+        self.permute = QtGui.QAction("Cycle Image Draw Order", self, triggered=self.viewArea.viewState.permute_layer_order)
+        self.permute.setShortcut(QtGui.QKeySequence("]"))
+
         tb = self.addToolBar("View")
         tb.addAction(flipX)
         tb.addAction(flipY)
         tb.addAction(self.rotate90L)
         tb.addAction(self.rotate90R)
+        tb.addAction(self.permute)
 
         self.flipX = flipX
         self.flipY = flipY
@@ -244,6 +248,7 @@ class MainWindow(QtGui.QMainWindow):
         self.viewMenu.addAction(self.rotate90R)
         self.viewMenu.addAction(self.flipX)
         self.viewMenu.addAction(self.flipY)
+        self.viewMenu.addAction(self.permute)
 
         self.viewMenu.addSeparator()
         self.viewMenu.addAction(self.rotate90L)

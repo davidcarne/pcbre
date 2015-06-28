@@ -86,6 +86,11 @@ class ViewState(QtCore.QObject, ViewPort):
         self.currentLayerChanged.connect(self.changed)
         self.__show_images = True
         self.__draw_other_layers = True
+        self.layer_permute = 0
+
+    def permute_layer_order(self):
+        self.layer_permute += 1
+        self.changed.emit()
 
     def rotate(self, angle):
         self.transform = self.transform.dot(M.rotate(math.radians(angle)))
@@ -484,7 +489,10 @@ class BoardViewWidget(BaseViewWidget):
         # Render all images down onto the layer
         with Timer() as il_timer:
             if self.viewState.show_images:
-                for l in stackup_layer.imagelayers:
+                images = list(stackup_layer.imagelayers)
+                i = self.viewState.layer_permute % len(images)
+                images_cycled = images[i:] + images[:i]
+                for l in images_cycled:
                     self.image_view_cache_load(l).render(self.viewState.glMatrix)
 
         # Now render features
