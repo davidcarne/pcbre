@@ -488,7 +488,7 @@ class BoardViewWidget(BaseViewWidget):
 
         # Render all images down onto the layer
         with Timer() as il_timer:
-            if self.viewState.show_images:
+            if self.viewState.show_images and (len(stackup_layer.imagelayers) > 0):
                 images = list(stackup_layer.imagelayers)
                 i = self.viewState.layer_permute % len(images)
                 images_cycled = images[i:] + images[:i]
