@@ -20,13 +20,15 @@ PCBRE requires the following dependencies. Some will probably need to come from 
 - scipy
 - PySide
 
+<!-- begin list -->
 - Cython (required by poly2tri and pypotrace)
-- geos (required by shapely)
+- geos (required by shapely, be sure to install geos with development headers)
 - capnp (required by pycapnp)
 - libspatialindex (required by rtree)
 - freetype (required by freetype_py)
 - opencv3 (with Python 3 bindings)
 
+<!-- begin list -->
 - libagg (required by pypotrace, not yet needed)
 - potrace (required by pypotrace, not yet needed)
 
@@ -39,6 +41,7 @@ PCBRE requires the following dependencies. Some will probably need to come from 
 - git+https://github.com/davidcarne/poly2tri.python.git
 - pyopengl
 
+<!-- begin list -->
 - mock (only needed for tests)
 - git+https://github.com/davidcarne/pypotrace.git (will be needed in the future)
 
