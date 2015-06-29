@@ -192,6 +192,7 @@ class ComponentTool(BaseTool):
     NAME = 'Component'
     ICON_NAME = 'component'
     SHORTCUT = 'c'
+    TOOLTIP = 'Component (c)'
 
     def __init__(self, project):
         super(ComponentTool, self).__init__(project)

@@ -40,6 +40,7 @@ class NameTool(BaseTool):
     ICON_NAME = "netname"
     NAME = "Name"
     SHORTCUT = 'n'
+    TOOLTIP = 'Name (n)'
 
     def __init__(self, project):
         super(NameTool, self).__init__(project)

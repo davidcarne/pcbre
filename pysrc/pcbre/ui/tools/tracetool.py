@@ -141,6 +141,7 @@ class TraceTool(BaseTool):
     ICON_NAME = "trace"
     NAME = "Trace"
     SHORTCUT = 't'
+    TOOLTIP = 'Trace (t)'
 
     def __init__(self, project):
         super(TraceTool, self).__init__(project)

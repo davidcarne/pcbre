@@ -79,6 +79,7 @@ class AirwireTool(BaseTool):
     ICON_NAME="airwire"
     NAME="Airwire"
     SHORTCUT="a"
+    TOOLTIP="Airwire (a)"
 
 
     def __init__(self, project):
