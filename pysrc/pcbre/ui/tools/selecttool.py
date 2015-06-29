@@ -99,6 +99,7 @@ class SelectTool(BaseTool):
     ICON_NAME="cross"
     NAME="Select"
     SHORTCUT = 's'
+    TOOLTIP = 'Select (s)'
 
     def __init__(self, project):
         super(SelectTool, self).__init__(project)

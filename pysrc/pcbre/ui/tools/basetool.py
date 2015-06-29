@@ -41,6 +41,7 @@ class BaseToolController(QtCore.QObject):
 
 class BaseTool(object):
     SHORTCUT=None
+    TOOLTIP=None
 
     def __init__(self, project):
         self.toolButton = None
@@ -55,6 +56,9 @@ class BaseTool(object):
 
         if self.SHORTCUT is not None:
             self.toolButton.setShortcut(self.SHORTCUT)
+
+        if self.TOOLTIP is not None:
+            self.toolButton.setToolTip(self.TOOLTIP)
 
     def setupToolButtonExtra(self):
         pass

@@ -141,6 +141,7 @@ class ViaTool(BaseTool):
     ICON_NAME = "via"
     NAME = "Via"
     SHORTCUT = 'v'
+    TOOLTIP = 'Via (v)'
 
     def __init__(self, project):
         super(ViaTool, self).__init__(project)
