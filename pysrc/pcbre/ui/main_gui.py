@@ -166,9 +166,11 @@ class MainWindow(QtGui.QMainWindow):
     def createViewToolbar(self):
         flipX = QtGui.QAction("Flip X", self, triggered=lambda: self.viewArea.viewState.flip(0))
         flipX.setShortcut(QtGui.QKeySequence("f"))
+        flipX.setToolTip('f')
 
         flipY = QtGui.QAction("Flip Y", self, triggered=lambda: self.viewArea.viewState.flip(1))
         flipY.setShortcut(QtGui.QKeySequence("shift+f"))
+        flipY.setToolTip('Shift+f')
 
         def rotater(deg):
             def _():
@@ -177,12 +179,15 @@ class MainWindow(QtGui.QMainWindow):
 
         self.rotate90L = QtGui.QAction("Rotate 90 (CCW)", self, triggered=rotater(-90))
         self.rotate90L.setShortcut(QtGui.QKeySequence("ctlr+shift+r"))
+        self.rotate90L.setToolTip("Ctrl+Shift+r")
 
         self.rotate90R = QtGui.QAction("Rotate 90 (CW)", self, triggered=rotater(90))
         self.rotate90R.setShortcut(QtGui.QKeySequence("ctrl+r"))
+        self.rotate90R.setToolTip("Ctrl+r")
 
         self.permute = QtGui.QAction("Cycle Image Draw Order", self, triggered=self.viewArea.viewState.permute_layer_order)
         self.permute.setShortcut(QtGui.QKeySequence("]"))
+        self.permute.setToolTip("]")
 
         tb = self.addToolBar("View")
         tb.addAction(flipX)
