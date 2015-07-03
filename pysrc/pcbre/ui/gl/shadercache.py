@@ -66,8 +66,13 @@ class ShaderCache(object):
                 vert = compileShader([vert_version, vert_prepend, vert1s], GL.GL_VERTEX_SHADER)
                 obj = compileProgram(vert, frag)
             except RuntimeError as e:
-                print("During Shader Compilation: ", e)
-                raise e
+                msg, shader, _ = e.args
+                print("During Shader Compilation: ", msg)
+                shader_body = b"".join(shader).decode('ascii')
+                lines = shader_body.split("\n")
+                for i in lines:
+                    print("\t%s" % i.strip())
+                return None
 
             obj.uniforms = UniformProxy(obj)
 

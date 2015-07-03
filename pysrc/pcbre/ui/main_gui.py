@@ -310,6 +310,10 @@ def main():
     import argparse
     import os.path
 
+    # Actually die on signal
+    import signal
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--create-if-not-exists", action="store_true")
     ap.add_argument("project", nargs='?')
