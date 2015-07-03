@@ -89,7 +89,8 @@ class ViewPort(object):
         return abs(self.__fwdMatrix[0][0]) * s
 
     def __update_scale_factor(self):
-        self.__scale_factor = self.__fwdMatrix[0][0]
+        self.__scale_factor = max(map(abs, [self.__fwdMatrix[0][0], self.__fwdMatrix[0][1], self.__fwdMatrix[1][0], self.__fwdMatrix[1][1]]))
+
 
     def resize(self, newwidth, newheight):
         self.__width = newwidth
