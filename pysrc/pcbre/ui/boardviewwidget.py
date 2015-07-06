@@ -37,7 +37,9 @@ import pcbre.matrix as M
 from pcbre.view.componentview import PadRender, DIPRender, SMDRender, PassiveRender
 
 
-MOVE_MOUSE_BUTTON = QtCore.Qt.RightButton
+MOVE_MODIFIER_KEY = QtCore.Qt.Key_Space
+MOVE_MOUSE_BUTTON = QtCore.Qt.LeftButton
+
 
 def fixed_center_dot(viewState, m, view_center=None):
 
@@ -159,7 +161,8 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
         self.viewState.changed.connect(self.update)
 
         # Nav Handling
-        self.move_dragging = False
+        self.__move_key_pressed = False
+        self.__move_dragging = False
         self.move_dragged = False
         self.mwemu = False
         self.lastPoint = None
@@ -174,13 +177,47 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
         # OpenGL shared resources object. Initialized during initializeGL
         self.gls = GLShared()
 
+    def _set_drag_cursor(self, dragging):
+        qapp = QtGui.QApplication.instance()
+        if not qapp:
+            return
 
+        if dragging and not qapp.overrideCursor():
+            qapp.setOverrideCursor(QtCore.Qt.OpenHandCursor)
+        elif not dragging and qapp.overrideCursor():
+            qapp.restoreOverrideCursor()
+
+    @property
+    def move_dragging(self):
+        return self.__move_dragging
+
+    @move_dragging.setter
+    def move_dragging(self, v):
+        self.__move_dragging = v
+        self._set_drag_cursor(v)
+
+    @property
+    def move_key_pressed(self):
+        return self.__move_key_pressed
+
+    @move_key_pressed.setter
+    def move_key_pressed(self, v):
+        self.__move_key_pressed = v
+        self._set_drag_cursor(v)
 
     def eventFilter(self, target, event):
         if self.interactionDelegate is None:
             return False
 
+        if (event.type() == QtCore.QEvent.ShortcutOverride and
+                MOVE_MODIFIER_KEY and
+                event.key() == MOVE_MODIFIER_KEY):
+            self.move_key_pressed = True
+
         if event.type() == QtCore.QEvent.KeyRelease:
+            if MOVE_MODIFIER_KEY and event.key() == MOVE_MODIFIER_KEY:
+                self.move_key_pressed = False
+
             s = self.interactionDelegate.keyReleaseEvent(event)
             self.update()
             return s
@@ -235,13 +272,15 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
         self.lastPoint = event.pos()
         self.move_dragged = False
 
-
-        if event.button() == MOVE_MOUSE_BUTTON:
+        if (event.button() == MOVE_MOUSE_BUTTON and
+                (MOVE_MODIFIER_KEY is None or self.move_key_pressed)):
             self.move_dragging = True
             return
+
         elif event.button() == QtCore.Qt.MiddleButton:
             self.mwemu = True
             return
+
         elif not self.move_dragging and not self.mwemu:
             if self.interactionDelegate is not None:
                 self.interactionDelegate.mousePressEvent(event)
@@ -562,6 +601,3 @@ class BoardViewWidget(BaseViewWidget):
 
         all_time = time.time() - t_render_start
         print("Render time all: %f ot: %f cmp: %f aw: %f gl: %f" % (all_time, other_timer.interval, cmp_timer.interval, t_aw.interval, t.interval))
-
-
-
