@@ -414,9 +414,11 @@ def scale(xs, ys=None):
     ], dtype=numpy.float32)
 
 def rotate(theta):
+    _cos = math.cos(theta)
+    _sin = math.sin(theta)
     return numpy.array([
-        [math.cos(theta), -math.sin(theta), 0],
-        [math.sin(theta),  math.cos(theta), 0],
+        [_cos, -_sin, 0],
+        [_sin,  _cos, 0],
         [              0,                0, 1]
     ], dtype=numpy.float32)
 
