@@ -1,5 +1,4 @@
 from OpenGL.arrays.vbo import VBO
-import cv2
 import OpenGL.GL as GL
 import numpy
 import ctypes
@@ -83,11 +82,6 @@ class ImageView(object):
 
 
     def render(self, viewPort):
-        #proj = viewPort.dot(self.il.transform_matrix)
-        #cv2.warpPerspective(self.im, proj,
-        #               (viewPort.width, viewPort.height), # No depth coord
-        #               surface.buffer, 0, cv2.BORDER_TRANSPARENT)
-
         m_pre = self.mat
         if self.mat is None:
             m_pre = self.il.transform_matrix
@@ -95,7 +89,6 @@ class ImageView(object):
 
         GL.glActiveTexture(GL.GL_TEXTURE0)
         with self.prog, self._tex.on(GL.GL_TEXTURE_2D), self.vao:
-        #with self.prog, self.vao:
             GL.glUniformMatrix3fv(self.mat_loc, 1, True, mat.astype(numpy.float32))
             GL.glUniform1i(self.tex1_loc, 0)
 
