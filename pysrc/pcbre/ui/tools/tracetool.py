@@ -6,7 +6,6 @@ from pcbre.model.artwork import Via
 from pcbre.model.artwork_geom import Trace, Via
 from pcbre.ui.boardviewwidget import QPoint_to_pair
 
-import cv2
 from pcbre.ui.dialogs.settingsdialog import SettingsDialog
 from pcbre.ui.widgets.unitedit import UnitLineEdit, UNIT_GROUP_MM
 from pcbre.view.rendersettings import RENDER_OUTLINES

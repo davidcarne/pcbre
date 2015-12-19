@@ -564,7 +564,7 @@ class TextRender(object):
             # fix line alignment to 1 byte so odd-sized textures load right
             GL.glPixelStorei(GL.GL_UNPACK_ALIGNMENT, 1)
 
-            # Download the data to the buffer. cv2 stores data in BGR format
+            # Download the data to the buffer. 
             GL.glTexImage2D(GL.GL_TEXTURE_2D,
                             0,
                             GL.GL_RED,

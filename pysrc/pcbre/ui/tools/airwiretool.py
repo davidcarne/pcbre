@@ -2,7 +2,6 @@ from pcbre.algo.geom import layer_for
 from pcbre.matrix import Point2
 from pcbre.model.artwork_geom import Airwire
 from pcbre.ui.tools.basetool import BaseTool, BaseToolController
-import cv2
 from PySide import QtGui, QtCore
 from pcbre.view.rendersettings import RENDER_HINT_ONCE
 
