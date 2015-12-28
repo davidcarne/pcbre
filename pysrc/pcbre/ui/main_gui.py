@@ -76,7 +76,7 @@ class MainWindow(QtGui.QMainWindow):
         
         dock = InfoWidget(self.project)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
-        self.subWindowMenu.addAction(dock.toggleViewAction())
+        #self.subWindowMenu.addAction(dock.toggleViewAction())
 
     def createDockWidgets(self):
         self.createLayerSelectionWidget()
@@ -228,57 +228,9 @@ class MainWindow(QtGui.QMainWindow):
     def createMenus(self):
 
 
-        fileMenu = QtGui.QMenu("&File", self)
-        subMenuAdd = fileMenu.addMenu("Add")
-        act = QtGui.QAction("Image", self, triggered=self.addImage)
-        subMenuAdd.addAction(act)
-
-        fileMenu.addSeparator()
-        fileMenu.addAction(self.saveAction)
-        fileMenu.addAction(self.saveAsAction)
-        fileMenu.addSeparator()
-        fileMenu.addAction(self.exitAct)
-
-        def updateCanSave():
-            self.saveAction.setEnabled(self.project.can_save)
-
-        fileMenu.aboutToShow.connect(updateCanSave)
 
         helpMenu = QtGui.QMenu("&Help", self)
 
-        self.viewMenu = QtGui.QMenu("&View", self)
-        self.subWindowMenu = self.viewMenu.addMenu("Sub-Windows")
-        self.viewMenu.addSeparator()
-        self.viewMenu.addAction(self.rotate90L)
-        self.viewMenu.addAction(self.rotate90R)
-        self.viewMenu.addAction(self.flipX)
-        self.viewMenu.addAction(self.flipY)
-        self.viewMenu.addAction(self.permute)
-
-        self.viewMenu.addSeparator()
-        self.viewMenu.addAction(self.rotate90L)
-
-        # Show Imagery Checkbox
-        show_images = QtGui.QAction("Show Imagery", self)
-
-        def change_show_images():
-            self.viewArea.viewState.show_images = show_images.isChecked()
-
-        show_images.setCheckable(True)
-        show_images.setChecked(True)
-        show_images.triggered.connect(change_show_images)
-        self.viewMenu.addAction(show_images)
-
-        # Show Other Images Checkbox
-        other_layers = QtGui.QAction("Show Other Layers artwork", self)
-
-        def change_other_layers():
-            self.viewArea.viewState.draw_other_layers = other_layers.isChecked()
-
-        other_layers.setCheckable(True)
-        other_layers.setChecked(True)
-        other_layers.triggered.connect(change_other_layers)
-        self.viewMenu.addAction(other_layers)
 
         pcbMenu = QtGui.QMenu("&PCB")
         pcbMenu.addAction(self.editStackup)
@@ -298,10 +250,12 @@ class MainWindow(QtGui.QMainWindow):
         pcbMenu.addAction(self.rebuildConnectivity)
 
 
+        from pcbre.ui.menu.file import FileMenu
+        from pcbre.ui.menu.view import ViewMenu
 
-        self.menuBar().addMenu(fileMenu)
+        self.menuBar().addMenu(FileMenu(self))
         self.menuBar().addMenu(helpMenu)
-        self.menuBar().addMenu(self.viewMenu)
+        self.menuBar().addMenu(ViewMenu(self))
 
         self.menuBar().addMenu(pcbMenu)
 
