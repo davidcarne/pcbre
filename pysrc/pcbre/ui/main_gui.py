@@ -266,6 +266,10 @@ def main():
 
     # Actually die on signal
     import signal
+
+    import pcbre.version_checks
+    pcbre.version_checks.check_pkg_versions()
+
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
     ap = argparse.ArgumentParser()
