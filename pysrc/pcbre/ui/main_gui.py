@@ -3,17 +3,54 @@
 from PySide import QtCore, QtGui
 
 import pcbre.model.project as P
-from pcbre.ui.actions.misc import NudgeUpAction, NudgeLeftAction, NudgeDownAction, NudgeRightAction
-from pcbre.ui.actions.pcb import StackupSetupDialogAction, LayerViewSetupDialogAction, RebuildConnectivityAction
+from pcbre.ui.actions.add import AddImageDialogAction
+from pcbre.ui.actions.misc import NudgeUpAction, NudgeLeftAction, NudgeDownAction, NudgeRightAction, \
+    ShowToolSettingsAction
+from pcbre.ui.actions.pcb import RebuildConnectivityAction, LayerViewSetupDialogAction, StackupSetupDialogAction
 from pcbre.ui.actions.save import checkCloseSave
-from pcbre.ui.actions.view import LayerJumpAction
-from pcbre.ui.dialogs.layeralignmentdialog.dialog import LayerAlignmentDialog
+from pcbre.ui.actions.view import LayerJumpAction, FlipXAction, FlipYAction, RotateLAction, CycleDrawOrderAction, \
+    RotateRAction, ToggleShowImageryAction, ToggleDrawOtherLayersAction
 from pcbre.ui.boardviewwidget import BoardViewWidget
 from pcbre.ui.panes.info import InfoWidget
 from pcbre.ui.panes.layerlist import LayerListWidget
 from pcbre.ui.tools.all import TOOLS
 from pcbre.ui.widgets.glprobe import probe
+from pcbre.ui.actions.save import SaveAction, SaveAsDialogAction, ExitAction
 
+
+class MainWindowActions:
+    def __init__(self, window):
+        # File actions
+        self.file_add_image = AddImageDialogAction(window)
+        self.file_save = SaveAction(window)
+        self.file_save_as = SaveAsDialogAction(window)
+        self.file_exit = ExitAction(window)
+
+        # View actions
+        self.view_flip_x = FlipXAction(window)
+        self.view_flip_y = FlipYAction(window)
+        self.view_rotate_l = RotateLAction(window)
+        self.view_rotate_r = RotateRAction(window)
+        self.view_cycle_draw_order = CycleDrawOrderAction(window)
+
+        self.view_toggle_show_imagery = ToggleShowImageryAction(window, window.viewArea)
+        self.view_toggle_draw_other_layers = ToggleDrawOtherLayersAction(window, window.viewArea)
+
+        # PCB Actions
+        self.pcb_stackup_setup_dialog = StackupSetupDialogAction(window)
+        self.pcb_layer_view_setup_dialog = LayerViewSetupDialogAction(window)
+        self.pcb_rebuild_connectivity = RebuildConnectivityAction(window)
+
+        # Invisible actions - don't need to save these
+        for i in range(0, 9):
+            window.addAction(LayerJumpAction(window, i))
+
+        window.addAction(ShowToolSettingsAction(window))
+
+        window.addAction(NudgeUpAction(window))
+        window.addAction(NudgeDownAction(window))
+        window.addAction(NudgeLeftAction(window))
+        window.addAction(NudgeRightAction(window))
 
 class MainWindow(QtGui.QMainWindow):
     def __init__(self, p):
@@ -24,14 +61,14 @@ class MainWindow(QtGui.QMainWindow):
         self.viewArea = BoardViewWidget(self.project)
         self.installEventFilter(self.viewArea)
 
+        self.actions = MainWindowActions(self)
+
         self.setCentralWidget(self.viewArea)
 
-        #self.createActions()
         self.createToolbars()
-        self.createMenus()
+        self.createMenubar()
         self.createDockWidgets()
 
-        self.setupInvisibleActions()
         self.setWindowTitle("PCB Reversing Suite")
 
 
@@ -81,91 +118,30 @@ class MainWindow(QtGui.QMainWindow):
     def createDockWidgets(self):
         self.createLayerSelectionWidget()
 
-    def setupInvisibleActions(self):
-        for i in range(0, 9):
-            self.addAction(LayerJumpAction(self, i))
-
-        def showToolSettings():
-            if self.current_controller:
-                self.current_controller.showSettingsDialog()
-
-        a = QtGui.QAction("raise controls", self, triggered=showToolSettings)
-        a.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Tab))
-        self.addAction(a)
-        
-        self.addAction(NudgeUpAction(self))
-        self.addAction(NudgeDownAction(self))
-        self.addAction(NudgeLeftAction(self))
-        self.addAction(NudgeRightAction(self))
 
     def createViewToolbar(self):
-        flipX = QtGui.QAction("Flip X", self, triggered=lambda: self.viewArea.viewState.flip(0))
-        flipX.setShortcut(QtGui.QKeySequence("f"))
-        flipX.setToolTip('f')
-
-        flipY = QtGui.QAction("Flip Y", self, triggered=lambda: self.viewArea.viewState.flip(1))
-        flipY.setShortcut(QtGui.QKeySequence("shift+f"))
-        flipY.setToolTip('Shift+f')
-
-        def rotater(deg):
-            def _():
-                self.viewArea.viewState.rotate(deg)
-            return _
-
-        self.rotate90L = QtGui.QAction("Rotate 90 (CCW)", self, triggered=rotater(-90))
-        self.rotate90L.setShortcut(QtGui.QKeySequence("ctlr+shift+r"))
-        self.rotate90L.setToolTip("Ctrl+Shift+r")
-
-        self.rotate90R = QtGui.QAction("Rotate 90 (CW)", self, triggered=rotater(90))
-        self.rotate90R.setShortcut(QtGui.QKeySequence("ctrl+r"))
-        self.rotate90R.setToolTip("Ctrl+r")
-
-        self.permute = QtGui.QAction("Cycle Image Draw Order", self, triggered=self.viewArea.viewState.permute_layer_order)
-        self.permute.setShortcut(QtGui.QKeySequence("]"))
-        self.permute.setToolTip("]")
-
         tb = self.addToolBar("View")
-        tb.addAction(flipX)
-        tb.addAction(flipY)
-        tb.addAction(self.rotate90L)
-        tb.addAction(self.rotate90R)
-        tb.addAction(self.permute)
-
-        self.flipX = flipX
-        self.flipY = flipY
-
-
-
-
-
+        tb.addAction(self.actions.view_flip_x)
+        tb.addAction(self.actions.view_flip_y)
+        tb.addAction(self.actions.view_rotate_l)
+        tb.addAction(self.actions.view_rotate_r)
+        tb.addAction(self.actions.view_cycle_draw_order)
 
     def closeEvent(self, evt):
-        return checkCloseSave(self)
+        if checkCloseSave(self):
+            evt.accept()
+        else:
+            evt.ignore()
 
 
-    def createMenus(self):
-        pcbMenu = QtGui.QMenu("&PCB")
-
-        pcbMenu.addAction(StackupSetupDialogAction(self))
-
-        pcbMenu.addAction(LayerViewSetupDialogAction(self))
-
-        from pcbre.ui.menu.imageselectionmenu import ImageSelectionMenu
-
-        pcbMenu.addMenu(ImageSelectionMenu(self))
-
-        pcbMenu.addSeparator()
-
-        pcbMenu.addAction(RebuildConnectivityAction(self))
-
-
+    def createMenubar(self):
         from pcbre.ui.menu.file import FileMenu
         from pcbre.ui.menu.view import ViewMenu
+        from pcbre.ui.menu.pcb import PCBMenu
 
         self.menuBar().addMenu(FileMenu(self))
         self.menuBar().addMenu(ViewMenu(self))
-
-        self.menuBar().addMenu(pcbMenu)
+        self.menuBar().addMenu(PCBMenu(self))
 
 def main():
     import sys
@@ -199,7 +175,7 @@ def main():
 
     app = QtGui.QApplication(sys.argv)
 
-    version = probe()
+    gl_version = probe()
 
     window = MainWindow(p)
     window.show()

@@ -1,6 +1,3 @@
-from pcbre.ui.actions.add import AddImageDialogAction
-from pcbre.ui.actions.save import SaveAction, SaveAsDialogAction, ExitAction
-
 __author__ = 'davidc'
 
 from PySide import QtGui
@@ -14,21 +11,20 @@ class FileMenu(QtGui.QMenu):
         self.__menu_add = self.addMenu("Add")
 
         # TODO: Move the addImage action to the action package
-        self.__menu_add.addAction(AddImageDialogAction(mw))
+        self.__menu_add.addAction(mw.actions.file_add_image)
 
         # Add the rest of the actions
         self.addSeparator()
-        self.__save = SaveAction(mw)
-        self.addAction(self.__save)
-        self.addAction(SaveAsDialogAction(mw))
+        self.addAction(mw.actions.file_save)
+        self.addAction(mw.actions.file_save_as)
         self.addSeparator()
-        self.addAction(ExitAction(mw))
+        self.addAction(mw.actions.file_exit)
 
 
         # the "save" option is disabled if a) the project hasn't changed
         # or b) the save location isn't defined
         def updateCanSave():
-            self.__save.setEnabled(mw.project.can_save)
+            mw.actions.file_save.setEnabled(mw.project.can_save)
 
         # So update the "greyed" state immediately before rendering
         self.aboutToShow.connect(updateCanSave)
