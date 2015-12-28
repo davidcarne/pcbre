@@ -8,7 +8,7 @@ class ToggleShowImageryAction(QtGui.QAction):
         self.setCheckable(True)
 
         self.update_from_prop()
-        self.triggered.connect(self.update_from_prop)
+        self.triggered.connect(self.__set_prop)
 
     def __set_prop(self):
         self.va.viewState.show_images = self.isChecked()
@@ -25,7 +25,7 @@ class ToggleDrawOtherLayersAction(QtGui.QAction):
         self.setCheckable(True)
 
         self.update_from_prop()
-        self.triggered.connect(self.update_from_prop)
+        self.triggered.connect(self.__set_prop)
 
     def __set_prop(self):
         self.va.viewState.draw_other_layers = self.isChecked()

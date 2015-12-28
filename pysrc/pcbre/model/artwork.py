@@ -343,7 +343,7 @@ class Artwork:
 
 
 
-    def compute_connected(self, all_geom):
+    def compute_connected(self, all_geom, progress_cb = lambda x,y:0 ):
         """
         Compute connected sets from all_geom
         :param all_geom:
@@ -356,7 +356,9 @@ class Artwork:
         label_to_geom = defaultdict(set)
         seen = set()
 
+        size = len(qh)
         while qh:
+            progress_cb(size - len(qh), size)
             k = qh.pop()
             label = None
 
@@ -391,8 +393,8 @@ class Artwork:
         return list(label_to_geom.values())
 
 
-    def rebuild_connectivity(self):
-        connectivity = self.compute_connected(self.get_all_artwork())
+    def rebuild_connectivity(self, progress_cb = lambda x,y:0):
+        connectivity = self.compute_connected(self.get_all_artwork(), progress_cb = progress_cb)
 
         # First, for each existing net, we identify which groups are owned by the net
         # and remove the groups having the smaller amounts of geometry (by count)

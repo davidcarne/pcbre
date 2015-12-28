@@ -2,17 +2,17 @@
 
 from PySide import QtCore, QtGui
 
-from pcbre.model.imagelayer import ImageLayer
 import pcbre.model.project as P
+from pcbre.ui.actions.misc import NudgeUpAction, NudgeLeftAction, NudgeDownAction, NudgeRightAction
+from pcbre.ui.actions.pcb import StackupSetupDialogAction, LayerViewSetupDialogAction, RebuildConnectivityAction
+from pcbre.ui.actions.save import checkCloseSave
+from pcbre.ui.actions.view import LayerJumpAction
 from pcbre.ui.dialogs.layeralignmentdialog.dialog import LayerAlignmentDialog
-import pcbre.ui.dialogs.stackupsetup
-import pcbre.ui.dialogs.layerviewsetup
 from pcbre.ui.boardviewwidget import BoardViewWidget
 from pcbre.ui.panes.info import InfoWidget
 from pcbre.ui.panes.layerlist import LayerListWidget
 from pcbre.ui.tools.all import TOOLS
 from pcbre.ui.widgets.glprobe import probe
-from pcbre.ui.widgets.imageselectionmenu import ImageSelectionMenu
 
 
 class MainWindow(QtGui.QMainWindow):
@@ -26,7 +26,7 @@ class MainWindow(QtGui.QMainWindow):
 
         self.setCentralWidget(self.viewArea)
 
-        self.createActions()
+        #self.createActions()
         self.createToolbars()
         self.createMenus()
         self.createDockWidgets()
@@ -81,40 +81,9 @@ class MainWindow(QtGui.QMainWindow):
     def createDockWidgets(self):
         self.createLayerSelectionWidget()
 
-    def save(self):
-        self.project.save()
-
-    def saveAs(self):
-        filename, _ =QtGui.QFileDialog.getSaveFileName(self, "Save project as....", filter="PCBRE Project Files (*.pcbre)")
-        if filename is not None:
-            print("Saving to %s" % filename)
-            self.project.save(filename, update_path=True)
-
-
-    def createActions(self):
-
-
-        self.exitAct = QtGui.QAction("E&xit", self, shortcut="Ctrl+Q",
-                triggered=self.close)
-
-        self.saveAction = QtGui.QAction("Save", self, shortcut="Ctrl+S",
-                triggered=self.save)
-
-        self.saveAsAction = QtGui.QAction("Save-As", self, shortcut="Ctrl+Shift+S",
-                                        triggered=self.saveAs)
-
-        self.editStackup = QtGui.QAction("Edit Stackup", self,
-                triggered=self.doStackupSetup)
-
-        self.rebuildConnectivity = QtGui.QAction("Rebuild Connectivity", self,
-                                         triggered=self.project.artwork.rebuild_connectivity)
-
-        self.editLayerViews = QtGui.QAction("Edit Stackup/Imagery pairing", self,
-                                         triggered=self.doLayerviewSetup)
-
-
     def setupInvisibleActions(self):
-        self.setupLayerSelection()
+        for i in range(0, 9):
+            self.addAction(LayerJumpAction(self, i))
 
         def showToolSettings():
             if self.current_controller:
@@ -123,45 +92,11 @@ class MainWindow(QtGui.QMainWindow):
         a = QtGui.QAction("raise controls", self, triggered=showToolSettings)
         a.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Tab))
         self.addAction(a)
-
-        def nudge(dx, dy):
-            pos = QtGui.QCursor.pos()
-            QtGui.QCursor.setPos(pos.x() + dx, pos.y() + dy)
-
-        a = QtGui.QAction("nudge left", self, triggered=lambda: nudge(-1, 0))
-        a.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Left))
-        self.addAction(a)
-
-        a = QtGui.QAction("nudge right", self, triggered=lambda: nudge(1, 0))
-        a.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Right))
-        self.addAction(a)
-
-        a = QtGui.QAction("nudge up", self, triggered=lambda: nudge(0, -1))
-        a.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Up))
-        self.addAction(a)
-
-        a = QtGui.QAction("nudge down", self, triggered=lambda: nudge(0, 1))
-        a.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Down))
-        self.addAction(a)
-
-
-
-    def setupLayerSelection(self):
-        def _act(arg):
-            selected_layer = arg - 1
-            if selected_layer >= len(self.project.stackup.layers):
-                return
-
-            self.viewArea.viewState.current_layer = self.project.stackup.layers[selected_layer]
-
-        for i in range(0, 10):
-            # Closure
-            def fn(i):
-                a = QtGui.QAction("layer %d" % i, self, triggered=lambda: _act(i))
-                a.setShortcut(QtGui.QKeySequence("%d" % i))
-                self.addAction(a)
-            fn(i)
-
+        
+        self.addAction(NudgeUpAction(self))
+        self.addAction(NudgeDownAction(self))
+        self.addAction(NudgeLeftAction(self))
+        self.addAction(NudgeRightAction(self))
 
     def createViewToolbar(self):
         flipX = QtGui.QAction("Flip X", self, triggered=lambda: self.viewArea.viewState.flip(0))
@@ -201,60 +136,33 @@ class MainWindow(QtGui.QMainWindow):
 
 
 
-    def doStackupSetup(self):
-        dlg = pcbre.ui.dialogs.stackupsetup.StackupSetupDialog(self, self.project)
-        dlg.exec_()
-
-    def doLayerviewSetup(self):
-        dlg = pcbre.ui.dialogs.layerviewsetup.LayerViewSetupDialog(self, self.project)
-        dlg.exec_()
 
 
-    def addImage(self):
-        fname, _ = QtGui.QFileDialog.getOpenFileName(self, "Open Image")
 
-        if not fname:
-            return
-
-        il = ImageLayer.fromFile(self.project, fname)
-
-        # Allow the user to align the image
-        dlg = LayerAlignmentDialog(self, self.project, il)
-        res = dlg.exec_()
-        if res == QtGui.QDialog.Accepted:
-            self.project.imagery.add_imagelayer(il)
+    def closeEvent(self, evt):
+        return checkCloseSave(self)
 
 
     def createMenus(self):
-
-
-
-        helpMenu = QtGui.QMenu("&Help", self)
-
-
         pcbMenu = QtGui.QMenu("&PCB")
-        pcbMenu.addAction(self.editStackup)
-        pcbMenu.addAction(self.editLayerViews)
 
-        lsm = ImageSelectionMenu(self.project)
-        lsm.setTitle("Edit image alignment")
-        def m(action):
-            ly = action.data()
-            dlg = LayerAlignmentDialog(self, self.project, ly)
-            dlg.exec_()
-        lsm.triggered.connect(m)
-        pcbMenu.addMenu(lsm)
+        pcbMenu.addAction(StackupSetupDialogAction(self))
+
+        pcbMenu.addAction(LayerViewSetupDialogAction(self))
+
+        from pcbre.ui.menu.imageselectionmenu import ImageSelectionMenu
+
+        pcbMenu.addMenu(ImageSelectionMenu(self))
+
         pcbMenu.addSeparator()
 
-
-        pcbMenu.addAction(self.rebuildConnectivity)
+        pcbMenu.addAction(RebuildConnectivityAction(self))
 
 
         from pcbre.ui.menu.file import FileMenu
         from pcbre.ui.menu.view import ViewMenu
 
         self.menuBar().addMenu(FileMenu(self))
-        self.menuBar().addMenu(helpMenu)
         self.menuBar().addMenu(ViewMenu(self))
 
         self.menuBar().addMenu(pcbMenu)
