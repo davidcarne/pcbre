@@ -23,7 +23,7 @@ def splitright(node, left, rightheight):
         assert left < node.next.left
 
 
-    newnode = S.SkyLineNode(left, rightheight)
+    newnode = S._SkyLineNode(left, rightheight)
 
     newnode.next = node.next
     node.next = newnode

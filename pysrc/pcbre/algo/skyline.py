@@ -1,10 +1,21 @@
+"""The skyline algorithm is a clean python implementation of the skyline best fit bin packing algorithm.
+(See: http://clb.demon.fi/files/RectangleBinPack.pdf pp 25). It is used in pcbre for packing rectangular sprites into
+textures. An example usage is text-sprite generation"""
+
 import math
+import itertools
+import operator
+
 
 __author__ = 'davidc'
 
-import itertools
-import operator
-class SkyLineNode(object):
+
+class _SkyLineNode(object):
+    """ A set of skyline nodes describe the skyline. They are organized in a singly linked list.
+    Each node has a coordinate (left, height) that describes the upper-left corner edge of a skyline block.
+    The width of the block (which continues at 'height') is implicit to either the 'left' of the next block, or to the
+    width of the area on which the skyline is being run.
+    """
     def __init__(self, left=0, height=0):
         self.left = left
         self.height = height
@@ -14,10 +25,12 @@ class SkyLineNode(object):
     def __repr__(self):
         return "<node: %d,%d>" % (self.left, self.height)
 
-def print_skyline(s):
-    return ", ".join("%d,%d" % (s.left, s.height) for s in node_iter(s))
 
-class StartHeight(object):
+def print_skyline(s):
+    return ", ".join("%d,%d" % (s.left, s.height) for s in _node_iter(s))
+
+
+class _StartHeight(object):
     def __init__(self, startnode, head=False):
         self.height = startnode.height
         self.node = startnode
@@ -50,25 +63,31 @@ class StartHeight(object):
 
     def __repr__(self):
         if self.head:
-            nodes = itertools.takewhile(lambda x: x != self, node_iter(self.next))
+            nodes = itertools.takewhile(lambda x: x != self, _node_iter(self.next))
             return ", ".join("%s height: %d fw:%d" % (s.node, s.height, s.wasted_width) for s in nodes)
         else:
             return  "<%s height: %d fw:%d>" % (self.node, self.height, self.wasted_width)
 
-def node_iter(node):
+def _node_iter(node):
     while node is not None:
         yield node
         node = node.next
 
 class SkyLine(object):
+    """The SkyLine class represents a mutable 'SkyLine' in area (width, height). Initially, the skyline is zero-height.
+    The 'pack' and 'pack_multiple' functions may be used to allocate rectangular areas, and update the skyline.
+
+    The SkyLine class itself does not directly manage any
+    """
     def __init__(self, width, height):
         self.width = width
         self.height = height
 
-        self.first = SkyLineNode()
+        self.first = _SkyLineNode()
 
     def first_iter(self):
-        return node_iter(self.first)
+        """return an iterator that walks the nodes from left to right"""
+        return _node_iter(self.first)
 
     def width(self, node):
         return self.next_left(node) - node.width
@@ -83,7 +102,7 @@ class SkyLine(object):
         node = self.first
 
         for node in self.first_iter():
-            for next_node in node_iter(node.next):
+            for next_node in _node_iter(node.next):
                 if next_node.height != node.height:
                     break
                 node.next = next_node.next
@@ -105,7 +124,7 @@ class SkyLine(object):
             return
 
         # walk the nodes ahead
-        for next in node_iter(node.next):
+        for next in _node_iter(node.next):
 
             # If one of the nodes ahead has left == our splitpoint
             # Then we just adopt the node as our next
@@ -128,7 +147,7 @@ class SkyLine(object):
                     node.next = next
                     return
                 else:
-                    newnode = SkyLineNode(splitpoint, last_height)
+                    newnode = _SkyLineNode(splitpoint, last_height)
                     newnode.next = next
                     node.next = newnode
                     # TODO: This merge shouldn't be needed
@@ -136,7 +155,7 @@ class SkyLine(object):
                     return
             last_height = next.height
 
-        newnode = SkyLineNode(splitpoint, last_height)
+        newnode = _SkyLineNode(splitpoint, last_height)
         newnode.next = None
         node.next = newnode
         self.merge()
@@ -147,9 +166,9 @@ class SkyLine(object):
 
         candidates = []
 
-        fake = SkyLineNode(self.width, self.height)
+        fake = _SkyLineNode(self.width, self.height)
         # left-to-right pass
-        s_h_list = StartHeight(fake, True)
+        s_h_list = _StartHeight(fake, True)
 
         # List with fake node at the end for end-of-list
         # Fake node will always fail-to-pack because
@@ -177,7 +196,7 @@ class SkyLine(object):
 
             # Otherwise, start a new candidate
             if node.height < s_h_list.prev.height:
-                s_h_list.prev.append(StartHeight(node))
+                s_h_list.prev.append(_StartHeight(node))
 
         if len(candidates):
             return sorted(candidates, key=operator.attrgetter("height", "wasted_width"))[0]
