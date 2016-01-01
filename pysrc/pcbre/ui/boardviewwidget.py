@@ -350,8 +350,10 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
         if width == 0 or height == 0:
             return
 
-        GL.glViewport(0, 0, width, height)
-        self.viewState.resize(self.width(), self.height())
+        size = max(width, height)
+
+        GL.glViewport((width - size)// 2, (height - size) // 2, size, size)
+        self.viewState.resize(width, height)
 
         # Allocate a new image buffer
         #self.image = NPBackedImage(self.width(), self.height())

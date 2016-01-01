@@ -96,25 +96,22 @@ class ViewPort(object):
         self.__width = newwidth
         self.__height = newheight
 
-        min_edge = min(self.__width, self.__height)
-
-        xscale = min_edge/float(self.width)
-        yscale = min_edge/float(self.height)
 
         # World to natural device coordinates matrix
         self.__w2ndc = numpy.array([
-                                       [xscale,      0,     0],
-                                       [     0, yscale,     0],
+                                       [     1,      0,     0],
+                                       [     0,      1,     0],
                                        [     0,      0,     1]
                                    ], dtype=numpy.float32)
 
         # Natural device coordinates to viewport matrix
-        xh = self.width/2
-        yh = self.height/2
+        xh = self.__width/2
+        yh = self.__height/2
 
+        rs = max(self.__width, self.__height)/2
         self.__ndc2v = numpy.array([
-            [ xh,   0, xh],
-            [  0, -yh, yh],
+            [ rs,   0, xh],
+            [  0, -rs, yh],
             [  0,   0,  1],
             ])
 
