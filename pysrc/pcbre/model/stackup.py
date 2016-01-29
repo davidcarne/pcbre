@@ -11,6 +11,10 @@ class Layer:
 
         self._project = None
 
+        # Nonpersistent layer number. All layers are renumbered by project
+        # Varies upredictably with database mutations
+        self.number = 0
+
     def __repr__(self):
         return "<Layer name:'%s' order:%s color:%s>" % (self.name,
                                                            self.order,
