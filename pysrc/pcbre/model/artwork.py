@@ -87,10 +87,19 @@ class Artwork:
         self.__components = set()
 
         self.vias = ImmutableSetProxy(self.__vias)
+        self.vias_generation = 0
+
         self.airwires = ImmutableSetProxy(self.__airwires)
+        self.airwires_generation = 0
+
         self.traces = ImmutableSetProxy(self.__traces)
+        self.traces_generation = 0
+
         self.components = ImmutableSetProxy(self.__components)
+        self.components_generation = 0
+
         self.polygons = ImmutableSetProxy(self.__polygons)
+        self.polygons_generation = 0
 
     def add_artwork(self, aw):
         """
@@ -105,12 +114,20 @@ class Artwork:
 
         if isinstance(aw, Trace):
             self.__traces.add(aw)
+            self.traces_generation += 1
+
         elif isinstance(aw, Via):
             self.__vias.add(aw)
+            self.vias_generation += 1
+
         elif isinstance(aw, Polygon):
             self.__polygons.add(aw)
+            self.polygons_generation += 1
+
         elif isinstance(aw, Airwire):
             self.__airwires.add(aw)
+            self.airwires_generation += 1
+
         else:
             raise NotImplementedError()
 
@@ -132,6 +149,8 @@ class Artwork:
         for pad in cmp.get_pads():
             self.__index.insert(pad)
 
+        self.components_generation += 1
+
 
     def merge_component(self, cmp):
         """
@@ -151,6 +170,8 @@ class Artwork:
         self.__index.remove(cmp)
         self.__components.remove(cmp)
 
+        self.components_generation += 1
+
 
     def remove_artwork(self, aw):
         assert aw._project is self.__project
@@ -164,12 +185,20 @@ class Artwork:
 
         if isinstance(aw, Trace):
             self.__traces.remove(aw)
+            self.traces_generation += 1
+
         elif isinstance(aw, Via):
             self.__vias.remove(aw)
+            self.vias_generation += 1
+
         elif isinstance(aw, Polygon):
             self.__polygons.remove(aw)
+            self.polygons_generation += 1
+
         elif isinstance(aw, Airwire):
             self.__airwires.remove(aw)
+            self.airwires_generation += 1
+
         else:
             raise NotImplementedError()
 
@@ -180,7 +209,10 @@ class Artwork:
             for airwire in set(self.__airwires):
                 if intersect(aw, airwire):
                     self.__airwires.remove(airwire)
+                    self.airwires_generation += 1
 
+
+        # If no remaining geometry is on the net, we need to drop it
         n = self.get_geom_for_net(aw_net)
 
         if len(n) == 0:
