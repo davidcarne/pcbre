@@ -2,6 +2,7 @@ from collections import namedtuple
 from pcbre.ui.tools.componenttool.passive import PassiveModel, PassiveEditWidget, Passive_getComponent, PassiveEditFlow
 from pcbre.ui.tools.multipoint import MultipointEditRenderer, DONE_REASON
 from pcbre.ui.widgets.unitedit import UNIT_GROUP_MM
+from pcbre.util import Timer
 from pcbre.view.rendersettings import RENDER_OUTLINES, RENDER_HINT_ONCE
 
 __author__ = 'davidc'
@@ -113,12 +114,16 @@ class ComponentOverlay:
         pass
 
     def render(self, vs):
-        cmp = self.parent.get_component()
-        cmp._project = self.parent.project
-        self.parent.view.render_component(vs.glMatrix, cmp, RENDER_OUTLINES, RENDER_HINT_ONCE)
+        with Timer() as t_get:
+            cmp = self.parent.get_component()
 
-        pr = MultipointEditRenderer(self.parent.flow, self.parent.view)
-        pr.render()
+        cmp._project = self.parent.project
+        with Timer() as t_cmp_render:
+            self.parent.view.render_component(vs.glMatrix, cmp, RENDER_OUTLINES, RENDER_HINT_ONCE)
+
+        with Timer() as t_mp_edit_renderer:
+            pr = MultipointEditRenderer(self.parent.flow, self.parent.view)
+            pr.render()
 
 
 class ComponentController(BaseToolController):

@@ -20,30 +20,45 @@ TRIANGLES_SIZE = (NUM_ENDCAP_SEGMENTS - 1) * 3 * 2 + 3 * 2
 
 FIRST_LINE_LOOP = NUM_ENDCAP_SEGMENTS * 2 + 2
 LINE_LOOP_SIZE = NUM_ENDCAP_SEGMENTS * 2
+
+class _TraceRenderBatch:
+    def __init__(self, parent):
+        self.parent = parent
+
+    def _initializeGL(self):
+        pass
+
 class TraceRender:
     def __init__(self, parent_view):
         self.parent = parent_view
 
         self.restart()
 
-    def initializeGL(self, gls):
+    def __initialize_uniform(self, gls):
         self.__uniform_shader_vao = VAO()
-        self.__attribute_shader_vao = VAO()
-
-        # Load two versions of the shader, one for rendering a single line through uniforms
-        # (no additional bound instance info), and one for rendering instanced geometry
-
         self.__uniform_shader = gls.shader_cache.get("line_vertex_shader","frag1", defines={"INPUT_TYPE":"uniform"})
-        self.__attribute_shader = gls.shader_cache.get("line_vertex_shader","frag1", defines={"INPUT_TYPE":"in"})
 
-        # Generate geometry for trace and endcaps
-        # ptid is a variable with value 0 or 1 that indicates which endpoint the geometry is associated with
+        with self.__uniform_shader_vao, self.trace_vbo:
+            vbobind(self.__uniform_shader, self.trace_vbo.dtype, "vertex").assign()
+            vbobind(self.__uniform_shader, self.trace_vbo.dtype, "ptid").assign()
+            self.index_vbo.bind()
 
+
+    def initializeGL(self, gls):
         # Build trace vertex VBO and associated vertex data
         dtype = [("vertex", numpy.float32, 2), ("ptid", numpy.uint32 )]
         self.working_array = numpy.zeros(NUM_ENDCAP_SEGMENTS * 2 + 2, dtype=dtype)
         self.trace_vbo = VBO(self.working_array, GL.GL_DYNAMIC_DRAW)
+
+        # Generate geometry for trace and endcaps
+        # ptid is a variable with value 0 or 1 that indicates which endpoint the geometry is associated with
         self.__build_trace()
+
+
+        self.__attribute_shader_vao = VAO()
+        self.__attribute_shader = gls.shader_cache.get("line_vertex_shader","frag1", defines={"INPUT_TYPE":"in"})
+
+
 
         # Now we build an index buffer that allows us to render filled geometry from the same
         # VBO.
@@ -68,11 +83,7 @@ class TraceRender:
         arr = numpy.array(arr, dtype=numpy.uint32)
         self.index_vbo = VBO(arr, target=GL.GL_ELEMENT_ARRAY_BUFFER)
 
-        # And bind the entire state together
-        with self.__uniform_shader_vao, self.trace_vbo:
-            vbobind(self.__uniform_shader, self.trace_vbo.dtype, "vertex").assign()
-            vbobind(self.__uniform_shader, self.trace_vbo.dtype, "ptid").assign()
-            self.index_vbo.bind()
+
 
         self.instance_dtype = numpy.dtype([
             ("pos_a", numpy.float32, 2),
@@ -98,6 +109,8 @@ class TraceRender:
             self.__base_rebind(0)
 
             self.index_vbo.bind()
+
+        self.__initialize_uniform(gls)
 
         self.__last_prepared = weakref.WeakKeyDictionary()
 
@@ -223,7 +236,9 @@ class TraceRender:
             # Setup overall calls
             GL.glUniformMatrix3fv(self.__attribute_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
 
-            for (is_selected, is_outline), ranges in draw_range_bins.items():
+            # We order the draw calls such that selected areas are drawn on top of nonselected.
+            sorted_kvs = sorted(draw_range_bins.items(), key=lambda i: i[0][0])
+            for (is_selected, is_outline), ranges in sorted_kvs:
                 if is_selected:
                     color = color_sel
                 else:

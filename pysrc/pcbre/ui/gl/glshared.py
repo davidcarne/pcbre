@@ -1,5 +1,6 @@
 from pcbre.ui.gl.shadercache import ShaderCache
-from pcbre.ui.gl.textrender import SDFTextAtlas, TextRender
+from pcbre.ui.gl.textrender import TextRender
+from pcbre.ui.gl.textatlas import SDFTextAtlas
 import OpenGL.GL as GL
 __author__ = 'davidc'
 

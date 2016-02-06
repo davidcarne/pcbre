@@ -8,6 +8,7 @@ from pcbre.ui.boardviewwidget import QPoint_to_pair
 from pcbre.ui.dialogs.settingsdialog import SettingsDialog
 from pcbre.ui.widgets.unitedit import UnitLineEdit, UNIT_GROUP_MM
 from pcbre.view.rendersettings import RENDER_OUTLINES
+from pcbre.view.viaview import THRenderer
 
 
 class ViaSettingsDialog(SettingsDialog):
@@ -35,6 +36,8 @@ class ViaToolOverlay:
         self.tpm = ctrl.toolparammodel
         self.ctrl = ctrl
 
+        self.render_b = ctrl.view.via_renderer.batch()
+
     def initializeGL(self, gls):
         """
         :type gls: GLShared
@@ -44,8 +47,13 @@ class ViaToolOverlay:
         self.gls = gls
 
     def render(self, viewport):
+        self.render_b.restart()
+
         if self.tpm.current_layer_pair is not None:
-            self.view.via_renderer.deferred(Point2(self.ctrl.x, self.ctrl.y), self.tpm.radius, 0, RENDER_OUTLINES)
+            self.render_b.deferred(Point2(self.ctrl.x, self.ctrl.y), self.tpm.radius, 0, RENDER_OUTLINES)
+
+        self.render_b.prepare()
+        self.render_b.render_outline( viewport.glMatrix)
 
 
 

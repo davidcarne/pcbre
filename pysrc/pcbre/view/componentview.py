@@ -58,18 +58,7 @@ def _text_to(view, pad, r, mat, textcol_a):
     if alpha:
         view.text_batch.submit_text_box(mat, "%s" % pname, r, textcol_a, None)
 
-def __text_name(view, cmp, box):
-    """
 
-    :param view:
-    :param cmp:
-    :type cmp: pcbre.model.component.Component
-    :param box:
-    :return:
-    """
-
-    mat = cmp.matrix
-    mat[0:2,0:2] = view.viewState.glMatrix[0:2,0:2]
 
 
 
@@ -89,15 +78,6 @@ class PadRender:
         self.gls = gls
         self.view = view
         self.text_cache = {}
-
-
-
-    def get_str(self, text):
-        if text not in self.text_cache:
-            self.text_cache[text] = self.gls.text.getString(text)
-
-        return self.text_cache[text]
-
 
 
     def render(self, mat, pad, render_mode=RENDER_STANDARD, render_hint=RENDER_HINT_NORMAL):
@@ -121,14 +101,14 @@ class PadRender:
         if pad.is_through():
             self.parent.via_renderer.deferred(pad.center, pad.l/2, pad.th_diam/2, render_mode, render_hint)
 
-            r = Rect.fromCenterSize(Point2(0,0), pad.l * 0.6, pad.w * 0.6)
+            #r = Rect.fromCenterSize(Point2(0,0), pad.l * 0.6, pad.w * 0.6)
 
-            _text_to(self.view, pad,r, mat, textcol_a)
+            #_text_to(self.view, pad,r, mat, textcol_a)
         else:
             t = pad.trace_repr
             self.parent.trace_renderer.deferred(t, render_mode, render_hint)
-            r = Rect.fromCenterSize(Point2(0,0), pad.l*0.8, pad.w*0.8)
-            _text_to(self.view, pad, r, mat, textcol_a)
+            #r = Rect.fromCenterSize(Point2(0,0), pad.l*0.8, pad.w*0.8)
+            #_text_to(self.view, pad, r, mat, textcol_a)
 
 
 class ComponentRender:
@@ -160,6 +140,7 @@ class ComponentRender:
 
         return r
 
+        self.__text_cache = weakref.WeakKeyDictionary()
     def render(self, mat, cmp, render_mode=RENDER_STANDARD, render_hint=RENDER_HINT_NORMAL):
         group = None
 
