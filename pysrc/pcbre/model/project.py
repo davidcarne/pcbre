@@ -64,7 +64,7 @@ class Stackup(QtCore.QObject):
 
     def __renumber_layers(self):
         for n, i in enumerate(self.__layers):
-            self.__layers[i].number = n
+            i.number = n
 
     def add_layer(self, layer):
         assert not layer._project

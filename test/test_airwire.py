@@ -1,7 +1,6 @@
 from pcbre.matrix import Point2
 from pcbre.model.artwork_geom import Trace, Airwire
 from pcbre.model.project import Project
-from pcbre.ui.widgets.glprobe import _33ProbeWidget
 
 __author__ = 'davidc'
 

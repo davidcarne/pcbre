@@ -1,11 +1,7 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey
 
 import pcbre.model.project as P
-import pcbre.model.imagelayer as IL
 import pcbre.model.stackup as S
-import pcbre.model.artwork as A
 import pcbre.model.imagelayer as IL
-import sqlalchemy as SA
 import unittest
 
 class via_sanity(unittest.TestCase):

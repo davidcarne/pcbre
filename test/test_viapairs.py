@@ -1,4 +1,3 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey
 from pcbre.matrix import Point2
 from pcbre.model.artwork_geom import Via
 from pcbre.model.net import Net
@@ -7,7 +6,6 @@ import pcbre.model.project as P
 import pcbre.model.imagelayer as IL
 import pcbre.model.stackup as S
 import pcbre.model.artwork as A
-import sqlalchemy as SA
 import unittest
 
 class via_sanity(unittest.TestCase):
