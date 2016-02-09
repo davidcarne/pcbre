@@ -36,6 +36,9 @@ class ComponentSettings(MultiAutoSettingsDialog):
     def __init__(self, mdl, ctrl):
         super(ComponentSettings, self).__init__()
 
+        self.resize(550, 700)
+        self.setWindowTitle("Component Settings")
+
         self.mdl = mdl
 
         hfl = QtGui.QFormLayout()

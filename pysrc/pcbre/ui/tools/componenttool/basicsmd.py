@@ -140,16 +140,21 @@ class BasicSMDFlow(MultipointEditFlow):
         self.matrix = translate(self.center.x, self.center.y).dot(rotate(self.__theta))
 
 
-
-
-
-
-
 SYM_4_SQUARE = 0
 SYM_4_RECT = 1
 SYM_2 = 2
 SYM_ARB = 3
 
+PACKAGE_CUSTOM = 0
+PACKAGE_SOIC8 = 1
+PACKAGE_SOIC16 = 2
+
+def text_for_package(package):
+    return {
+        PACKAGE_CUSTOM: "CUSTOM",
+        PACKAGE_SOIC8: "SOIC-8",
+        PACKAGE_SOIC16: "SOIC-16",
+    }[package]
 
 def text_for_sym(sym):
     return {
@@ -183,6 +188,19 @@ class BasicSMDICEditWidget(AutoSettingsWidget):
         super(BasicSMDICEditWidget, self).__init__()
 
         self.mdl = icmdl
+
+# PACKAGE
+        self.packagew = QtGui.QComboBox()
+        packages = [PACKAGE_CUSTOM, PACKAGE_SOIC8, PACKAGE_SOIC16]
+        for r in packages:
+            self.packagew.addItem(text_for_package(r), r)
+
+        self.package = guess_sym(self.mdl.side1_pins, self.mdl.side2_pins, self.mdl.side3_pins, self.mdl.side4_pins)
+        self.packagew.setCurrentIndex(self.package)
+
+        self.layout.addRow("Package", self.packagew)
+        self.packagew.currentIndexChanged.connect(self.package_changed)
+
         # Symmetry
         self.symw = QtGui.QComboBox()
         syms = [SYM_4_SQUARE, SYM_4_RECT, SYM_2, SYM_ARB]
@@ -220,6 +238,9 @@ class BasicSMDICEditWidget(AutoSettingsWidget):
         self.addEdit("(L) Pin PCB contact length", UnitEditable(self.mdl, "pin_contact_length", UNIT_GROUP_MM))
         self.addEdit("(b) Pin PCB contact width", UnitEditable(self.mdl, "pin_contact_width", UNIT_GROUP_MM))
 
+        self.update_package_ena()
+        self.package_value_changed(False)
+
         self.update_sym_ena()
         self.sym_value_changed(False)
 
@@ -227,6 +248,29 @@ class BasicSMDICEditWidget(AutoSettingsWidget):
         self.sym = idx
         self.update_sym_ena()
         self.sym_value_changed(False)
+
+    def package_changed(self, idx):
+        self.package = idx
+        self.update_package_ena()
+        self.package_value_changed(False)
+
+    def update_package_ena(self):
+        self.pincw.widget.setEnabled(self.package in [PACKAGE_CUSTOM])
+        self.s1pw.widget.setEnabled(self.package in [PACKAGE_CUSTOM])
+        self.s2pw.widget.setEnabled(self.package in [PACKAGE_CUSTOM])
+        self.s3pw.widget.setEnabled(self.package in [PACKAGE_CUSTOM])
+        self.s4pw.widget.setEnabled(self.package in [PACKAGE_CUSTOM])
+
+    def package_value_changed(self, is_pinc=False):
+        if self.package == PACKAGE_SOIC8:
+            self.s2pw.value = self.s1pw.value = 4
+            self.s4pw.value = self.s3pw.value = 0
+            self.pincw.value = 8
+        elif self.package == PACKAGE_SOIC16:
+            self.s2pw.value = self.s1pw.value = 8
+            self.s4pw.value = self.s3pw.value = 0
+            self.pincw.value = 16
+
 
     def update_sym_ena(self):
         self.pincw.widget.setEnabled(self.sym in [SYM_2, SYM_4_SQUARE])
