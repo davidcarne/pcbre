@@ -37,7 +37,7 @@ class ShaderCache(object):
             byte_str = pkg_resources.resource_string('pcbre.resources', "shaders/%s.glsl" % name)
             return byte_str.decode('ascii')
 
-    def get(self, vert_name, frag_name, defines={}, vertex_defines={}, fragment_defines={}):
+    def get(self, vert_name, frag_name, defines={}, vertex_defines={}, fragment_defines={}, fragment_bindings={}):
 
         _fragment_defines={}
         _fragment_defines.update(fragment_defines)
@@ -64,7 +64,7 @@ class ShaderCache(object):
             try:
                 frag = compileShader([frag_version, frag_prepend, frag1s], GL.GL_FRAGMENT_SHADER)
                 vert = compileShader([vert_version, vert_prepend, vert1s], GL.GL_VERTEX_SHADER)
-                obj = compileProgram(vert, frag)
+                obj = compileProgram([vert, frag], fragment_bindings)
             except RuntimeError as e:
                 msg, shader, _ = e.args
                 print("During Shader Compilation: ", msg)

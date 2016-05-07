@@ -100,11 +100,14 @@ class EnhShaderProgram(ShaderProgram):
         if len(self._attribs_to_be):
             raise UnboundAttributeException(", ".join(self._uniforms_to_be))
 
-def compileProgram(*shaders):
+def compileProgram(shaders, frag_bindings):
     program = GL.glCreateProgram()
 
     for shader in shaders:
         GL.glAttachShader(program, shader)
+
+    for name, value in frag_bindings.items():
+        GL.glBindFragDataLocation(program, value, name)
 
     program = EnhShaderProgram( program )
 
