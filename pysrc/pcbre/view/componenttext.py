@@ -27,7 +27,7 @@ class ComponentTextBatcher:
         self.__top_side_labels.initializeGL()
         self.__bottom_side_labels.initializeGL()
 
-    def __needs_rebuild(self):
+    def needs_rebuild(self, update=False):
         needs_rebuild = False
         # Check if we need to rebuild component text
         if self.__project.artwork.components_generation != self.__last_generation:
@@ -42,15 +42,15 @@ class ComponentTextBatcher:
         if math.acos(round(float(ltor_unit_vector.dot(self.__ltor_vector)), 8)) > 0.01:
             needs_rebuild = True
 
-
-        self.__up_vector = up_unit_vector
-        self.__ltor_vector = ltor_unit_vector
-        self.__last_generation = self.__project.artwork.components_generation
+        if update:
+            self.__up_vector = up_unit_vector
+            self.__ltor_vector = ltor_unit_vector
+            self.__last_generation = self.__project.artwork.components_generation
 
         return needs_rebuild
 
     def update_if_necessary(self):
-        if not self.__needs_rebuild():
+        if not self.needs_rebuild(update=True):
             return
 
         components = self.__project.artwork.components

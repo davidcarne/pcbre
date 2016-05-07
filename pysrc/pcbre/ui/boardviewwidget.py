@@ -17,7 +17,7 @@ from pcbre.model.passivecomponent import PassiveComponent, PassiveSymType, Passi
 from pcbre.model.smd4component import SMD4Component
 from pcbre.model.stackup import Layer
 
-from pcbre.ui.gl import vbobind
+from pcbre.ui.gl import vbobind, VAO, Texture
 from pcbre.ui.gl.glshared import GLShared
 from pcbre.ui.gl.shadercache import ShaderCache
 from pcbre.ui.gl.textrender import TextBatcher, TextBatch
@@ -27,6 +27,7 @@ from pcbre.view.cachedpolygonrenderer import PolygonVBOPair, CachedPolygonRender
 from pcbre.view.componenttext import ComponentTextBatcher
 from pcbre.view.hairlinerenderer import HairlineRenderer
 from pcbre.view.imageview import ImageView
+from pcbre.view.layer_render_target import RenderLayer, CompositeManager
 from pcbre.view.rendersettings import RENDER_OUTLINES, RENDER_STANDARD, RENDER_SELECTED, RENDER_HINT_NORMAL, \
     RENDER_HINT_ONCE
 from pcbre.view.traceview import TraceRender
@@ -324,6 +325,8 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
                 self.interactionDelegate.mouseWheelEvent(event)
 
     def initializeGL(self):
+        assert not self.__gl_initialized
+
         self.__gl_initialized = True
 
         GL.glClearColor(0,0,0,1)
@@ -397,11 +400,22 @@ class BoardViewWidget(BaseViewWidget):
         self.hairline_renderer = HairlineRenderer(self)
         self.passive_renderer = PassiveRender(self)
 
+
+        self.compositor = CompositeManager()
+
         # Initial view is a normalized 1-1-1 area.
         # Shift to be 10cm max
         self.viewState.transform = translate(-0.9, -0.9).dot(scale(1./100000))
 
 
+        self.__deferred_last_text = False
+
+
+
+    def resizeGL(self, width, height):
+        super(BoardViewWidget, self).resizeGL(width, height)
+
+        self.compositor.resize(width, height)
 
     def text_color(self):
         return [1,1,1]
@@ -448,8 +462,18 @@ class BoardViewWidget(BaseViewWidget):
         self.poly_renderer.initializeGL()
         self.hairline_renderer.initializeGL()
 
+        self.compositor.initializeGL(self.gls, self.width(), self.height())
+
         for i in list(self.image_view_cache.values()):
             i.initGL()
+
+        self.XX = 0
+
+
+
+
+
+
 
     def getVisibleArtwork(self):
         objects = []
@@ -495,9 +519,27 @@ class BoardViewWidget(BaseViewWidget):
     def layer_visible_m(self, l):
         return self.viewState.current_layer in l or self.viewState.draw_other_layers
 
-    def render(self):
-        t_render_start = time.time()
+    def render_mode_trace(self):
+        with self.compositor.composite_prebind() as pb:
+            pb.composite(0, (255, 255, 0, 0))
 
+
+    def render_mode_cad(self):
+        l0 = self.compositor.get(0)
+
+        GL.glBindTexture(GL.GL_TEXTURE_2D, l0.info_texture)
+        WW = 10
+        HH = 10
+        GL.glTexSubImage2D(GL.GL_TEXTURE_2D, 0, 1, 1, WW, HH, GL.GL_RG_INTEGER, GL.GL_UNSIGNED_BYTE,
+                           [(255,0)] * WW * HH)
+
+        GL.glTexSubImage2D(GL.GL_TEXTURE_2D, 0, 15, 10, WW, HH, GL.GL_RG_INTEGER, GL.GL_UNSIGNED_BYTE,
+                           [(255,2)] * WW * HH)
+
+        return [0]
+
+    def render(self):
+        # Update the layer-visible check
         self.__layer_visible_lut = [self._layer_visible(i) for i in self.project.stackup.layers]
 
         # zero accuum buffers for restarts
@@ -506,10 +548,42 @@ class BoardViewWidget(BaseViewWidget):
         self.poly_renderer.restart()
         self.hairline_renderer.restart()
 
+        # Update the Compositor
+        self.compositor.restart()
+
+        # Fill colors
+        self.compositor.set_color_table(
+            [(255,255,255,255),(255,0,0,255),(0,255,0,255),(0,0,255,255),(255,255,0, 255),(255,0,255,255),(0,255,255,255)]
+        )
+
+        # Fake some data on the layer
+
+
 
         # Two view modes - CAM and trace
         # CAM -  all layers, SIDE-up
         # Trace - current layer + artwork (optional, other layers underneath)
+
+        # Setup HAX
+        MODE_CAD = 0
+        MODE_TRACE = 1
+        self.render_mode = MODE_CAD
+
+        if self.render_mode == MODE_CAD:
+            # Render layer stack bottom to top
+            self.render_mode_cad()
+
+        elif self.render_mode == MODE_TRACE:
+            # Render a single layer for maximum contrast
+            self.render_mode_trace()
+
+        # Render the background
+
+
+        # Render the UI overlay
+        with self.compositor.composite_prebind() as pb:
+            pb.composite(0, (255, 255, 0, 0))
+
 
         stackup_layer = self.viewState.current_layer
         if stackup_layer is None:
@@ -560,6 +634,14 @@ class BoardViewWidget(BaseViewWidget):
                 for i,rs in sx:
                     self.trace_renderer.deferred(i, rs, RENDER_HINT_NORMAL)
 
+        # Text layout is expensive. When we need to do a full text rebuild,
+        # we quickly paint a frame and then do the text rebuild
+        suppress_text = False
+        if self.cmp_text_batch.needs_rebuild():
+            if not self.__deferred_last_text:
+                self.__deferred_last_text = True
+                self.update()
+                suppress_text = True
 
         with Timer() as cmp_timer:
             for cmp in self.project.artwork.components:
@@ -569,7 +651,9 @@ class BoardViewWidget(BaseViewWidget):
                 self.render_component(self.viewState.glMatrix, cmp, render_state)
 
             with Timer() as t_cmp_gen:
-                self.cmp_text_batch.update_if_necessary()
+                if not suppress_text:
+                    self.cmp_text_batch.update_if_necessary()
+                    self.__deferred_last_text = False
 
         with Timer() as other_timer:
             super(BoardViewWidget, self).render()
@@ -605,9 +689,10 @@ class BoardViewWidget(BaseViewWidget):
             # Final rendering
             # Render the non-layer text
             with t_tex_draw:
-                self.cmp_text_batch.render_layer(self.viewState.glMatrix, SIDE.Top, False)
-                self.cmp_text_batch.render_layer(self.viewState.glMatrix, SIDE.Bottom, False)
-                self.text_batch.render()
+                if not suppress_text:
+                    self.cmp_text_batch.render_layer(self.viewState.glMatrix, SIDE.Top, False)
+                    self.cmp_text_batch.render_layer(self.viewState.glMatrix, SIDE.Bottom, False)
+                    self.text_batch.render()
 
             self.hairline_renderer.render_group(self.viewState.glMatrix, None)
 
@@ -615,9 +700,9 @@ class BoardViewWidget(BaseViewWidget):
 
             GL.glFinish()
 
-        all_time = time.time() - t_render_start
-        print("Render time all: %f ot: %f cmp: %f aw: %f (vt %f tr %f) gl: %f (vt: %f tr: %f tex: %f)" % (
-            all_time, other_timer.interval, cmp_timer.interval, t_aw.interval, t_vt_gen.interval, t_tr_gen.interval, gl_draw_timer.interval, t_vt_draw.interval, t_tr_draw.interval, t_tex_draw.interval))
+        #all_time = time.time() - t_render_start
+        #print("Render time all: %f ot: %f cmp: %f aw: %f (vt %f tr %f) gl: %f (vt: %f tr: %f tex: %f)" % (
+        #    all_time, other_timer.interval, cmp_timer.interval, t_aw.interval, t_vt_gen.interval, t_tr_gen.interval, gl_draw_timer.interval, t_vt_draw.interval, t_tr_draw.interval, t_tex_draw.interval))
 
 
 

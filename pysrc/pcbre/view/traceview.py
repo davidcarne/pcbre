@@ -36,7 +36,11 @@ class TraceRender:
 
     def __initialize_uniform(self, gls):
         self.__uniform_shader_vao = VAO()
-        self.__uniform_shader = gls.shader_cache.get("line_vertex_shader","frag1", defines={"INPUT_TYPE":"uniform"})
+        self.__uniform_shader = gls.shader_cache.get(
+                "line_vertex_shader","frag1",
+                defines={"INPUT_TYPE":"uniform"},
+                fragment_bindings={"alpha" : 0, "type": 1}
+        )
 
         with self.__uniform_shader_vao, self.trace_vbo:
             vbobind(self.__uniform_shader, self.trace_vbo.dtype, "vertex").assign()
