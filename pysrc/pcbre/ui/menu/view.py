@@ -14,13 +14,14 @@ class ViewMenu(QtWidgets.QMenu):
 
         self.addSeparator()
 
-        self.addAction(mw.actions.view_toggle_show_imagery)
-        self.addAction(mw.actions.view_toggle_draw_other_layers)
+        self.addAction(mw.actions.view_set_mode_trace)
+        self.addAction(mw.actions.view_set_mode_cad)
 
         def update_sub():
-            mw.actions.view_toggle_show_imagery.update_from_prop()
-            mw.actions.view_toggle_draw_other_layers.update_from_prop()
+            mw.actions.view_set_mode_trace.update_from_prop()
+            mw.actions.view_set_mode_cad.update_from_prop()
 
         self.aboutToShow.connect(update_sub)
+
 
 

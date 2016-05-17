@@ -7,7 +7,7 @@ from pcbre.matrix import Rect, Point2, projectPoint, projectPoints
 from pcbre.model.passivecomponent import PassiveBodyType
 from pcbre.view.rendersettings import RENDER_STANDARD, RENDER_SELECTED, RENDER_HINT_NORMAL, \
     RENDER_HINT_ONCE
-
+from pcbre.view.target_const import COL_CMP_LINE
 
 __author__ = 'davidc'
 
@@ -98,6 +98,8 @@ class PadRender:
             color_a = [1,1,1,1]
 
 
+        return
+
         if pad.is_through():
             self.parent.via_renderer.deferred(pad.center, pad.l/2, pad.th_diam/2, render_mode, render_hint)
 
@@ -141,17 +143,17 @@ class ComponentRender:
         return r
 
         self.__text_cache = weakref.WeakKeyDictionary()
+
     def render(self, mat, cmp, render_mode=RENDER_STANDARD, render_hint=RENDER_HINT_NORMAL):
         group = None
 
-        color = (1, 0, 1)
         if render_hint & RENDER_HINT_ONCE:
             geom = self._build_points(cmp)
             for p1, p2 in geom:
-                self.view.hairline_renderer.deferred(p1, p2, color, group, RENDER_HINT_ONCE)
+                self.view.hairline_renderer.deferred(p1, p2, COL_CMP_LINE, group, RENDER_HINT_ONCE)
         else:
             res = self.__get_cached_reservation(cmp, group)
-            self.view.hairline_renderer.deferred_reservation(res, color, group)
+            self.view.hairline_renderer.deferred_reservation(res, COL_CMP_LINE, group)
 
     def _build_points(self, cmp):
         return []

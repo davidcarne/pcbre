@@ -44,7 +44,8 @@ class CompositeManager:
             i.resize(width, height)
 
         self.__composite_vbo.set_array(self.__get_vbo_data())
-        self.__composite_vbo.copy_data()
+        with self.__composite_vbo:
+            self.__composite_vbo.copy_data()
 
     def restart(self):
         """
@@ -129,8 +130,8 @@ class CompositeManager:
 
         # Create a stub array with the color table data
         array.fill(0)
+        array[:] = (255, 0, 255, 255)
         array[:len(colors)] = colors
-        array[255] = (255, 0, 255, 255)
 
         with self.__texture_colors.on(GL.GL_TEXTURE_1D):
             GL.glTexImage1D(GL.GL_TEXTURE_1D, 0, GL.GL_RGBA, 256, 0, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE,
@@ -149,7 +150,7 @@ class CompositeManager:
         GL.glActiveTexture(GL.GL_TEXTURE1)
         GL.glBindTexture(GL.GL_TEXTURE_1D, self.__texture_colors)
 
-        GL.glBlendFunc(GL.GL_ONE, GL.GL_ZERO)
+        GL.glBlendFunc(GL.GL_ONE, GL.GL_ONE)
         #GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
 
 

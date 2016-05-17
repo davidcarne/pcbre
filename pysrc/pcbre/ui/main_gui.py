@@ -4,12 +4,13 @@ from qtpy import QtCore, QtGui, QtWidgets
 
 import pcbre.model.project as P
 from pcbre.ui.actions.add import AddImageDialogAction
+from pcbre.ui.actions.debug import ToggleDrawBBoxAction, ToggleDrawDebugAction
 from pcbre.ui.actions.misc import NudgeUpAction, NudgeLeftAction, NudgeDownAction, NudgeRightAction, \
     ShowToolSettingsAction
 from pcbre.ui.actions.pcb import RebuildConnectivityAction, LayerViewSetupDialogAction, StackupSetupDialogAction
 from pcbre.ui.actions.save import checkCloseSave
 from pcbre.ui.actions.view import LayerJumpAction, FlipXAction, FlipYAction, RotateLAction, CycleDrawOrderAction, \
-    RotateRAction, ToggleShowImageryAction, ToggleDrawOtherLayersAction
+    RotateRAction, SetModeTraceAction, SetModeCADAction, CycleModeAction
 from pcbre.ui.boardviewwidget import BoardViewWidget
 from pcbre.ui.panes.info import InfoWidget
 from pcbre.ui.panes.layerlist import LayerListWidget
@@ -17,6 +18,11 @@ from pcbre.ui.tools.all import TOOLS
 from pcbre.ui.widgets.glprobe import probe
 from pcbre.ui.actions.save import SaveAction, SaveAsDialogAction, ExitAction
 
+
+class DebugActions:
+    def __init__(self, window):
+        self.debug_draw = ToggleDrawDebugAction(window, window.viewArea)
+        self.debug_draw_bbox = ToggleDrawBBoxAction(window, window.viewArea)
 
 class MainWindowActions:
     def __init__(self, window):
@@ -33,15 +39,16 @@ class MainWindowActions:
         self.view_rotate_r = RotateRAction(window)
         self.view_cycle_draw_order = CycleDrawOrderAction(window)
 
-        self.view_toggle_show_imagery = ToggleShowImageryAction(window, window.viewArea)
-        self.view_toggle_draw_other_layers = ToggleDrawOtherLayersAction(window, window.viewArea)
+        self.view_set_mode_trace = SetModeTraceAction(window, window.viewArea)
+        self.view_set_mode_cad = SetModeCADAction(window, window.viewArea)
+
 
         # PCB Actions
         self.pcb_stackup_setup_dialog = StackupSetupDialogAction(window)
         self.pcb_layer_view_setup_dialog = LayerViewSetupDialogAction(window)
         self.pcb_rebuild_connectivity = RebuildConnectivityAction(window)
 
-        # Invisible actions - don't need to save these
+        # Invisible a)ctions - don't need to save these
         for i in range(0, 9):
             window.addAction(LayerJumpAction(window, i))
 
@@ -51,6 +58,8 @@ class MainWindowActions:
         window.addAction(NudgeDownAction(window))
         window.addAction(NudgeLeftAction(window))
         window.addAction(NudgeRightAction(window))
+
+        window.addAction(CycleModeAction(window, window.viewArea))
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, p):
@@ -62,6 +71,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.installEventFilter(self.viewArea)
 
         self.actions = MainWindowActions(self)
+        self.debug_actions = DebugActions(self)
 
         self.setCentralWidget(self.viewArea)
 
@@ -139,9 +149,14 @@ class MainWindow(QtWidgets.QMainWindow):
         from pcbre.ui.menu.view import ViewMenu
         from pcbre.ui.menu.pcb import PCBMenu
 
+        from pcbre.ui.menu.debug import DebugMenu
+
         self.menuBar().addMenu(FileMenu(self))
         self.menuBar().addMenu(ViewMenu(self))
         self.menuBar().addMenu(PCBMenu(self))
+
+        # TODO: Only show menu if started in debug mode
+        self.menuBar().addMenu(DebugMenu(self))
 
 def main():
     import sys

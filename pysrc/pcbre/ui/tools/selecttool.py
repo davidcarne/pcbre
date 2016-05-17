@@ -1,6 +1,7 @@
 import enum
 from .basetool import BaseTool, BaseToolController
 from pcbre.model.artwork_geom import Trace
+from pcbre.ui.boardviewwidget import MODE_CAD, MODE_TRACE
 from pcbre.model.const import TFF
 from pcbre.ui.boardviewwidget import QPoint_to_pair
 from qtpy import QtCore, QtGui, QtWidgets

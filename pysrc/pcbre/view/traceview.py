@@ -15,6 +15,8 @@ import ctypes
 
 import weakref
 
+from pcbre.view.target_const import COL_LAYER_MAIN, COL_SEL
+
 NUM_ENDCAP_SEGMENTS = 32
 TRIANGLES_SIZE = (NUM_ENDCAP_SEGMENTS - 1) * 3 * 2 + 3 * 2
 
@@ -60,7 +62,7 @@ class TraceRender:
 
 
         self.__attribute_shader_vao = VAO()
-        self.__attribute_shader = gls.shader_cache.get("line_vertex_shader","frag1", defines={"INPUT_TYPE":"in"})
+        self.__attribute_shader = gls.shader_cache.get("line_vertex_shader","basic_fill_frag", defines={"INPUT_TYPE":"in"})
 
 
 
@@ -241,12 +243,11 @@ class TraceRender:
             # We order the draw calls such that selected areas are drawn on top of nonselected.
             sorted_kvs = sorted(draw_range_bins.items(), key=lambda i: i[0][0])
             for (is_selected, is_outline), ranges in sorted_kvs:
-                if is_selected:
-                    color = color_sel
-                else:
-                    color = color_a
 
-                GL.glUniform4f(self.__attribute_shader.uniforms.color, *color)
+                if is_selected:
+                    GL.glUniform4ui(self.__attribute_shader.uniforms.layer_info, 255, COL_SEL, 0, 0)
+                else:
+                    GL.glUniform4ui(self.__attribute_shader.uniforms.layer_info, 255, COL_LAYER_MAIN, 0, 0)
 
                 if has_base_instance:
                     # Many instances backport glDrawElementsInstancedBaseInstance
@@ -287,7 +288,7 @@ class TraceRender:
             GL.glUniform2f(self.__uniform_shader.uniforms.pos_a, trace.p0.x, trace.p0.y)
             GL.glUniform2f(self.__uniform_shader.uniforms.pos_b, trace.p1.x, trace.p1.y)
             GL.glUniformMatrix3fv(self.__uniform_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
-            GL.glUniform4f(self.__uniform_shader.uniforms.color, *color_a)
+            GL.glUniform4ui(self.__attribute_shader.uniforms.layer_info, 255, COL_LAYER_MAIN, 0, 0)
 
             if render_settings & RENDER_OUTLINES:
                 GL.glDrawArrays(GL.GL_LINE_LOOP, 2, NUM_ENDCAP_SEGMENTS * 2)
