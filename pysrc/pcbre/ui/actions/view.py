@@ -1,3 +1,4 @@
+from pcbre.ui.boardviewwidget import MODE_TRACE, MODE_CAD
 from pcbre.ui.icon import Icon
 
 __author__ = 'davidc'
@@ -81,9 +82,9 @@ class CycleDrawOrderAction(QtGui.QAction):
         self.__window.viewArea.viewState.permute_layer_order()
 
 
-class ToggleShowImageryAction(QtGui.QAction):
+class SetModeTraceAction(QtGui.QAction):
     def __init__(self, mw, va):
-        QtGui.QAction.__init__(self, "Show Imagery", mw)
+        QtGui.QAction.__init__(self, "Tracing Mode", mw)
         self.va = va
 
         self.setCheckable(True)
@@ -92,15 +93,15 @@ class ToggleShowImageryAction(QtGui.QAction):
         self.triggered.connect(self.__set_prop)
 
     def __set_prop(self):
-        self.va.viewState.show_images = self.isChecked()
+        self.va.render_mode = MODE_TRACE
 
     def update_from_prop(self):
-        self.setChecked(self.va.viewState.show_images)
+        self.setChecked(self.va.render_mode == MODE_TRACE)
 
 
-class ToggleDrawOtherLayersAction(QtGui.QAction):
+class SetModeCADAction(QtGui.QAction):
     def __init__(self, mw, va):
-        QtGui.QAction.__init__(self, "Show Other Layers artwork", mw)
+        QtGui.QAction.__init__(self, "CAD Mode", mw)
         self.va = va
 
         self.setCheckable(True)
@@ -109,7 +110,27 @@ class ToggleDrawOtherLayersAction(QtGui.QAction):
         self.triggered.connect(self.__set_prop)
 
     def __set_prop(self):
-        self.va.viewState.draw_other_layers = self.isChecked()
+        self.va.render_mode = MODE_CAD
 
     def update_from_prop(self):
-        self.setChecked(self.va.viewState.draw_other_layers)
+        self.setChecked(self.va.render_mode == MODE_CAD)
+
+class CycleModeAction(QtGui.QAction):
+    def __init__(self, mw, va):
+        QtGui.QAction.__init__(self, "Cycle view Mode", mw)
+        self.setShortcut(QtGui.QKeySequence("m"))
+        self.va = va
+
+        self.triggered.connect(self.__cycle)
+
+    def __cycle(self):
+        print("Trigger")
+        mode = self.va.render_mode
+
+        if mode == MODE_CAD:
+            newmode = MODE_TRACE
+        elif mode == MODE_TRACE:
+            newmode = MODE_CAD
+
+        self.va.render_mode = newmode
+

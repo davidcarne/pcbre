@@ -1,6 +1,7 @@
 from collections import defaultdict
 from pcbre.view.rendersettings import RENDER_STANDARD, RENDER_OUTLINES, RENDER_SELECTED, RENDER_HINT_NORMAL, \
     RENDER_HINT_ONCE
+from pcbre.view.target_const import COL_SEL, COL_AIRWIRE
 from pcbre.view.util import get_consolidated_draws_1, get_consolidated_draws
 
 __author__ = 'davidc'
@@ -108,7 +109,7 @@ class HairlineRenderer:
 
     def initializeGL(self):
         self.__dtype = numpy.dtype([('vertex', numpy.float32, 2)])
-        self.__shader = self.__view.gls.shader_cache.get("vert2", "frag1")
+        self.__shader = self.__view.gls.shader_cache.get("basic_fill_vert", "basic_fill_frag")
 
         self.__recurring_draws = HairlineRenderer._RenderData(self.__dtype, self.__shader, GL.GL_STATIC_DRAW)
         self.__once_draws = HairlineRenderer._RenderData(self.__dtype, self.__shader, GL.GL_DYNAMIC_DRAW)
@@ -123,30 +124,29 @@ class HairlineRenderer:
     def new_reservation(self, group):
         return HairlineRenderer._ReservationBuilder(group, self.__recurring_draws.add_point, self.__recurring_draws.last_index(group)//2)
 
-    def deferred(self, p1, p2, color, group, hint=RENDER_HINT_NORMAL):
+    def deferred(self, p1, p2, group, hint=RENDER_HINT_NORMAL):
         if hint & RENDER_HINT_ONCE:
             idx = self.__once_draws.add_point(p1, p2, group)
-            self.__draw_tags_once[group].append((idx, color))
+            self.__draw_tags_once[group].append((idx, COL_SEL))
         else:
             idx = self.__recurring_draws.get_point_index(p1, p2, group)
-            self.__draw_tags_recur[group].append((idx, color))
+            self.__draw_tags_recur[group].append((idx, COL_AIRWIRE))
 
-    def deferred_reservation(self, reservation, color, group):
-        self.__draw_resv[group].append((reservation, color))
+    def deferred_reservation(self, reservation, info, group):
+        self.__draw_resv[group].append((reservation, info))
 
 
     def __render_class(self, offset, tags, reservations=[]):
-        color_batches = defaultdict(list)
-        for idx, color in tags:
-            color_batches[color].append((idx, idx + 1))
+        info_batches = defaultdict(list)
+        for idx, info in tags:
+            info_batches[info].append((idx, idx + 1))
 
-        for reservation, color in reservations:
-            color_batches[color].append((reservation.first, reservation.last + 1))
+        for reservation, info in reservations:
+            info_batches[info].append((reservation.first, reservation.last + 1))
 
-        for color, indicies in color_batches.items():
-            color = tuple(color) + (1,)
+        for info, indicies in info_batches.items():
             batches = get_consolidated_draws(indicies)
-            GL.glUniform4f(self.__shader.uniforms.color, *color)
+            GL.glUniform4ui(self.__shader.uniforms.layer_info, 255, info, 0, 0)
             for first, last in batches:
                 GL.glDrawArrays(GL.GL_LINES, offset + first * 2, (last - first) * 2)
 

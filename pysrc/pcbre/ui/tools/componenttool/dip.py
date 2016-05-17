@@ -127,6 +127,10 @@ class DIPEditFlow(MultipointEditFlow):
     def theta(self):
         return self.__theta
 
+    @theta.setter
+    def theta(self, theta):
+        self.__theta = theta
+
 
 
 class DIPModel(GenModel):

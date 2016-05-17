@@ -1,7 +1,9 @@
 from collections import defaultdict
 from pcbre.model.artwork_geom import Via
+from pcbre.model.component import Component
 from pcbre.view.rendersettings import RENDER_SELECTED, RENDER_OUTLINES, RENDER_HINT_NORMAL
 import weakref
+from pcbre.view.target_const import COL_VIA, COL_SEL, COL_CMP_LINE
 
 __author__ = 'davidc'
 import math
@@ -28,6 +30,7 @@ class ViaBoardBatcher:
         self.__batch_for_vp = {}
         self.__selected_set = set()
         self.__last_via_generation = None
+        self.__last_component_generation = None
 
     def update_if_necessary(self, selection_list):
 
@@ -39,18 +42,23 @@ class ViaBoardBatcher:
         if self.__last_via_generation != self.project.artwork.vias_generation:
             ok = False
 
-        via_sel_list = set(i for i in selection_list if isinstance(i, Via))
+        via_sel_list = set(i for i in selection_list if isinstance(i, (Via, Component)))
+
         if via_sel_list != self.__selected_set:
+            ok = False
+
+        if self.__last_component_generation != self.project.artwork.components_generation:
             ok = False
 
         if ok:
             return
 
         self.__last_via_generation = self.project.artwork.vias_generation
+        self.__last_component_generation = self.project.artwork.components_generation
         self.__selected_set = via_sel_list
 
-        # One batch per via_pair
-        while len(self.batches) < len(self.project.stackup.via_pairs):
+        # One batch per via_pair. We add an extra batch for through-hole pads
+        while len(self.batches) < len(self.project.stackup.via_pairs) + 1:
             self.batches.append(self.renderer.batch())
 
         # Clear the batches and create a new batch<->viapair mapping
@@ -64,11 +72,25 @@ class ViaBoardBatcher:
             self.__batch_for_vp[via.viapair].deferred(via.pt, via.r, 0,
                 RENDER_SELECTED if via in via_sel_list else 0, RENDER_HINT_NORMAL)
 
+        component_batch = self.batches[-1]
+        component_batch.restart()
+        for component in self.project.artwork.components:
+            rf = RENDER_SELECTED if component in selection_list else 0
+            for pad in component.get_pads():
+                if pad.is_through():
+                    component_batch.deferred(pad.center, pad.w/2, pad.th_diam/2, rf)
+
+
+
         for i in self.batches:
             i.prepare()
 
+
     def render_viapair(self, mat, viapair):
         self.__batch_for_vp[viapair].render_filled(mat)
+
+    def render_component_pads(self, mat):
+        self.batches[-1].render_filled(mat)
 
 class _THBatch:
     def __init__(self, parent):
@@ -97,7 +119,6 @@ class _THBatch:
             vbobind(self.parent._filled_shader, self.parent._filled_instance_dtype, "pos", div=1).assign()
             vbobind(self.parent._filled_shader, self.parent._filled_instance_dtype, "r", div=1).assign()
             vbobind(self.parent._filled_shader, self.parent._filled_instance_dtype, "r_inside_frac_sq", div=1).assign()
-            vbobind(self.parent._filled_shader, self.parent._filled_instance_dtype, "color", div=1).assign()
 
         with self.__outline_vao, self.parent._outline_vbo:
             vbobind(self.parent._outline_shader, self.parent._outline_vbo.data.dtype, "vertex").assign()
@@ -112,7 +133,6 @@ class _THBatch:
         with self.__outline_vao, self.outline_instance_vbo:
             vbobind(self.parent._outline_shader, self.parent._outline_instance_dtype, "pos", div=1).assign()
             vbobind(self.parent._outline_shader, self.parent._outline_instance_dtype, "r", div=1).assign()
-            vbobind(self.parent._outline_shader, self.parent._outline_instance_dtype, "color", div=1).assign()
 
     def deferred(self, center, r1, r2, rs, render_hint=RENDER_HINT_NORMAL):
         if rs & RENDER_OUTLINES:
@@ -134,20 +154,31 @@ class _THBatch:
         if count == 0:
             return
 
+        # Array is partitioned into two: selected and nonselected
+        self.__filled_selected_start = 0
+        for center, r1, r2, rs in self.__deferred_list_filled:
+            if not rs & RENDER_SELECTED:
+                self.__filled_selected_start += 1
+
+        idx_nonsel = 0
+        idx_sel = self.__filled_selected_start
+
         # Resize instance data array
-        instance_array = numpy.ndarray(count, dtype = self.parent._filled_instance_dtype)
+        instance_array = numpy.ndarray((count,), dtype = self.parent._filled_instance_dtype)
 
-        color_a = [0.6, 0.6, 0.6, 1]
-
-        for n, (center, r1, r2, rs) in enumerate(self.__deferred_list_filled):
-
-            # HACK, color object
-            color_mod = self.parent.parent.sel_colormod(rs & RENDER_SELECTED, color_a)
-
+        for center, r1, r2, rs in self.__deferred_list_filled:
             # frag shader uses pythag to determine is frag is within
             # shaded area. Precalculate comparison term
             r_frac_sq = (r2 / r1) ** 2
-            instance_array[n] = (center, r1, r_frac_sq, color_mod)
+
+            if rs & RENDER_SELECTED:
+                n = idx_sel
+                idx_sel += 1
+            else:
+                n = idx_nonsel
+                idx_nonsel += 1
+
+            instance_array[n] = (center, r1, r_frac_sq)
 
         self.filled_instance_vbo.data = instance_array
         self.filled_instance_vbo.size = None
@@ -171,17 +202,14 @@ class _THBatch:
         instance_array = numpy.ndarray(count, dtype = self.parent._outline_instance_dtype)
 
         n = 0
+
+
         for center, r1, r2, rs in self.__deferred_list_outline:
-            color_a = [0.6, 0.6, 0.6, 1]
-
-            # HACK, color object
-            color_a = self.parent.parent.sel_colormod(rs & RENDER_SELECTED, color_a)
-
-            instance_array[n] = (center, r1, color_a)
+            instance_array[n] = (center, r1)
             n += 1
 
             if r2 > 0:
-                instance_array[n] = (center, r2, color_a)
+                instance_array[n] = (center, r2)
                 n += 1
 
         self.outline_instance_vbo.data = instance_array
@@ -198,9 +226,19 @@ class _THBatch:
         if self.__filled_count == 0:
             return
 
+
         with self.parent._filled_shader, self.__filled_vao, self.filled_instance_vbo, self.parent._sq_vbo:
             GL.glUniformMatrix3fv(self.parent._filled_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
-            GL.glDrawArraysInstanced(GL.GL_TRIANGLE_STRIP, 0, 4, len(self.__deferred_list_filled))
+
+            print("Count: selected %d unselected %d" % (self.__filled_count - self.__filled_selected_start, self.__filled_selected_start))
+            if self.__filled_selected_start > 0:
+                GL.glUniform1ui(self.parent._filled_shader.uniforms.color, COL_VIA)
+                GL.glDrawArraysInstancedBaseInstance(GL.GL_TRIANGLE_STRIP, 0, 4, self.__filled_selected_start, 0)
+
+            if self.__filled_count - self.__filled_selected_start > 0:
+                GL.glUniform1ui(self.parent._filled_shader.uniforms.color, COL_SEL)
+                GL.glDrawArraysInstancedBaseInstance(GL.GL_TRIANGLE_STRIP, 0, 4,
+                                                     self.__filled_count - self.__filled_selected_start, self.__filled_selected_start)
 
     def render_outline(self, mat):
         if self.__outline_count == 0:
@@ -256,13 +294,11 @@ class THRenderer:
             ("pos", numpy.float32, 2),
             ("r", numpy.float32, 1),
             ("r_inside_frac_sq", numpy.float32, 1),
-            ("color", numpy.float32, 4)
         ])
 
         self._outline_instance_dtype = numpy.dtype([
             ("pos", numpy.float32, 2),
             ("r", numpy.float32, 1),
-            ("color", numpy.float32, 4)
         ])
 
         for i in self.__batches:
