@@ -3,7 +3,7 @@ from pcbre.model.artwork_geom import Airwire
 from pcbre.model.component import Component
 from pcbre.model.const import SIDE
 from pcbre.model.dipcomponent import DIPComponent
-from pcbre.model.passivecomponent import PassiveComponent
+from pcbre.model.passivecomponent import Passive2Component
 from pcbre.model.smd4component import SMD4Component
 from pcbre.view.componentview import dip_border_va, smd_border_va, passive_border_va, cmp_border_va
 from pcbre.view.rendersettings import RENDER_STANDARD, RENDER_OUTLINES, RENDER_SELECTED, RENDER_HINT_NORMAL, \

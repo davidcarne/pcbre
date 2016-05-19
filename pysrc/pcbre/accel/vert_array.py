@@ -13,6 +13,7 @@ size_t vertex_array_clear(struct vertex_array * va);
 size_t vertex_array_size_bytes(struct vertex_array * va);
 void vertex_array_free(struct vertex_array * va);
 void * vertex_array_raw(struct vertex_array * va);
+void vertex_array_concat(struct vertex_array * dest, struct vertex_array * src);
 
 void vertex_xy_array_append(struct vertex_array * va, float x, float y);
 void vertex_xy_array_bench(struct vertex_array * va, size_t count);
@@ -27,7 +28,9 @@ void vertex_xy_array_circle(struct vertex_array * va, float cx, float cy, float 
 void vertex_xy_array_arc(struct vertex_array * va, float cx, float cy, float r, float theta0, float theta1,
     size_t n_step);
 
-int vertex_xy_rgb_offs_r;
+void trace_array_append(struct vertex_array * va, float ax, float ay, float bx, float by, float t);
+
+void via_array_append(struct vertex_array * va, float x, float y, float r, float r_inside);
 """)
 lib = ffi.dlopen("/home/davidc/tmp/py_bench/bench.so")
 
@@ -59,6 +62,9 @@ class VA:
 
     def buffer(self):
         return ffi.buffer(self.raw(), self.size_bytes())
+
+    def extend(self, va):
+        return lib.vertex_array_concat(self._va, va._va)
 
     def __del__(self):
         if self._va is not None:
@@ -93,3 +99,25 @@ class VA_xy(VA):
         Draw a CCW arc starting at theta0 through theta1
         """
         lib.vertex_xy_array_arc(self._va, cx, cy, r, theta0, theta1, n_steps)
+
+
+class VA_thickline(VA):
+    def __init__(self, size):
+        super(VA_thickline, self).__init__(size, 20)
+
+    def add_thickline(self, x0, y0, x1, y1, t):
+        lib.trace_array_append(self._va, x0, y0, x1, y1, t)
+
+    # Convenience function for adding a trace to the thickline draw set
+    def add_trace(self, t):
+        lib.trace_array_append(self._va, t.p0.x, t.p0.y, t.p1.x, t.p1.y, t.thickness/2)
+
+class VA_via(VA):
+    def __init__(self, size):
+        super(VA_via, self).__init__(size, 16)
+
+    def add_donut(self, x, y, r, r_inside=0):
+        lib.via_array_append(self._va, x, y, r, r_inside)
+
+    def add_via(self, via):
+        lib.via_array_append(self._va, via.pt.x, via.pt.y, via.r, 0)

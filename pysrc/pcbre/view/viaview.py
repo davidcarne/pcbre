@@ -1,4 +1,5 @@
 from collections import defaultdict
+from pcbre.accel.vert_array import VA_via
 from pcbre.model.artwork_geom import Via
 from pcbre.model.component import Component
 from pcbre.view.rendersettings import RENDER_SELECTED, RENDER_OUTLINES, RENDER_HINT_NORMAL
@@ -17,6 +18,10 @@ import ctypes
 
 N_OUTLINE_SEGMENTS = 100
 
+class ViaBatch:
+    def __init__(self):
+        self.nonsel = VA_via(1024)
+        self.sel = VA_via(1024)
 
 class ViaBoardBatcher:
     """
@@ -26,8 +31,8 @@ class ViaBoardBatcher:
     def __init__(self, via_renderer, project):
         self.project = project
         self.renderer = via_renderer
-        self.batches = []
-        self.__batch_for_vp = {}
+        self.__batch_for_vp = defaultdict(ViaBatch)
+
         self.__selected_set = set()
         self.__last_via_generation = None
         self.__last_component_generation = None
@@ -57,193 +62,40 @@ class ViaBoardBatcher:
         self.__last_component_generation = self.project.artwork.components_generation
         self.__selected_set = via_sel_list
 
-        # One batch per via_pair. We add an extra batch for through-hole pads
-        while len(self.batches) < len(self.project.stackup.via_pairs) + 1:
-            self.batches.append(self.renderer.batch())
-
         # Clear the batches and create a new batch<->viapair mapping
-        self.__batch_for_vp = {}
-        for i, vp in zip(self.batches, self.project.stackup.via_pairs):
-            i.restart()
-            self.__batch_for_vp[vp] = i
+        self.__batch_for_vp.clear()
 
         # Batch vias by viapair
         for via in self.project.artwork.vias:
-            self.__batch_for_vp[via.viapair].deferred(via.pt, via.r, 0,
-                RENDER_SELECTED if via in via_sel_list else 0, RENDER_HINT_NORMAL)
+            vpb = self.__batch_for_vp[via.viapair]
+            if via in via_sel_list:
+                dest = vpb.sel
+            else:
+                dest = vpb.nonsel
 
-        component_batch = self.batches[-1]
-        component_batch.restart()
+            dest.add_via(via)
+
+        # TODO MOVE
+        component_batch = self.__batch_for_vp["CMP"]
+
         for component in self.project.artwork.components:
-            rf = RENDER_SELECTED if component in selection_list else 0
+            if component in selection_list:
+                dest = component_batch.sel
+            else:
+                dest = component_batch.nonsel
+
             for pad in component.get_pads():
                 if pad.is_through():
-                    component_batch.deferred(pad.center, pad.w/2, pad.th_diam/2, rf)
+                    dest.add_donut(pad.center.x, pad.center.y, pad.w/2, pad.th_diam/2)
 
-
-
-        for i in self.batches:
-            i.prepare()
 
 
     def render_viapair(self, mat, viapair):
-        self.__batch_for_vp[viapair].render_filled(mat)
+        self.renderer._render_filled(mat, self.__batch_for_vp[viapair])
 
     def render_component_pads(self, mat):
-        self.batches[-1].render_filled(mat)
+        self.renderer._render_filled(mat, self.__batch_for_vp["CMP"])
 
-class _THBatch:
-    def __init__(self, parent):
-        self.parent = parent
-        self.restart()
-        self.initialized = False
-
-    def restart(self):
-        self.__deferred_list_filled = []
-        self.__deferred_list_outline = []
-
-    def _initializeGL(self):
-        self.initialized = True
-
-        self.__filled_vao = VAO()
-        self.__outline_vao = VAO()
-
-        with self.__filled_vao, self.parent._sq_vbo:
-            vbobind(self.parent._filled_shader, self.parent._sq_vbo.data.dtype, "vertex").assign()
-
-        # Use a fake array to get a zero-length VBO for initial binding
-        filled_instance_array = numpy.ndarray(0, dtype=self.parent._filled_instance_dtype)
-        self.filled_instance_vbo = VBO(filled_instance_array)
-
-        with self.__filled_vao, self.filled_instance_vbo:
-            vbobind(self.parent._filled_shader, self.parent._filled_instance_dtype, "pos", div=1).assign()
-            vbobind(self.parent._filled_shader, self.parent._filled_instance_dtype, "r", div=1).assign()
-            vbobind(self.parent._filled_shader, self.parent._filled_instance_dtype, "r_inside_frac_sq", div=1).assign()
-
-        with self.__outline_vao, self.parent._outline_vbo:
-            vbobind(self.parent._outline_shader, self.parent._outline_vbo.data.dtype, "vertex").assign()
-
-        # Build instance for outline rendering
-        # We don't have an inner 'r' for this because we just do two instances per vertex
-
-        # Use a fake array to get a zero-length VBO for initial binding
-        outline_instance_array = numpy.ndarray(0, dtype=self.parent._outline_instance_dtype)
-        self.outline_instance_vbo = VBO(outline_instance_array)
-
-        with self.__outline_vao, self.outline_instance_vbo:
-            vbobind(self.parent._outline_shader, self.parent._outline_instance_dtype, "pos", div=1).assign()
-            vbobind(self.parent._outline_shader, self.parent._outline_instance_dtype, "r", div=1).assign()
-
-    def deferred(self, center, r1, r2, rs, render_hint=RENDER_HINT_NORMAL):
-        if rs & RENDER_OUTLINES:
-            self.__deferred_list_outline.append((center, r1, r2, rs))
-        else:
-            self.__deferred_list_filled.append((center, r1, r2, rs))
-
-    def prepare(self):
-        self.__prepare_filled()
-        self.__prepare_outline()
-
-    def __prepare_filled(self):
-        if not self.initialized:
-            self._initializeGL()
-
-        count = len(self.__deferred_list_filled)
-        self.__filled_count = count
-
-        if count == 0:
-            return
-
-        # Array is partitioned into two: selected and nonselected
-        self.__filled_selected_start = 0
-        for center, r1, r2, rs in self.__deferred_list_filled:
-            if not rs & RENDER_SELECTED:
-                self.__filled_selected_start += 1
-
-        idx_nonsel = 0
-        idx_sel = self.__filled_selected_start
-
-        # Resize instance data array
-        instance_array = numpy.ndarray((count,), dtype = self.parent._filled_instance_dtype)
-
-        for center, r1, r2, rs in self.__deferred_list_filled:
-            # frag shader uses pythag to determine is frag is within
-            # shaded area. Precalculate comparison term
-            r_frac_sq = (r2 / r1) ** 2
-
-            if rs & RENDER_SELECTED:
-                n = idx_sel
-                idx_sel += 1
-            else:
-                n = idx_nonsel
-                idx_nonsel += 1
-
-            instance_array[n] = (center, r1, r_frac_sq)
-
-        self.filled_instance_vbo.data = instance_array
-        self.filled_instance_vbo.copied = False
-        self.filled_instance_vbo.bind()
-
-    def __prepare_outline(self):
-        count = 0
-        for center, r1, r2, rs in self.__deferred_list_outline:
-            if r2 == 0:
-                count += 1
-            else:
-                count += 2
-
-        self.__outline_count = count
-        if count == 0:
-            return
-
-
-        # Resize instance data array
-        instance_array = numpy.ndarray(count, dtype = self.parent._outline_instance_dtype)
-
-        n = 0
-
-
-        for center, r1, r2, rs in self.__deferred_list_outline:
-            instance_array[n] = (center, r1)
-            n += 1
-
-            if r2 > 0:
-                instance_array[n] = (center, r2)
-                n += 1
-
-        self.outline_instance_vbo.data = instance_array
-        self.outline_instance_vbo.copied = False
-        self.outline_instance_vbo.bind()
-
-
-    def render(self, mat):
-        self.render_filled(mat)
-        self.render_outline(mat)
-
-    def render_filled(self, mat):
-        if self.__filled_count == 0:
-            return
-
-
-        with self.parent._filled_shader, self.__filled_vao, self.filled_instance_vbo, self.parent._sq_vbo:
-            GL.glUniformMatrix3fv(self.parent._filled_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
-
-            if self.__filled_selected_start > 0:
-                GL.glUniform1ui(self.parent._filled_shader.uniforms.color, COL_VIA)
-                GL.glDrawArraysInstancedBaseInstance(GL.GL_TRIANGLE_STRIP, 0, 4, self.__filled_selected_start, 0)
-
-            if self.__filled_count - self.__filled_selected_start > 0:
-                GL.glUniform1ui(self.parent._filled_shader.uniforms.color, COL_SEL)
-                GL.glDrawArraysInstancedBaseInstance(GL.GL_TRIANGLE_STRIP, 0, 4,
-                                                     self.__filled_count - self.__filled_selected_start, self.__filled_selected_start)
-
-    def render_outline(self, mat):
-        if self.__outline_count == 0:
-            return
-
-        with self.parent._outline_shader, self.__outline_vao, self.outline_instance_vbo, self.parent._sq_vbo:
-            GL.glUniformMatrix3fv(self.parent._outline_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
-            GL.glDrawArraysInstanced(GL.GL_LINE_LOOP, 0, N_OUTLINE_SEGMENTS, self.__outline_count)
 
 class THRenderer:
     def __init__(self, parent_view):
@@ -298,5 +150,66 @@ class THRenderer:
             ("r", numpy.float32, 1),
         ])
 
-        for i in self.__batches:
-            i._initializeGL()
+
+        self.__filled_vao = VAO()
+        self.__outline_vao = VAO()
+
+        with self.__filled_vao, self._sq_vbo:
+            vbobind(self._filled_shader, self._sq_vbo.data.dtype, "vertex").assign()
+
+        # Use a fake array to get a zero-length VBO for initial binding
+        filled_instance_array = numpy.ndarray(0, dtype=self._filled_instance_dtype)
+        self.filled_instance_vbo = VBO(filled_instance_array)
+
+        with self.__filled_vao, self.filled_instance_vbo:
+            vbobind(self._filled_shader, self._filled_instance_dtype, "pos", div=1).assign()
+            vbobind(self._filled_shader, self._filled_instance_dtype, "r", div=1).assign()
+            vbobind(self._filled_shader, self._filled_instance_dtype, "r_inside_frac_sq", div=1).assign()
+
+        with self.__outline_vao, self._outline_vbo:
+            vbobind(self._outline_shader, self._outline_vbo.data.dtype, "vertex").assign()
+
+        # Build instance for outline rendering
+        # We don't have an inner 'r' for this because we just do two instances per vertex
+
+        # Use a fake array to get a zero-length VBO for initial binding
+        outline_instance_array = numpy.ndarray(0, dtype=self._outline_instance_dtype)
+        self.outline_instance_vbo = VBO(outline_instance_array)
+
+        with self.__outline_vao, self.outline_instance_vbo:
+            vbobind(self._outline_shader, self._outline_instance_dtype, "pos", div=1).assign()
+            vbobind(self._outline_shader, self._outline_instance_dtype, "r", div=1).assign()
+
+    def _render_filled(self, mat, va):
+        filled_count = va.sel.count() + va.nonsel.count()
+
+        if not filled_count:
+            return
+
+
+        filled_selected_start = va.nonsel.count()
+
+        self.filled_instance_vbo.set_array(va.nonsel.buffer()[:] + va.sel.buffer()[:])
+
+
+        with self._filled_shader, self.__filled_vao, self.filled_instance_vbo, self._sq_vbo:
+            GL.glUniformMatrix3fv(self._filled_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
+
+            if filled_selected_start > 0:
+                GL.glUniform1ui(self._filled_shader.uniforms.color, COL_VIA)
+                GL.glDrawArraysInstancedBaseInstance(GL.GL_TRIANGLE_STRIP, 0, 4, filled_selected_start, 0)
+
+            if filled_count - filled_selected_start > 0:
+                GL.glUniform1ui(self._filled_shader.uniforms.color, COL_SEL)
+                GL.glDrawArraysInstancedBaseInstance(GL.GL_TRIANGLE_STRIP, 0, 4,
+                                                     filled_count - filled_selected_start, filled_selected_start)
+
+    def render_outline(self, mat, va):
+        raise NotImplementedError()
+
+        if not va.count():
+            return
+
+        with self._outline_shader, self.__outline_vao, self.outline_instance_vbo, self._sq_vbo:
+            GL.glUniformMatrix3fv(self._outline_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
+            GL.glDrawArraysInstanced(GL.GL_LINE_LOOP, 0, N_OUTLINE_SEGMENTS, self.__outline_count)

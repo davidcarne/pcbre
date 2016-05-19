@@ -13,7 +13,7 @@ from pcbre.matrix import scale, translate, Point2, projectPoint
 from pcbre.model.const import SIDE
 from pcbre.model.dipcomponent import DIPComponent
 from pcbre.model.pad import Pad
-from pcbre.model.passivecomponent import PassiveComponent, PassiveSymType, PassiveBodyType
+from pcbre.model.passivecomponent import Passive2Component, PassiveSymType, Passive2BodyType
 from pcbre.model.smd4component import SMD4Component
 from pcbre.model.stackup import Layer, ViaPair
 
@@ -565,7 +565,7 @@ class BoardViewWidget(BaseViewWidget):
 
             with Timer() as t_tr_gen:
                 for i,rs in sx:
-                    self.trace_renderer.deferred(i, rs, RENDER_HINT_NORMAL)
+                    self.trace_renderer.deferred(i, rs)
 
 
     def __render_top_half(self):
@@ -578,18 +578,17 @@ class BoardViewWidget(BaseViewWidget):
             if cmp in self.selectionList:
                 render_state |= RENDER_SELECTED
             self.render_component(self.viewState.glMatrix, cmp, render_state)
-            print(cmp.get_pads()[0].is_through())
 
         # Build all artwork layers
         for n, layer in enumerate(self.project.stackup.layers):
             with self.compositor.get(layer):
 
                 # Draw artwork
-                self.trace_renderer.render_deferred_layer(self.viewState.glMatrix, layer)
 
                 # Draw polygon
                 self.poly_renderer.render(self.viewState.glMatrix, layer)
 
+        self.trace_renderer.render(self.viewState.glMatrix)
 
         for via_pair in self.project.stackup.via_pairs:
             with self.compositor.get(via_pair):

@@ -1,4 +1,5 @@
 from collections import defaultdict
+from pcbre.accel.vert_array import VA_thickline
 from pcbre.view.rendersettings import RENDER_STANDARD, RENDER_OUTLINES, RENDER_SELECTED
 from pcbre.view.util import get_consolidated_draws_1
 
@@ -23,17 +24,40 @@ TRIANGLES_SIZE = (NUM_ENDCAP_SEGMENTS - 1) * 3 * 2 + 3 * 2
 FIRST_LINE_LOOP = NUM_ENDCAP_SEGMENTS * 2 + 2
 LINE_LOOP_SIZE = NUM_ENDCAP_SEGMENTS * 2
 
-class _TraceRenderBatch:
-    def __init__(self, parent):
-        self.parent = parent
 
-    def _initializeGL(self):
-        pass
+def trace_batch_and_draw(view, traces):
+    va = VA_thickline(1024)
+
+    t_by_l = defaultdict(list)
+
+    # Layer batches
+    for i in traces:
+        t_by_l[i.layer].append(i)
+
+    # We build the VA such that each layer may be drawn contiguously
+    layer_meta = {}
+    for layer, traces in t_by_l.items():
+        layer_meta[layer] = va.tell(), len(traces)
+        for t in traces:
+            va.add_trace(t)
+
+    for layer, (first, count) in layer_meta.items():
+        with view.compositor.get(layer):
+            view.trace_renderer.render_va(va, view.viewState.glMatrix, COL_LAYER_MAIN, True,
+                                               first, count)
+
+# TODO: Detect automatically
+has_base_instance = True
+
+class TraceLayer:
+    def __init__(self):
+        self.nonsel = VA_thickline(1024)
+        self.sel = VA_thickline(1024)
 
 class TraceRender:
     def __init__(self, parent_view):
         self.parent = parent_view
-
+        self.__deferred_layer = defaultdict(TraceLayer)
         self.restart()
 
     def __initialize_uniform(self, gls):
@@ -126,8 +150,13 @@ class TraceRender:
         self.__bind_thickness.assign(base)
 
     def restart(self):
-        self.__deferred_layer = defaultdict(list)
         self.__prepared = False
+
+        # Reset all VBOs
+        for v in self.__deferred_layer.values():
+            v.sel.clear()
+            v.nonsel.clear()
+
         self.__needs_rebuild = False
 
     def __build_trace(self):
@@ -151,136 +180,104 @@ class TraceRender:
         self.trace_vbo.set_array(self.working_array)
 
 
-
-    def deferred_multiple(self, trace_settings, render_settings=0):
-        """
-        :param trace_settings: list of traces to draw and the settings for that particular trace
-        :param render_settings:
-        :return:
-        """
-        for t, tr in trace_settings:
-            tr |= render_settings
-            self.deferred(t, tr)
-
-    def deferred(self, trace, render_settings, render_hint):
+    def deferred(self, trace, render_settings):
         assert not self.__prepared
-        self.__deferred_layer[trace.layer].append((trace, render_settings))
-        if trace not in self.__last_prepared:
-            self.__needs_rebuild = True
+        assert not render_settings & RENDER_OUTLINES
 
-    def prepare(self):
-        """
-        :return: Build VBOs and information for rendering pass
-        """
-        self.__prepared = True
+        ls = self.__deferred_layer[trace.layer]
 
-        if not self.__needs_rebuild:
-            return
+        if render_settings & RENDER_SELECTED:
+            dest = ls.sel
+        else:
+            dest = ls.nonsel
 
-        self.__last_prepared = weakref.WeakKeyDictionary()
+        dest.add_thickline(trace.p0.x, trace.p0.y, trace.p1.x, trace.p1.y, trace.thickness/2)
 
-        # Total trace count, across all layers
-        count = sum(len(i) for i in self.__deferred_layer.values())
+    def render(self, mat):
 
-        # Allocate an array of that size
-        instance_array = numpy.ndarray(count, dtype = self.instance_dtype)
 
-        pos = 0
-        for layer, traces in self.__deferred_layer.items():
-            # We reorder the traces to batch them by outline, and net to encourage
-            # maximum draw call length. The rationale is that nets are commonly selected
-            # or may be commonly drawn in different colors.
-            traces = sorted(traces, key=lambda i: (i[1] & RENDER_OUTLINES, id(i[0].net)))
+        # Build and copy VBO. Track draw start/size per layer
+        pos = {}
 
-            for trace, _ in traces:
-                # Now insert into the array
-                instance_array[pos] = (trace.p0, trace.p1, trace.thickness/2)
+        accuum = VA_thickline(1024)
+        for layer, ts in self.__deferred_layer.items():
+            pos[layer, False] = (accuum.tell(), ts.nonsel.count())
+            accuum.extend(ts.nonsel)
 
-                # And memoize where the trace occurs
-                self.__last_prepared[trace] = pos
+        for layer, ts in self.__deferred_layer.items():
+            pos[layer, True] = (accuum.tell(), ts.sel.count())
+            accuum.extend(ts.sel)
 
-                pos += 1
 
         # Force full resend of VBO
+        self.instance_vbo.set_array(accuum.buffer()[:])
         self.instance_vbo.bind()
-        self.instance_vbo.set_array(instance_array)
 
 
-    def render_deferred_layer(self, mat, layer):
-        if not self.__prepared:
-            self.prepare()
-
-        trace_settings = self.__deferred_layer[layer]
-
-        count = len(trace_settings)
-        if count == 0:
-            return
-
-        # key format: is_selected, is_outline
-        draw_bins = defaultdict(list)
-        draw_range_bins = dict()
-
-        # Bin the traces by draw call
-        for t, tr in trace_settings:
-            is_selected = bool(tr & RENDER_SELECTED)
-            is_outline = bool(tr & RENDER_OUTLINES)
-            draw_bins[is_selected, is_outline].append(self.__last_prepared[t])
-
-        # Build draw ranges
-        for key, bin in draw_bins.items():
-            draw_range_bins[key] = get_consolidated_draws_1(draw_bins[key])
-
-
-        # HACK / Fixme: Precalculate selected / nonselected colors
-        color_a = self.parent.color_for_layer(layer) + [1]
-        color_sel = self.parent.sel_colormod(True, color_a)
-
-        has_base_instance = False
         with self.__attribute_shader, self.__attribute_shader_vao:
-            # Setup overall calls
             GL.glUniformMatrix3fv(self.__attribute_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
 
-            # We order the draw calls such that selected areas are drawn on top of nonselected.
-            sorted_kvs = sorted(draw_range_bins.items(), key=lambda i: i[0][0])
-            for (is_selected, is_outline), ranges in sorted_kvs:
+            for layer in self.__deferred_layer:
+                with self.parent.compositor.get(layer):
+                    for selected in (False, True):
+                        first, count = pos[layer, selected]
+                        if not count:
+                            continue
 
-                if is_selected:
-                    GL.glUniform4ui(self.__attribute_shader.uniforms.layer_info, 255, COL_SEL, 0, 0)
-                else:
-                    GL.glUniform4ui(self.__attribute_shader.uniforms.layer_info, 255, COL_LAYER_MAIN, 0, 0)
-
-                if has_base_instance:
-                    # Many instances backport glDrawElementsInstancedBaseInstance
-                    # This is faster than continually rebinding, so support if possible
-                    if not is_outline:
-                        for first, last in ranges:
-                            # filled traces come first in the array
-                            GL.glDrawElementsInstancedBaseInstance(GL.GL_TRIANGLES, TRIANGLES_SIZE, GL.GL_UNSIGNED_INT,
-                                                                   ctypes.c_void_p(0), last - first, first)
-                    else:
-                        for first, last in ranges:
-                            # Then outline traces. We reuse the vertex data for the outside
-                            GL.glDrawArraysInstancedBaseInstance(GL.GL_LINE_LOOP, 2, NUM_ENDCAP_SEGMENTS * 2,
-                                                                 last - first, first)
-                else:
-                    with self.instance_vbo:
-                        if not is_outline:
-                            for first, last in ranges:
-                                # filled traces come first in the array
-                                self.__base_rebind(first)
-                                GL.glDrawElementsInstanced(GL.GL_TRIANGLES, TRIANGLES_SIZE, GL.GL_UNSIGNED_INT,
-                                                                       ctypes.c_void_p(0), last - first)
+                        if selected:
+                            col = COL_SEL
                         else:
-                            for first, last in ranges:
-                                self.__base_rebind(first)
-                                # Then outline traces. We reuse the vertex data for the outside
-                                GL.glDrawArraysInstanced(GL.GL_LINE_LOOP, 2, NUM_ENDCAP_SEGMENTS * 2,
-                                                                     last - first)
+                            col = COL_LAYER_MAIN
+
+                        self.__render_va_inner(col, False, first, count)
+
+
+    def __render_va_inner(self, col, is_outline, first, count):
+        GL.glUniform4ui(self.__attribute_shader.uniforms.layer_info, 255, col, 0, 0)
+
+
+        if has_base_instance:
+            # Many instances backport glDrawElementsInstancedBaseInstance
+            # This is faster than continually rebinding, so support if possible
+            if not is_outline:
+                # filled traces come first in the array
+                GL.glDrawElementsInstancedBaseInstance(GL.GL_TRIANGLES, TRIANGLES_SIZE, GL.GL_UNSIGNED_INT,
+                                                       ctypes.c_void_p(0), count, first)
+            else:
+                # Then outline traces. We reuse the vertex data for the outside
+                GL.glDrawArraysInstancedBaseInstance(GL.GL_LINE_LOOP, 2, NUM_ENDCAP_SEGMENTS * 2,
+                                                     count, first)
+        else:
+            with self.instance_vbo:
+                if not is_outline:
+                    # filled traces come first in the array
+                    self.__base_rebind(first)
+                    GL.glDrawElementsInstanced(GL.GL_TRIANGLES, TRIANGLES_SIZE, GL.GL_UNSIGNED_INT,
+                                               ctypes.c_void_p(0), count)
+                else:
+                    self.__base_rebind(first)
+                    # Then outline traces. We reuse the vertex data for the outside
+                    GL.glDrawArraysInstanced(GL.GL_LINE_LOOP, 2, NUM_ENDCAP_SEGMENTS * 2,
+                                             count)
+
+    def render_va(self, va, mat, col, is_outline=False, first=0, count=None):
+        self.instance_vbo.set_array(va.buffer()[:])
+        self.instance_vbo.bind()
+
+        if count is None:
+            count = va.count() - va.first()
+
+        with self.__attribute_shader, self.__attribute_shader_vao:
+            GL.glUniformMatrix3fv(self.__attribute_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
+
+            self.__render_va_inner(col, is_outline, first, count)
+
+
 
     # Immediate-mode render of a single trace
     # SLOW (at least for bulk-rendering)
-    # Useful for rendering UI elements
-    def render(self, mat, trace, render_settings=RENDER_STANDARD):
+    # Useful for rendering Ua elements
+    def render_OLD(self, mat, trace, render_settings=RENDER_STANDARD):
         with self.__uniform_shader, self.__uniform_shader_vao:
             GL.glUniform1f(self.__uniform_shader.uniforms.thickness, trace.thickness/2)
             GL.glUniform2f(self.__uniform_shader.uniforms.pos_a, trace.p0.x, trace.p0.y)

@@ -5,13 +5,13 @@ uniform mat3 mat;
 INPUT_TYPE vec2 pos_a;
 INPUT_TYPE vec2 pos_b;
 INPUT_TYPE float thickness;
-//uniform vec4 color;
+uniform vec4 color;
 
 
 in vec2 vertex;
 in int ptid;
 
-//out vec4 color_vtx;
+out vec4 color_vtx;
 
 void main(void)
 {
@@ -38,6 +38,6 @@ void main(void)
     vec3 calc = mat * vec3(pos + endcap_r * (thickness * vertex), 1);
     gl_Position = vec4(calc.x, calc.y, 0, 1);
 
-    //color_vtx = color;
+    color_vtx = color;
 }
 

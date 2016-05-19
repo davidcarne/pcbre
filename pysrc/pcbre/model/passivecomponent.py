@@ -1,6 +1,6 @@
 from enum import Enum
-from pcbre.matrix import Vec2, Rect
-from pcbre.model.const import OnSide
+from pcbre.matrix import Vec2, Rect, Point2
+from pcbre.model.const import OnSide, IntersectionClass
 from pcbre.model.pad import Pad
 
 __author__ = 'davidc'
@@ -17,16 +17,21 @@ class PassiveSymType(Enum):
     TYPE_IND  = 3
     TYPE_DIODE = 4
 
-class PassiveBodyType(Enum):
+class Passive2BodyType(Enum):
     CHIP = 0
+    SMD_CAP = 3    # SMD Electrolytic capacitor (pana?)
+
     TH_AXIAL = 1
     TH_RADIAL = 2
+    TH_FLIPPED_CAP = 4 # radial capacitor laid down on its side, with
 
-class PassiveComponent(Component):
+class Passive2Component(Component):
+    ISC = IntersectionClass.NONE
+
     def __init__(self, center, theta, side,
                  sym_type, body_type, pin_d, body_corner_vec, pin_corner_vec,
                  side_layer_oracle=None):
-        super(PassiveComponent, self).__init__(center, theta, side, side_layer_oracle=side_layer_oracle)
+        super(Passive2Component, self).__init__(center, theta, side, side_layer_oracle=side_layer_oracle)
 
         self.sym_type = sym_type
         self.body_type = body_type
@@ -44,7 +49,7 @@ class PassiveComponent(Component):
             return
 
         v = Vec2.fromPolar(0, self.pin_d)
-        td = 1 if self.body_type in (PassiveBodyType.TH_AXIAL, PassiveBodyType.TH_RADIAL) else 0
+        td = 1 if self.body_type in (Passive2BodyType.TH_AXIAL, Passive2BodyType.TH_RADIAL) else 0
 
         if td:
             y = x = self.pin_corner_vec.x *2
@@ -63,16 +68,29 @@ class PassiveComponent(Component):
         return self.__pads
 
     def on_sides(self):
-        return OnSide.One if self.body_type == PassiveBodyType.CHIP else OnSide.Both
+        return OnSide.One if self.body_type == Passive2BodyType.CHIP else OnSide.Both
 
     @property
     def theta_bbox(self):
         l = max(self.pin_d + self.pin_corner_vec.x, self.body_corner_vec.x)
         w = max(self.pin_corner_vec.y, self.body_corner_vec.y)
-        return Rect.fromCenterSize(self.center, l * 2, w * 2)
+        return Rect.fromCenterSize(Point2(0,0), l * 2, w * 2)
 
-    def serializeTo(self, msg):
-        pass
+    def serializeTo(self, pasv_msg):
+        self._serializeTo(pasv_msg.common)
+
+        m = pasv_msg.dip
+        raise NotImplementedError()
+
+
+    @staticmethod
+    def deserialize(project, dip_msg):
+        m = dip_msg.dip
+        cmp = Passive2Component.__new__(Passive2Component)
+        Component.deserializeTo(project, m.common, cmp)
+        raise NotImplementedError()
+        #cmp.__my_init(m.pinCount, m.pinSpace, m.pinWidth, m.padSize, project)
+        return cmp
 
 
 
