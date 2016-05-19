@@ -39,7 +39,7 @@ class TraceRender:
     def __initialize_uniform(self, gls):
         self.__uniform_shader_vao = VAO()
         self.__uniform_shader = gls.shader_cache.get(
-                "line_vertex_shader","frag1",
+                "line_vertex_shader","basic_fill_frag",
                 defines={"INPUT_TYPE":"uniform"},
                 fragment_bindings={"alpha" : 0, "type": 1}
         )
@@ -281,14 +281,12 @@ class TraceRender:
     # SLOW (at least for bulk-rendering)
     # Useful for rendering UI elements
     def render(self, mat, trace, render_settings=RENDER_STANDARD):
-        color_a = self.parent.color_for_trace(trace) + [1]
-        color_a = self.parent.sel_colormod(render_settings & RENDER_SELECTED, color_a)
         with self.__uniform_shader, self.__uniform_shader_vao:
             GL.glUniform1f(self.__uniform_shader.uniforms.thickness, trace.thickness/2)
             GL.glUniform2f(self.__uniform_shader.uniforms.pos_a, trace.p0.x, trace.p0.y)
             GL.glUniform2f(self.__uniform_shader.uniforms.pos_b, trace.p1.x, trace.p1.y)
             GL.glUniformMatrix3fv(self.__uniform_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
-            GL.glUniform4ui(self.__attribute_shader.uniforms.layer_info, 255, COL_LAYER_MAIN, 0, 0)
+            GL.glUniform4ui(self.__uniform_shader.uniforms.layer_info, 255, COL_LAYER_MAIN, 0, 0)
 
             if render_settings & RENDER_OUTLINES:
                 GL.glDrawArrays(GL.GL_LINE_LOOP, 2, NUM_ENDCAP_SEGMENTS * 2)

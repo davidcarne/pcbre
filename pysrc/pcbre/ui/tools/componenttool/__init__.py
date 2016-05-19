@@ -1,9 +1,12 @@
 from collections import namedtuple
+from pcbre.accel.vert_array import VA_xy
 from pcbre.ui.tools.componenttool.passive import PassiveModel, PassiveEditWidget, Passive_getComponent, PassiveEditFlow
 from pcbre.ui.tools.multipoint import MultipointEditRenderer, DONE_REASON
 from pcbre.ui.widgets.unitedit import UNIT_GROUP_MM
 from pcbre.util import Timer
+from pcbre.view.componentview import cmp_border_va, cmp_pad_periph_va
 from pcbre.view.rendersettings import RENDER_OUTLINES, RENDER_HINT_ONCE
+from pcbre.view.target_const import COL_SEL
 
 __author__ = 'davidc'
 
@@ -113,17 +116,26 @@ class ComponentOverlay:
     def initializeGL(self, gls):
         pass
 
-    def render(self, vs):
+    def render(self, vs, compositor):
         with Timer() as t_get:
             cmp = self.parent.get_component()
 
         cmp._project = self.parent.project
-        with Timer() as t_cmp_render:
-            self.parent.view.render_component(vs.glMatrix, cmp, RENDER_OUTLINES, RENDER_HINT_ONCE)
 
-        with Timer() as t_mp_edit_renderer:
-            pr = MultipointEditRenderer(self.parent.flow, self.parent.view)
+        outline = VA_xy(1024)
+        cmp_border_va(outline, cmp)
+        cmp_pad_periph_va(outline, cmp)
+
+
+        pr = MultipointEditRenderer(self.parent.flow, self.parent.view)
+
+        with compositor.get("OVERLAY"):
+            self.parent.view.hairline_renderer.render_va(self.parent.view.viewState.glMatrix, outline, 0, COL_SEL)
             pr.render()
+
+        #batch = self.parent.view.via_renderer.batch()
+        #self.parent.view.render_component(vs.glMatrix, cmp, RENDER_OUTLINES, RENDER_HINT_ONCE)
+
 
 
 class ComponentController(BaseToolController):

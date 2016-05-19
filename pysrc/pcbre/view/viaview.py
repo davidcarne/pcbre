@@ -228,7 +228,6 @@ class _THBatch:
         with self.parent._filled_shader, self.__filled_vao, self.filled_instance_vbo, self.parent._sq_vbo:
             GL.glUniformMatrix3fv(self.parent._filled_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
 
-            print("Count: selected %d unselected %d" % (self.__filled_count - self.__filled_selected_start, self.__filled_selected_start))
             if self.__filled_selected_start > 0:
                 GL.glUniform1ui(self.parent._filled_shader.uniforms.color, COL_VIA)
                 GL.glDrawArraysInstancedBaseInstance(GL.GL_TRIANGLE_STRIP, 0, 4, self.__filled_selected_start, 0)

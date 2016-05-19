@@ -3,8 +3,11 @@ import math
 import weakref
 
 from pcbre import units
-from pcbre.matrix import Rect, Point2, projectPoint, projectPoints
-from pcbre.model.passivecomponent import PassiveBodyType
+from pcbre.matrix import Rect, Point2, projectPoint, projectPoints, Vec2
+from pcbre.model.const import SIDE
+from pcbre.model.dipcomponent import DIPComponent
+from pcbre.model.passivecomponent import PassiveBodyType, PassiveComponent
+from pcbre.model.smd4component import SMD4Component
 from pcbre.view.rendersettings import RENDER_STANDARD, RENDER_SELECTED, RENDER_HINT_NORMAL, \
     RENDER_HINT_ONCE
 from pcbre.view.target_const import COL_CMP_LINE
@@ -64,51 +67,49 @@ def _text_to(view, pad, r, mat, textcol_a):
 
 
 
-class PadRender:
-    def __init__(self, parent_view):
-        self.parent = parent_view
-        pass
+#class PadRender:
+    #def __init__(self, parent_view):
+    #    self.parent = parent_view
+    #    pass
 
-    def initializeGL(self, view, gls):
-        """
-        :type gls: GLShared
-        :param gls:
-        :return:
-        """
-        self.gls = gls
-        self.view = view
-        self.text_cache = {}
-
-
-    def render(self, mat, pad, render_mode=RENDER_STANDARD, render_hint=RENDER_HINT_NORMAL):
-        """
-        :type pad: Pad
-        :param mat:
-        :param pad:
-        :return:
-        """
+    #def initializeGL(self, view, gls):
+    #    """
+    #    :type gls: GLShared
+    #    :param gls:
+    #    :return:
+    #    """
+    #    self.gls = gls
+    #    self.view = view
+    #    self.text_cache = {}
 
 
-        textcol = self.parent.text_color()
-        textcol_a = textcol + [1]
+    #def render(self, mat, pad, render_mode=RENDER_STANDARD, render_hint=RENDER_HINT_NORMAL):
+    #    """
+    #    :type pad: Pad
+    #    :param mat:
+    #    :param pad:
+    #    :return:
+    #    """
 
-        color = self.parent.color_for_pad(pad)
-        color_a = color + [1]
-        if render_mode & RENDER_SELECTED:
-            color_a = [1,1,1,1]
+
+        #textcol = self.parent.text_color()
+        #textcol_a = textcol + [1]
+
+        #color = self.parent.color_for_pad(pad)
+        #color_a = color + [1]
+        #if render_mode & RENDER_SELECTED:
+        #    color_a = [1,1,1,1]
 
 
-        return
-
-        if pad.is_through():
-            self.parent.via_renderer.deferred(pad.center, pad.l/2, pad.th_diam/2, render_mode, render_hint)
+        #if pad.is_through():
+        #    self.parent.via_renderer.deferred(pad.center, pad.l/2, pad.th_diam/2, render_mode, render_hint)
 
             #r = Rect.fromCenterSize(Point2(0,0), pad.l * 0.6, pad.w * 0.6)
 
             #_text_to(self.view, pad,r, mat, textcol_a)
-        else:
-            t = pad.trace_repr
-            self.parent.trace_renderer.deferred(t, render_mode, render_hint)
+        #else:
+        #    t = pad.trace_repr
+        #    self.parent.trace_renderer.deferred(t, render_mode, render_hint)
             #r = Rect.fromCenterSize(Point2(0,0), pad.l*0.8, pad.w*0.8)
             #_text_to(self.view, pad, r, mat, textcol_a)
 
@@ -117,146 +118,92 @@ class ComponentRender:
     def __init__(self, view):
         self.__cache = weakref.WeakKeyDictionary()
         self.view = view
-        self.pr = view.pad_renderer
 
     def initializeGL(self, gls):
         pass
 
-    def __get_cached_reservation(self, cmp, group):
-        try:
-            gd = self.__cache[cmp]
-            return gd[group]
-        except KeyError:
-            pass
-
-        geom = self._build_points(cmp)
-        rb = self.view.hairline_renderer.new_reservation(group)
-        for p1, p2 in geom:
-            rb.add(p1, p2)
-
-        r = rb.finalize()
-        if cmp in self.__cache:
-            self.__cache[cmp][group] = r
-        else:
-            self.__cache[cmp] = {group: r}
-
-        return r
-
-        self.__text_cache = weakref.WeakKeyDictionary()
 
     def render(self, mat, cmp, render_mode=RENDER_STANDARD, render_hint=RENDER_HINT_NORMAL):
         group = None
+        pass
 
-        if render_hint & RENDER_HINT_ONCE:
-            geom = self._build_points(cmp)
-            for p1, p2 in geom:
-                self.view.hairline_renderer.deferred(p1, p2, COL_CMP_LINE, group, RENDER_HINT_ONCE)
-        else:
-            res = self.__get_cached_reservation(cmp, group)
-            self.view.hairline_renderer.deferred_reservation(res, COL_CMP_LINE, group)
 
     def _build_points(self, cmp):
         return []
 
-class PassiveRender(ComponentRender):
-    def _build_points(self, cmp):
-        """
-        :type cmp: pcbre.model.passivecomponent.PassiveComponent
-        :param cmp: 
-        :return:
-        """
-        circ_groups = []
+def passive_border_va(va, cmp):
+    """
+    :type cmp: pcbre.model.passivecomponent.PassiveComponent
+    :type va: pcbre.accel.vert_array.VA_xy
+    :param cmp:
+    :return:
+    """
 
-        if cmp.body_type == PassiveBodyType.CHIP:
-            bx = cmp.body_corner_vec.x
-            by = cmp.body_corner_vec.y
-            circ_groups.append(map(Point2, [(-bx, by), (-bx,-by),(bx,-by),(bx,by) ]))
+    if cmp.body_type == PassiveBodyType.CHIP:
+        bx = cmp.body_corner_vec.x
+        by = cmp.body_corner_vec.y
+        va.add_box(cmp.center.x, cmp.center.y, bx * 2, by * 2, cmp.theta)
 
-        elif cmp.body_type == PassiveBodyType.TH_AXIAL:
-            bx = cmp.body_corner_vec.x
-            by = cmp.body_corner_vec.y
-            circ_groups.append(map(Point2, [(-bx, by), (-bx,-by),(bx,-by),(bx,by)]))
+    elif cmp.body_type == PassiveBodyType.TH_AXIAL:
+        bx = cmp.body_corner_vec.x
+        by = cmp.body_corner_vec.y
+        va.add_box(cmp.center.x, cmp.center.y, bx * 2, by * 2, cmp.theta)
 
-            d = cmp.pin_d - cmp.pin_corner_vec.x
-            print(bx, d)
-            circ_groups.append([Point2(bx, 0), Point2(d, 0)])
-            circ_groups.append([Point2(-bx, 0), Point2(-d, 0)])
+        vec = Vec2(math.cos(cmp.theta), math.sin(cmp.theta))
 
-        elif cmp.body_type == PassiveBodyType.TH_RADIAL:
-            g = []
-            m = cmp.body_corner_vec.mag()
-            for i in range(32):
-                p = Point2.fromPolar(i/16*math.pi, m)
-                g.append(p)
-            circ_groups.append(g)
+        # Add legs
+        pa = cmp.pin_d * vec
+        pb = cmp.pin_corner_vec.x * vec
+        va.add_line( pa.x,  pa.y,  pb.x,  pb.y)
+        va.add_line(-pa.x, -pa.y, -pb.x, -pb.y)
 
-
-        ll = []
-        for group in circ_groups:
-            newpoints = projectPoints(cmp.matrix, group)
-            ll += list(zip(newpoints, newpoints[1:] + newpoints[0:1]))
-        return ll
+    elif cmp.body_type == PassiveBodyType.TH_RADIAL:
+        raise NotImplementedError()
+    else:
+        raise NotImplementedError()
 
 
-class DIPRender(ComponentRender):
-    def _build_points(self, dip):
-        bx = dip.body_width() / 2
-        by = dip.body_length() / 2
+def dip_border_va(va_xy, dip):
+    by = dip.body_length() / 2
 
-        points = []
-        points.extend(projectPoints(dip.matrix, map(Point2, [(-bx, by), (-bx,-by),(bx,-by),(bx,by) ])))
+    r = units.MM
 
-        for i in range(28):
-            theta = -math.pi * i / 27
+    va_xy.add_box(dip.center.x, dip.center.y, dip.body_width(), dip.body_length(), dip.theta)
 
-            points.append(projectPoint(dip.matrix, Point2(math.cos(theta) * units.MM, math.sin(theta) * units.MM + by)))
+    pt_center = projectPoint(dip.matrix, Point2(0, by))
+    va_xy.add_arc(pt_center.x, pt_center.y, r, dip.theta + math.pi, dip.theta, 28)
 
-        return list(zip(points, points[1:] + points[0:1]))
+def smd_border_va(va_xy, smd):
+    #va_xy.add_box()
+    va_xy.add_box(smd.center.x, smd.center.y, smd.dim_2_body, smd.dim_1_body, smd.theta)
 
-class SMDRender(ComponentRender):
+    # Calculate size / position of marker
+    scale = min(smd.dim_1_body, smd.dim_2_body) / 5
+    if scale > units.MM:
+        scale = units.MM
+    if scale < units.MM/5:
+        scale = units.MM/5
 
-    def _build_points(self, smd):
-        lines =  []
-
-        by = smd.dim_1_body/2
-        bx = smd.dim_2_body/2
-
-        corners = [projectPoint(smd.matrix, Point2(t)) for t in [(-bx, by), (-bx,-by),(bx,-by),(bx,by) ]]
-
-        for p1, p2 in  zip(corners, corners[1:] + corners[0:1]):
-            lines.append((p1, p2))
-
-        scale = min(smd.dim_1_body, smd.dim_2_body) / 5
-        if scale > units.MM:
-            scale = units.MM
-        if scale < units.MM/5:
-            scale = units.MM/5
-
-        size = scale/2
-        offs = scale
-        posx = -bx + offs
-        posy = by - offs
-
-        circle_points = []
-
-        circ_center = projectPoint(smd.matrix, Point2(posx, posy))
-
-        for i in range(28):
-            theta = math.pi * 2 * i / 27
-            d = Point2(math.cos(theta) * size, math.sin(theta) * size)
-            circle_points.append(d + circ_center)
+    size = scale/2
+    offs = scale
+    posx = -smd.dim_2_body/2 + offs
+    posy = smd.dim_1_body/2 - offs
 
 
+    pt = projectPoint(smd.matrix, Point2(posx, posy))
+    va_xy.add_circle(pt.x, pt.y, size, 40)
 
-        for p1, p2 in zip(circle_points, circle_points[1:] + circle_points[0:1]):
-            lines.append((p1, p2))
+def cmp_border_va(dest, component):
+    if isinstance(component, DIPComponent):
+        dip_border_va(dest, component)
+    elif isinstance(component, SMD4Component):
+        smd_border_va(dest, component)
+    elif isinstance(component, PassiveComponent):
+        passive_border_va(dest, component)
 
-        return lines
-
-
-
-
-
-
-
-
+def cmp_pad_periph_va(va_xy, component):
+    for i in component.get_pads():
+        if i.is_through():
+            va_xy.add_circle(i.center.x, i.center.y, i.w/2)
+        else:
+            va_xy.add_box(i.center.x, i.center.y, i.w, i.l, i.theta)

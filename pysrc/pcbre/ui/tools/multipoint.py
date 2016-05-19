@@ -1,8 +1,11 @@
 from qtpy import QtCore, QtGui
 from copy import copy, deepcopy
 from enum import Enum
+
+from pcbre.accel.vert_array import VA_xy
 from pcbre.matrix import Point2, Vec2, clip_point_to_rect, Rect
 from pcbre.view.rendersettings import RENDER_HINT_ONCE
+from pcbre.view.target_const import COL_SEL, COL_SET_MARK, COL_UNSET_MARK
 
 __author__ = 'davidc'
 
@@ -73,11 +76,11 @@ class DONE_REASON(Enum):
 
 def _default_color_fn(flow, pt):
     if pt is flow.current_point:
-        return (1,1,1)
+        return COL_SEL
     elif pt.is_set:
-        return (1,0,0)
+        return COL_SET_MARK
     else:
-        return (0.5,0,0)
+        return COL_UNSET_MARK
 
 
 class MultipointEditRenderer:
@@ -96,25 +99,42 @@ class MultipointEditRenderer:
 
     def render(self):
         N=5
+
+        va_unset = VA_xy(1024)
+        va_set= VA_xy(1024)
+        va_current = VA_xy(1024)
+
         corners = list(map(Point2, [(-N,-N), (N, -N), (N, N), (-N, N)]))
 
         for p in self.flow.points:
             if not self.show_fn(p):
                 continue
 
+            # TODO
             color = self.color_fn(self.flow, p)
             p_view = self.view.viewState.tfW2V(p.get())
             #p_view = p.get()
 
+            if color == COL_SET_MARK:
+                dest = va_set
+            elif color == COL_UNSET_MARK:
+                dest = va_unset
+            elif color == COL_SEL:
+                dest = va_current
+            else:
+                raise NotImplementedError()
 
             # Draw crappy cross for now
 
             for pa, pb in zip(corners, corners[1:] + corners[:1]):
-                self.view.hairline_renderer.deferred(p_view + pa,
-                                                     p_view + pb,
-                                                     color,
-                                                     "OVERLAY_VS",
-                                                     RENDER_HINT_ONCE)
+                pa_ = p_view + pa
+                pb_ = p_view + pb
+
+                dest.add_line(pa_.x, pa_.y, pb_.x, pb_.y)
+
+        self.view.hairline_renderer.render_va(self.view.viewState.glWMatrix,va_current,va_current.tell(),COL_SEL)
+        self.view.hairline_renderer.render_va(self.view.viewState.glWMatrix,va_unset, va_unset.tell(),COL_UNSET_MARK)
+        self.view.hairline_renderer.render_va(self.view.viewState.glWMatrix,va_set, va_set.tell(),COL_SET_MARK)
 
 
 class MultipointEditFlow:
