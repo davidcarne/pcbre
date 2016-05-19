@@ -25,7 +25,8 @@ from pcbre.ui.tools.airwiretool import AIRWIRE_COLOR
 from pcbre.util import Timer
 from pcbre.view.cachedpolygonrenderer import PolygonVBOPair, CachedPolygonRenderer
 from pcbre.view.componenttext import ComponentTextBatcher
-from pcbre.view.hairlinerenderer import HairlineRenderer
+from pcbre.view.debugrender import DebugRender
+from pcbre.view.hairlinerenderer import HairlineRenderer, HairlineBatcher
 from pcbre.view.imageview import ImageView
 from pcbre.view.layer_render_target import RenderLayer, CompositeManager
 from pcbre.view.rendersettings import RENDER_OUTLINES, RENDER_STANDARD, RENDER_SELECTED, RENDER_HINT_NORMAL, \
@@ -36,7 +37,7 @@ from pcbre.view.viewport import ViewPort
 from pcbre.model.artwork import Via
 from pcbre.model.artwork_geom import Trace, Via, Polygon, Airwire
 import pcbre.matrix as M
-from pcbre.view.componentview import PadRender, DIPRender, SMDRender, PassiveRender
+#from pcbre.view.componentview import DIPRender, SMDRender, PassiveRender
 from pcbre.ui.gl import VAO, vbobind, glimports as GLI
 
 
@@ -358,9 +359,9 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
 
 
 
-    def render(self):
+    def render_tool(self):
         if self.interactionDelegate and self.interactionDelegate.overlay:
-            self.interactionDelegate.overlay.render(self.viewState)
+            self.interactionDelegate.overlay.render(self.viewState, self.compositor)
 
 
 
@@ -383,13 +384,17 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
 class BoardViewWidget(BaseViewWidget):
     def __init__(self, project):
         BaseViewWidget.__init__(self)
+        self.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.project = project
 
         self.image_view_cache = { }
 
-        self.pad_renderer = PadRender(self)
-        self.dip_renderer = DIPRender(self)
-        self.smd_renderer = SMDRender(self)
+        #self.pad_renderer = PadRender(self)
+
+        #self.dip_renderer = DIPRender(self)
+        #self.smd_renderer = SMDRender(self)
+        #self.passive_renderer = PassiveRender(self)
+
         self.trace_renderer = TraceRender(self)
         self.via_renderer = THRenderer(self)
         self.__via_project_batch = ViaBoardBatcher(self.via_renderer, self.project)
@@ -399,7 +404,12 @@ class BoardViewWidget(BaseViewWidget):
 
         self.poly_renderer = CachedPolygonRenderer(self)
         self.hairline_renderer = HairlineRenderer(self)
-        self.passive_renderer = PassiveRender(self)
+
+
+        self.hairline_batcher = HairlineBatcher(self.hairline_renderer, self.project)
+
+
+        self.debug_renderer = DebugRender(self)
 
 
         self.compositor = CompositeManager()
@@ -414,8 +424,6 @@ class BoardViewWidget(BaseViewWidget):
         self.render_mode = MODE_CAD
 
 
-        self.debug_draw = False
-        self.debug_draw_bbox = False
 
 
 
@@ -459,15 +467,14 @@ class BoardViewWidget(BaseViewWidget):
         return self.image_view_cache[key]
 
     def reinit(self):
-        self.pad_renderer.initializeGL(self, self.gls)
-        self.dip_renderer.initializeGL(self.gls)
-        self.smd_renderer.initializeGL(self.gls)
+        #self.pad_renderer.initializeGL(self, self.gls)
         self.trace_renderer.initializeGL(self.gls)
         self.via_renderer.initializeGL(self.gls)
         self.text_batch.initializeGL()
         self.cmp_text_batch.initializeGL()
         self.poly_renderer.initializeGL()
         self.hairline_renderer.initializeGL()
+        self.debug_renderer.initializeGL(self.gls)
 
         self.compositor.initializeGL(self.gls, self.width(), self.height())
 
@@ -495,26 +502,26 @@ class BoardViewWidget(BaseViewWidget):
         if not self.layer_visible_m(cmp.on_layers()):
             return
 
-        if isinstance(cmp, DIPComponent):
-            self.dip_renderer.render(mat, cmp, render_mode, render_hint)
-        elif isinstance(cmp, SMD4Component):
-            self.smd_renderer.render(mat, cmp, render_mode, render_hint)
-        elif isinstance(cmp, PassiveComponent):
-            self.passive_renderer.render(mat, cmp, render_mode, render_hint)
-        else:
-            pass
+        #if isinstance(cmp, DIPComponent):
+        #    self.dip_renderer.render(mat, cmp, render_mode, render_hint)
+        #elif isinstance(cmp, SMD4Component):
+        #    self.smd_renderer.render(mat, cmp, render_mode, render_hint)
+        #elif isinstance(cmp, PassiveComponent):
+        #    self.passive_renderer.render(mat, cmp, render_mode, render_hint)
+        #else:
+        #    pass
             #raise TypeError("Can't render %s" % cmp)
 
-        cm = mat.dot(cmp.matrix)
+        #cm = mat.dot(cmp.matrix)
 
-        for pad in cmp.get_pads():
-            pad_render_mode = render_mode
-            if not pad.is_through() and not self.layer_visible(pad.layer):
-                continue
+        #for pad in cmp.get_pads():
+            #pad_render_mode = render_mode
+            #if not pad.is_through() and not self.layer_visible(pad.layer):
+            #    continue
 
-            if pad in self.selectionList:
-                pad_render_mode |= RENDER_SELECTED
-            self.pad_renderer.render(cm, pad, pad_render_mode, render_hint)
+            #if pad in self.selectionList:
+            #    pad_render_mode |= RENDER_SELECTED
+            #self.pad_renderer.render(cm, pad, pad_render_mode, render_hint)
 
 
     def _layer_visible(self, l):
@@ -541,15 +548,14 @@ class BoardViewWidget(BaseViewWidget):
 
                 elif isinstance(i, Polygon):
                         self.poly_renderer.deferred(i, rs, RENDER_HINT_NORMAL)
-                elif isinstance(i, Airwire):
-                    self.hairline_renderer.deferred(i.p0, i.p1, None, RENDER_HINT_NORMAL)
-                elif isinstance(i, Via):
+                elif isinstance(i, (Via, Airwire)):
                     pass
                 else:
                     raise NotImplementedError()
 
             with Timer() as t_vt_gen:
                 self.__via_project_batch.update_if_necessary(self.selectionList)
+                self.hairline_batcher.update_if_necessary(self.selectionList, self.__layer_visible_lut)
 
 
             with Timer() as t_tr_gen:
@@ -567,6 +573,7 @@ class BoardViewWidget(BaseViewWidget):
             if cmp in self.selectionList:
                 render_state |= RENDER_SELECTED
             self.render_component(self.viewState.glMatrix, cmp, render_state)
+            print(cmp.get_pads()[0].is_through())
 
         # Build all artwork layers
         for n, layer in enumerate(self.project.stackup.layers):
@@ -574,8 +581,6 @@ class BoardViewWidget(BaseViewWidget):
 
                 # Draw artwork
                 self.trace_renderer.render_deferred_layer(self.viewState.glMatrix, layer)
-
-                self.hairline_renderer.render_group(self.viewState.glMatrix, layer)
 
                 # Draw polygon
                 self.poly_renderer.render(self.viewState.glMatrix, layer)
@@ -591,13 +596,22 @@ class BoardViewWidget(BaseViewWidget):
         with l0:
             self.__via_project_batch.render_component_pads(self.viewState.glMatrix)
 
-        l0 = self.compositor.get("OVERLAY")
+        l0 = self.compositor.get("LINEART_FS")
         with l0:
-            self.hairline_renderer.render_group(self.viewState.glMatrix, None)
-            self.hairline_renderer.render_group(self.viewState.glWMatrix, "OVERLAY_VS")
+            self.hairline_batcher.render_frontside(self.viewState.glMatrix)
+
+        l0 = self.compositor.get("LINEART_BS")
+        with l0:
+            self.hairline_batcher.render_backside(self.viewState.glMatrix)
+
+
+        l0 = self.compositor.get("OVERLAY")
+
+        self.render_tool()
+            #self.hairline_renderer.render_group(self.viewState.glMatrix, None)
+            #self.hairline_renderer.render_group(self.viewState.glWMatrix, "OVERLAY_VS")
 
     def render_mode_cad(self):
-        self.__render_top_half()
 
         # Composite all the layers
         GL.glDisable(GL.GL_DEPTH_TEST)
@@ -631,6 +645,8 @@ class BoardViewWidget(BaseViewWidget):
                 return (0, 1)
 
         draw_things.sort(key=layer_key)
+        draw_things.append(("LINEART_BS", (255,255,255,255)))
+        draw_things.append(("LINEART_FS", (255,255,255,255)))
 
         with self.compositor.composite_prebind() as pb:
             for key, color in draw_things:
@@ -642,7 +658,6 @@ class BoardViewWidget(BaseViewWidget):
         return
 
     def render_mode_trace(self):
-        self.__render_top_half()
 
         # Composite all the layers
         GL.glDisable(GL.GL_DEPTH_TEST)
@@ -678,112 +693,58 @@ class BoardViewWidget(BaseViewWidget):
             pb.composite("OVERLAY", (255,255,255,255))
 
 
-    def __draw_debug(self):
-
-        # Prepare a VBO of all bounding box features
-        # Now draw debug features
-
-
-        with Timer() as t_debug:
-            if self.debug_draw_bbox:
-                bboxes = []
-                debug_lines = []
-                for i in self.getVisibleArtwork():
-                    bboxes.append((i.bbox, i in self.selectionList))
-
-
-                for i in self.project.artwork.components:
-                    bboxes.append((i.bbox, i in self.selectionList))
-                    for j in i.get_pads():
-                        bboxes.append((j.bbox, j in self.selectionList))
-
-
-                for bbox, selected in bboxes:
-
-                    pts = [bbox.bl, bbox.br, bbox.tr, bbox.tl]
-
-                    color =  (255, 0, 255, 255)
-                    if selected:
-                        color = (255, 255, 255, 255)
-
-                    for a, b in zip(pts, pts[1:] + pts[0:1]):
-                        debug_lines.append((a, color))
-                        debug_lines.append((b, color))
-
-
-                idt = numpy.dtype([
-                    ("vertex", numpy.float32, 2),
-                    ("color", numpy.float32, 4),
-                ])
-
-                shader = self.gls.shader_cache.get("vert1", "frag1")
-
-                points = numpy.ndarray((len(debug_lines), ), dtype=idt)
-                points[:] = debug_lines
-
-                vao = VAO()
-                vbo = VBO(points)
-
-                with vao, vbo:
-                    vbobind(shader, idt, "vertex").assign()
-                    vbobind(shader, idt, "color").assign()
-
-
-                with shader, vao, vbo:
-                    #GL.glUniform4f(shader.uniforms.color, 255, 0, 255, 255)
-                    GL.glUniformMatrix3fv(shader.uniforms.mat, 1, True, self.viewState.glMatrix.ctypes.data_as(GLI.c_float_p))
-                    GL.glDrawArrays(GL.GL_LINES, 0, len(debug_lines))
-        print("debug draw time: %f" % t_debug.interval)
 
 
 
     def render(self):
-        # Update the layer-visible check
-        self.__layer_visible_lut = [self._layer_visible(i) for i in self.project.stackup.layers]
+        with Timer() as t_render:
+            # Update the layer-visible check
+            self.__layer_visible_lut = [self._layer_visible(i) for i in self.project.stackup.layers]
 
-        # zero accuum buffers for restarts
-        self.trace_renderer.restart()
-        self.text_batch.restart()
-        self.poly_renderer.restart()
-        self.hairline_renderer.restart()
+            # zero accuum buffers for restarts
+            self.trace_renderer.restart()
+            self.text_batch.restart()
+            self.poly_renderer.restart()
 
-        # Update the Compositor
-        self.compositor.restart()
+            # Update the Compositor
+            self.compositor.restart()
 
-        # Fill colors
-        self.compositor.set_color_table(
-            [
-                (255,255,255,255),  # Color 0 is always the Layer current color (ignored)
-                (255,255,255,255),  # Color of Text
-                (255,255,255,255),  # Color of Selection
-                (128, 128, 128, 255),  # Color of Vias
-                (128,128,0,255),  # Color of Airwires
-            ]
-        )
+            # Fill colors
+            self.compositor.set_color_table(
+                [
+                    (255,255,255,255),  # Color 0 is always the Layer current color (ignored)
+                    (255,255,255,255),  # Color of Text
+                    (255,255,255,255),  # Color of Selection
+                    (128, 128, 128, 255),  # Color of Vias
+                    (128,128,0,255),  # Color of Airwires
+                ]
+            )
 
-        # Fake some data on the layer
-
-
-
-        # Two view modes - CAM and trace
-        # CAM -  all layers, SIDE-up
-        # Trace - current layer + artwork (optional, other layers underneath)
-
-        # Setup HAX
-
-        if self.render_mode == MODE_CAD:
-            # Render layer stack bottom to top
-            self.render_mode_cad()
-
-        elif self.render_mode == MODE_TRACE:
-            # Render a single layer for maximum contrast
-            self.render_mode_trace()
+            # Fake some data on the layer
 
 
-        if self.debug_draw:
-            self.__draw_debug()
 
-        # Render the background
+            # Two view modes - CAM and trace
+            # CAM -  all layers, SIDE-up
+            # Trace - current layer + artwork (optional, other layers underneath)
+
+            # Setup HAX
+
+            self.__render_top_half()
+
+            if self.render_mode == MODE_CAD:
+                # Render layer stack bottom to top
+                self.render_mode_cad()
+
+            elif self.render_mode == MODE_TRACE:
+                # Render a single layer for maximum contrast
+                self.render_mode_trace()
+
+
+            self.debug_renderer.render()
+
+        print("Total render time: %f" % t_render.interval)
+
         return
 
         stackup_layer = self.viewState.current_layer
@@ -813,7 +774,8 @@ class BoardViewWidget(BaseViewWidget):
                     self.__deferred_last_text = False
 
         with Timer() as other_timer:
-            super(BoardViewWidget, self).render()
+            pass
+            #super(BoardViewWidget, self).render()
 
         with Timer() as gl_draw_timer:
             # Draw all the layers

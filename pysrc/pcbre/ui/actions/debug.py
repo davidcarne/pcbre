@@ -11,10 +11,10 @@ class ToggleDrawBBoxAction(QtGui.QAction):
         self.triggered.connect(self.__set_prop)
 
     def __set_prop(self):
-        self.va.debug_draw_bbox = self.isChecked()
+        self.va.debug_renderer.debug_draw_bbox = self.isChecked()
 
     def update_from_prop(self):
-        self.setChecked(self.va.debug_draw_bbox)
+        self.setChecked(self.va.debug_renderer.debug_draw_bbox)
 
 class ToggleDrawDebugAction(QtGui.QAction):
     def __init__(self, mw, va):
@@ -27,7 +27,7 @@ class ToggleDrawDebugAction(QtGui.QAction):
         self.triggered.connect(self.__set_prop)
 
     def __set_prop(self):
-        self.va.debug_draw = self.isChecked()
+        self.va.debug_renderer.debug_draw = self.isChecked()
 
     def update_from_prop(self):
-        self.setChecked(self.va.debug_draw)
+        self.setChecked(self.va.debug_renderer.debug_draw)

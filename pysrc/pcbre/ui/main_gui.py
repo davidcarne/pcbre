@@ -92,6 +92,7 @@ class MainWindow(QtGui.QMainWindow):
         controller = self.current_tool.getToolController(self.viewArea)
         self.current_controller = controller
         self.viewArea.setInteractionDelegate(controller)
+        self.viewArea.setFocus()
 
     def createToolbars(self):
         self.createViewToolbar()
