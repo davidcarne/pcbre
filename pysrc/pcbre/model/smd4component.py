@@ -113,7 +113,7 @@ class SMD4Component(Component):
 
 
     def serializeTo(self, cmp_msg):
-        Component.serializeTo(self, cmp_msg.common)
+        self._serializeTo(cmp_msg.common)
         cmp_msg.init("smd4")
         t = cmp_msg.smd4
         t.dim1Body = int(self.dim_1_body)

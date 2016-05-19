@@ -7,6 +7,7 @@ from pcbre.util import Timer
 from pcbre.view.componentview import cmp_border_va, cmp_pad_periph_va
 from pcbre.view.rendersettings import RENDER_OUTLINES, RENDER_HINT_ONCE
 from pcbre.view.target_const import COL_SEL
+from pcbre.view.traceview import trace_batch_and_draw
 
 __author__ = 'davidc'
 
@@ -130,12 +131,17 @@ class ComponentOverlay:
         pr = MultipointEditRenderer(self.parent.flow, self.parent.view)
 
         with compositor.get("OVERLAY"):
+            # Render all the traces
             self.parent.view.hairline_renderer.render_va(self.parent.view.viewState.glMatrix, outline, 0, COL_SEL)
+
             pr.render()
 
-        #batch = self.parent.view.via_renderer.batch()
-        #self.parent.view.render_component(vs.glMatrix, cmp, RENDER_OUTLINES, RENDER_HINT_ONCE)
+        traces = []
+        for i in cmp.get_pads():
+            if not i.is_through():
+                traces.append(i.trace_repr)
 
+        trace_batch_and_draw(self.parent.view, traces)
 
 
 class ComponentController(BaseToolController):

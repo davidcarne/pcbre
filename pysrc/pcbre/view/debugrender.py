@@ -7,7 +7,7 @@ import ctypes
 
 class DebugRender:
     def __init__(self, boardview):
-        self.debug_draw = True
+        self.debug_draw = False
         self.debug_draw_bbox = True
         self.parent = boardview
 

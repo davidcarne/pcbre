@@ -67,7 +67,7 @@ class Component:
     def set_net_for_pad_no(self, pinno, value):
         self.net_mapping[pinno] = value
 
-    def serializeTo(self, cmp_msg):
+    def _serializeTo(self, cmp_msg):
         if self.side == SIDE.Top:
             cmp_msg.side = "top"
         elif self.side == SIDE.Bottom:

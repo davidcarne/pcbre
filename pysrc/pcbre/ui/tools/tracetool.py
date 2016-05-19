@@ -1,4 +1,10 @@
+from collections import defaultdict
+
 from PySide import QtCore, QtGui
+
+from pcbre.accel.vert_array import VA_thickline
+from pcbre.view.target_const import COL_LAYER_MAIN
+from pcbre.view.traceview import trace_batch_and_draw
 from .basetool import BaseTool, BaseToolController
 from pcbre import units
 from pcbre.matrix import Point2, translate, Vec2
@@ -25,6 +31,7 @@ class TraceToolOverlay:
         self.tpm = ctrl.toolparammodel
         self.ctrl = ctrl
 
+
     def initializeGL(self, gls):
         """
         :type gls: GLShared
@@ -38,11 +45,7 @@ class TraceToolOverlay:
         if not traces:
             return
 
-        with compositor.get(traces[0].layer):
-            for i in traces:
-                self.view.trace_renderer.render(viewport.glMatrix, i, RENDER_OUTLINES)
-
-
+        trace_batch_and_draw(self.view, traces)
 
 
 class TraceToolController(BaseToolController):

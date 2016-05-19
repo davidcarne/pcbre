@@ -2,7 +2,7 @@ from PySide import QtCore, QtGui
 from pcbre import units
 from pcbre.matrix import Point2, Vec2
 from pcbre.model.const import SIDE
-from pcbre.model.passivecomponent import PassiveComponent, PassiveSymType, PassiveBodyType
+from pcbre.model.passivecomponent import Passive2Component, PassiveSymType, Passive2BodyType
 from pcbre.ui.dialogs.settingsdialog import AutoSettingsWidget, UnitEditable, PointUnitEditable
 from pcbre.ui.tools.multipoint import EditablePoint, OffsetDefaultPoint, MultipointEditFlow
 from pcbre.ui.uimodel import GenModel, mdlacc
@@ -18,7 +18,7 @@ def _wkchip(name):
     n, _ = name.split('/')
     l = int(n[:2])/10 * units.MM
     w = int(n[2:4])/10 * units.MM
-    return _well_known_t(name, PassiveBodyType.CHIP, l, Point2(l, w), Point2(w, w))
+    return _well_known_t(name, Passive2BodyType.CHIP, l, Point2(l, w), Point2(w, w))
 
 
 well_known_chip = [
@@ -49,7 +49,7 @@ class PassiveModel(GenModel):
     snap_well = mdlacc(True)
     
     sym_type = mdlacc(PassiveSymType.TYPE_RES)
-    body_type = mdlacc(PassiveBodyType.CHIP)
+    body_type = mdlacc(Passive2BodyType.TH_AXIAL)
 
 
     @property
@@ -151,7 +151,9 @@ class PassiveEditWidget(AutoSettingsWidget):
         # Snap checkbox
         self.cb_snap = QtGui.QCheckBox()
         self.cb_snap.setChecked(self.__model.snap_well)
+        self.cb_snap.clicked.connect(self.snap_ui_changed)
         self.layout.addRow("Snap to Well Known", self.cb_snap)
+
 
         self.gs = [
             self.addEdit("Pad Centers", UnitEditable(self.__model, "pin_d", UNIT_GROUP_MM)),
@@ -163,9 +165,9 @@ class PassiveEditWidget(AutoSettingsWidget):
             ]
 
     def snap_ui_changed(self):
-        en =False
+        en = not self.cb_snap.isChecked()
         for i in self.gs:
-            self.gs.setEnabled(en)
+            i.widget.setEnabled(en)
 
     def pkg_changed(self, idx):
         self.well_known= self.__idx_to_wk[idx]
@@ -177,7 +179,7 @@ class PassiveEditWidget(AutoSettingsWidget):
         self.__model.snap_well = self.cb_snap.isChecked()
 
 def Passive_getComponent(model, ctrl, flow):
-    return PassiveComponent(flow.center, flow.theta, flow.side,
-                            model.sym_type, model.body_type, model.pin_d/2,
-                            model.body_corner_vec/2, model.pin_corner_vec/2,
-                            side_layer_oracle=ctrl.project)
+    return Passive2Component(flow.center, flow.theta, flow.side,
+                             model.sym_type, model.body_type, model.pin_d / 2,
+                             model.body_corner_vec / 2, model.pin_corner_vec / 2,
+                             side_layer_oracle=ctrl.project)

@@ -13,6 +13,7 @@ from pcbre.model.const import IntersectionClass
 from pcbre.model.dipcomponent import DIPComponent
 from pcbre.model.net import Net
 from pcbre.model.pad import Pad
+from pcbre.model.passivecomponent import Passive2Component
 from pcbre.model.serialization import serialize_point2, deserialize_point2
 from pcbre.model.smd4component import SMD4Component
 from pcbre.model.util import ImmutableSetProxy
@@ -754,6 +755,8 @@ class Artwork:
                 cmp = DIPComponent.deserialize(self.__project, i)
             elif i.which() == "smd4":
                 cmp = SMD4Component.deserialize(self.__project, i)
+            elif i.which() == "passive":
+                cmp = Passive2Component.deserialize(self.__project, i)
             else:
                 raise NotImplementedError()
 

@@ -241,6 +241,36 @@ struct SMD4Component {
 	side3Pins @9: UInt16;
 	side4Pins @10: UInt16;
 }
+
+# Not just passive components.
+#   Tracks any 2-terminal axial, radial, or chip-type component
+#
+
+struct Passive2Component {
+		enum SymType {
+		    res @0;
+            cap @1;
+            capPol @2;
+            ind @ 3;
+            diode @4;
+        }
+
+		enum BodyType {
+		    chip @0;
+            thAxial @1;
+            thRadial @2;
+            thSideCap @3;
+            thFlippedCap @4;
+
+		}
+        symType @0: SymType;
+        bodyType @1: BodyType;
+
+        pinD @2: DIM;
+        bodyCornerVec @3: Point2;
+        pinCornerVec @4: Point2;
+
+}
 	
 
 struct Component {
@@ -248,6 +278,7 @@ struct Component {
 	union {
 		dip @1 :DipComponent;
 		smd4 @2 :SMD4Component;
+		passive2 @3 :Passive2Component;
 	}
 }
 

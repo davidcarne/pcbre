@@ -102,7 +102,7 @@ class DIPComponent(Component):
         return Rect.fromCenterSize(Point2(0,0), self.body_width(), self.body_length())
 
     def serializeTo(self, dip_msg):
-        super(DIPComponent, self).serializeTo(dip_msg.common)
+        self._serializeTo(dip_msg.common)
 
         m = dip_msg.dip
 
