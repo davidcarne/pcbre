@@ -150,8 +150,8 @@ class CompositeManager:
         GL.glActiveTexture(GL.GL_TEXTURE1)
         GL.glBindTexture(GL.GL_TEXTURE_1D, self.__texture_colors)
 
-        GL.glBlendFunc(GL.GL_ONE, GL.GL_ONE)
-        #GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
+        #GL.glBlendFunc(GL.GL_ONE, GL.GL_ONE)
+        GL.glBlendFunc(GL.GL_ONE, GL.GL_ONE_MINUS_SRC_ALPHA)
 
 
         layer_list = self.__keys
@@ -159,11 +159,13 @@ class CompositeManager:
 
         class _PREBIND:
             def composite(self, n, layer_primary_color):
+                alpha = 0.5 * 255
                 l = layer_list[n]
                 GL.glActiveTexture(GL.GL_TEXTURE0)
                 GL.glBindTexture(GL.GL_TEXTURE_2D, l.info_texture)
 
-                GL.glUniform4f(composite_shader.uniforms.layer_color, *layer_primary_color)
+                GL.glUniform4f(composite_shader.uniforms.layer_color,
+                        layer_primary_color[0], layer_primary_color[1], layer_primary_color[2], alpha)
                 GL.glDrawArrays(GL.GL_TRIANGLE_STRIP, 0, 4)
 
         # Composite the layer to the screen

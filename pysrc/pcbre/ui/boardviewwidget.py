@@ -541,26 +541,6 @@ class BoardViewWidget(BaseViewWidget):
 
     def render_component(self, mat, cmp, render_mode=RENDER_STANDARD, render_hint=RENDER_HINT_NORMAL):
         pass
-        #if isinstance(cmp, DIPComponent):
-        #    self.dip_renderer.render(mat, cmp, render_mode, render_hint)
-        #elif isinstance(cmp, SMD4Component):
-        #    self.smd_renderer.render(mat, cmp, render_mode, render_hint)
-        #elif isinstance(cmp, PassiveComponent):
-        #    self.passive_renderer.render(mat, cmp, render_mode, render_hint)
-        #else:
-        #    pass
-            #raise TypeError("Can't render %s" % cmp)
-
-        #cm = mat.dot(cmp.matrix)
-
-        #for pad in cmp.get_pads():
-            #pad_render_mode = render_mode
-            #if not pad.is_through() and not self.layer_visible(pad.layer):
-            #    continue
-
-            #if pad in self.selectionList:
-            #    pad_render_mode |= RENDER_SELECTED
-            #self.pad_renderer.render(cm, pad, pad_render_mode, render_hint)
 
 
     def _layer_visible(self, l):
@@ -614,14 +594,6 @@ class BoardViewWidget(BaseViewWidget):
 
         self.cmp_text_batch.update_if_necessary()
 
-
-        # "Render" all the components
-        for cmp in self.project.artwork.components:
-            render_state = 0
-            if cmp in self.selectionList:
-                render_state |= RENDER_SELECTED
-            self.render_component(self.viewState.glMatrix, cmp, render_state)
-
         # Build all artwork layers
         for n, layer in enumerate(self.project.stackup.layers):
             with self.compositor.get(layer):
@@ -670,19 +642,20 @@ class BoardViewWidget(BaseViewWidget):
 
         draw_things = [ ]
 
+
         # Prepare to draw all the layers
         for i in self.project.stackup.layers:
             if not self.layer_visible(i):
                 continue
 
-            draw_things.append((i, self.color_for_layer(i) + [0]))
+            draw_things.append((i, self.color_for_layer(i)))
 
         # and the via pairs
         for i in self.project.stackup.via_pairs:
-            if not self.layer_visible(i.layers[0]) and not self.layer_visible(i.layers[1]):
+            if not self.vp_is_visible(i):
                 continue
 
-            draw_things.append((i, (255,0, 255, 255)))
+            draw_things.append((i, (255,0, 255)))
 
         # Now, sort them based on an order in which layers are drawn from bottom-to-top
         # (unless the board is flipped, in which case, top-to-bottom), followed by the currently selected layer
@@ -691,20 +664,31 @@ class BoardViewWidget(BaseViewWidget):
         def layer_key(a):
             lt, _ = a
             if isinstance(lt, Layer):
-                return (0, 0)
+                a_l = lt
+                b = 0
             elif isinstance(lt, ViaPair):
-                return (0, 1)
+                a_l = lt.layers[0]
+                b = 1
+
+            # We always draw the current layer last
+            if a_l == self.viewState.current_layer:
+                a = 1
+            else:
+                a = -a_l.order
+
+            return (a,b)
+
 
         draw_things.sort(key=layer_key)
-        draw_things.append(("LINEART_BS", (255,255,255,255)))
-        draw_things.append(("LINEART_FS", (255,255,255,255)))
+        draw_things.insert(0, ("LINEART_BS", (255,255,255)))
+        draw_things.append(("MULTI", (255,255,255)))
+        draw_things.append(("LINEART_FS", (255,255,255)))
 
         with self.compositor.composite_prebind() as pb:
             for key, color in draw_things:
                 pb.composite(key, color)
 
-            pb.composite("MULTI", (255,255,255,255))
-            pb.composite("OVERLAY", (255,255,255,255))
+            pb.composite("OVERLAY", (255,255,255))
 
         return
 
@@ -735,20 +719,20 @@ class BoardViewWidget(BaseViewWidget):
         with self.compositor.composite_prebind() as pb:
 
             # Render the traced geometry
-            color = self.color_for_layer(layer) + [0]
+            color = self.color_for_layer(layer)
             pb.composite(layer, color)
 
             for via_pair in self.project.stackup.via_pairs:
                 if layer in via_pair.layers:
-                    pb.composite(via_pair, (255, 0, 255, 255))
+                    pb.composite(via_pair, (255, 0, 255))
 
             if layer == self.project.stackup.layer_for_side(SIDE.Top):
-                pb.composite("LINEART_FS", (255,255,255,255))
+                pb.composite("LINEART_FS", (255,255,255))
             elif layer == self.project.stackup.layer_for_side(SIDE.Bottom):
-                pb.composite("LINEART_BS", (255,255,255,255))
+                pb.composite("LINEART_BS", (255,255,255))
 
-            pb.composite("MULTI", (255,255,255,255))
-            pb.composite("OVERLAY", (255,255,255,255))
+            pb.composite("MULTI", (255,255,255))
+            pb.composite("OVERLAY", (255,255,255))
 
 
 
@@ -803,60 +787,3 @@ class BoardViewWidget(BaseViewWidget):
             self.debug_renderer.render()
 
         print("Total render time: %f" % t_render.interval)
-
-        return
-
-        stackup_layer = self.viewState.current_layer
-        if stackup_layer is None:
-            return
-
-
-        # Text layout is expensive. When we need to do a full text rebuild,
-        # we quickly paint a frame and then do the text rebuild
-        suppress_text = False
-        if self.cmp_text_batch.needs_rebuild():
-            if not self.__deferred_last_text:
-                self.__deferred_last_text = True
-                self.update()
-                suppress_text = True
-
-        with Timer() as cmp_timer:
-            for cmp in self.project.artwork.components:
-                render_state = 0
-                if cmp in self.selectionList:
-                    render_state |= RENDER_SELECTED
-                self.render_component(self.viewState.glMatrix, cmp, render_state)
-
-            with Timer() as t_cmp_gen:
-                if not suppress_text:
-                    self.cmp_text_batch.update_if_necessary()
-                    self.__deferred_last_text = False
-
-        with Timer() as other_timer:
-            pass
-            #super(BoardViewWidget, self).render()
-
-        with Timer() as gl_draw_timer:
-            # Draw all the layers
-            layers = sorted(self.project.stackup.layers, key=ly_order_func)
-
-            for layer in layers:
-                self.trace_renderer.render_deferred_layer(self.viewState.glMatrix, layer)
-
-                with t_tex_draw:
-                    self.text_batch.render(key=layer)
-                self.hairline_renderer.render_group(self.viewState.glMatrix, layer)
-
-            # Final rendering
-            # Render the non-layer text
-            with t_tex_draw:
-                if not suppress_text:
-                    self.cmp_text_batch.render_layer(self.viewState.glMatrix, SIDE.Top, False)
-                    self.cmp_text_batch.render_layer(self.viewState.glMatrix, SIDE.Bottom, False)
-                    self.text_batch.render()
-
-
-
-
-
-

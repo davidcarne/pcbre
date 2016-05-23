@@ -32,7 +32,10 @@ void trace_array_append(struct vertex_array * va, float ax, float ay, float bx, 
 
 void via_array_append(struct vertex_array * va, float x, float y, float r, float r_inside);
 """)
-lib = ffi.dlopen("/home/davidc/tmp/py_bench/bench.so")
+
+
+from .find_so import find_so
+lib = ffi.dlopen(find_so("_va"))
 
 class VA:
     def __init__(self, size, stride):
