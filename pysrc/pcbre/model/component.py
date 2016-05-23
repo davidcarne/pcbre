@@ -31,14 +31,6 @@ class Component:
 
         return self.__side_layer_oracle
 
-    def on_layers(self):
-        if self.on_sides == OnSide.Both:
-            return self._side_layer_oracle.stackup.both_sides
-        else:
-            if self.side == SIDE.Bottom:
-                return (self._side_layer_oracle.stackup.bottom_layer, )
-            elif self.side == SIDE.Top:
-                return (self._side_layer_oracle.stackup.top_layer, )
 
     @property
     def matrix(self):
@@ -120,6 +112,7 @@ class Component:
             target.name_mapping[ident] = i.name
             assert i.net is not None
             target.net_mapping[ident] = project.scontext.get(i.net)
+
 
     def point_inside(self, pt):
         return self.bbox.point_test(pt)

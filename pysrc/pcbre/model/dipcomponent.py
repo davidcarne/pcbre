@@ -7,6 +7,93 @@ from pcbre.model.component import Component
 
 __author__ = 'davidc'
 
+class SIPComponent(Component):
+    ISC = IntersectionClass.NONE
+
+    def __init__(self, center, theta, side, side_layer_oracle, pin_count, pin_space, pad_size):
+        Component.__init__(self, center, theta, side, side_layer_oracle = side_layer_oracle)
+        self.__my_init(pin_count, pin_space, pad_size)
+
+
+    def __my_init(self, pin_count, pin_space, pad_size):
+
+        self.__pin_count = pin_count
+        self.__pin_space = pin_space
+        self.__pad_size = pad_size
+
+        self._project = None
+
+        self.__pins_cache = []
+
+    @property
+    def on_sides(self):
+        return OnSide.Both
+
+    def __update(self):
+        if self.__pins_cache:
+            return
+
+        edge_count = self.__pin_count
+
+        pin_edge = self.__pin_space * (edge_count - 1)
+        pin_edge_center_delta = pin_edge / 2
+
+        for i in range(self.__pin_count):
+            dx = (i % edge_count) * self.__pin_space
+
+            x = 0
+            y = pin_edge_center_delta - dx
+
+            center = Point2(x,y)
+            newpad = Pad(self, "%s" % (i + 1), center, 0, self.__pad_size, self.__pad_size, th_diam=500)
+            self.__pins_cache.append(newpad)
+
+    @property
+    def pin_count(self):
+        return self.__pin_count
+
+    @property
+    def pin_space(self):
+        return self.__pin_space
+
+    @property
+    def pad_size(self):
+        return self.__pad_size
+
+    def get_pads(self):
+        self.__update()
+        return self.__pins_cache
+
+    def body_width(self):
+        return self.pad_size + 0.158 * units.IN
+
+    def body_length(self):
+        return (self.pin_count - 1) * self.pin_space + 0.158 * units.IN
+
+    @property
+    def theta_bbox(self):
+        return Rect.fromCenterSize(Point2(0,0), self.body_width(), self.body_length())
+
+    def serializeTo(self, sip_msg):
+        self._serializeTo(sip_msg.common)
+        sip_msg.init("sip")
+
+        m = sip_msg.sip
+
+        m.pinCount = self.pin_count
+        m.pinSpace = self.pin_space
+        m.padSize = self.pad_size
+
+    @staticmethod
+    def deserialize(project, sip_msg):
+        m = sip_msg.sip
+        cmp = SIPComponent.__new__(SIPComponent)
+        Component.deserializeTo(project, sip_msg.common, cmp)
+        cmp.__my_init(m.pinCount, m.pinSpace, m.padSize)
+        return cmp
+
+
+
 class DIPComponent(Component):
     ISC = IntersectionClass.NONE
 
@@ -103,6 +190,7 @@ class DIPComponent(Component):
 
     def serializeTo(self, dip_msg):
         self._serializeTo(dip_msg.common)
+        dip_msg.init("dip")
 
         m = dip_msg.dip
 

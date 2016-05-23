@@ -57,12 +57,12 @@ class SelectToolController(BaseToolController):
         new = set()
 
         if self.model.vers == SelectByModes.POINT:
-            res = self.project.artwork.query_point(pt_w)
+            res = self.view.query_point(pt_w)
             if res is not None:
                 new.add(res)
 
         elif self.model.vers == SelectByModes.NET:
-            res = self.project.artwork.query_point(pt_w)
+            res = self.view.query_point(pt_w)
             if res is not None and res.TYPE_FLAGS & TFF.HAS_NET:
                 net = res.net
                 aw = self.project.artwork.get_geom_for_net(net)

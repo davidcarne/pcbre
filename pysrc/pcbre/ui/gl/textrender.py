@@ -9,6 +9,7 @@ import ctypes
 import numpy
 
 from pcbre.ui.gl.textatlas import BASE_FONT
+from pcbre.view.target_const import COL_TEXT
 
 __author__ = 'davidc'
 
@@ -18,7 +19,7 @@ class TextBatch:
         self.__text_render = tr
 
         self.__elem_count = 0
-        self.__color = [1.0, 1.0, 1.0, 1.0]
+        self.__color = (255, COL_TEXT, 0, 0)
 
     def initializeGL(self):
         self.vbo = VBO(numpy.ndarray(0, dtype=self.__text_render.buffer_dtype), GL.GL_STATIC_DRAW, GL.GL_ARRAY_BUFFER)
@@ -75,7 +76,7 @@ class TextBatch:
         with self.__text_render.sdf_shader, self.__text_render.tex.on(GL.GL_TEXTURE_2D), self.vao:
             GL.glUniform1i(self.__text_render.sdf_shader.uniforms.tex1, 0)
             GL.glUniformMatrix3fv(self.__text_render.sdf_shader.uniforms.mat, 1, True, mat.astype(numpy.float32))
-            GL.glUniform4f(self.__text_render.sdf_shader.uniforms.color, *self.__color)
+            GL.glUniform4ui(self.__text_render.sdf_shader.uniforms.layer_info, *self.__color)
 
             GL.glDrawArrays(GL.GL_TRIANGLES, 0, self.__elem_count)
 

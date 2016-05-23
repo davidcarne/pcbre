@@ -30,20 +30,18 @@ class WidthProjectedPoint:
     def set(self, v):
         baseline_vec_r = self.__baseline()
         dv = v - self.parent.p_bottom_corner.get()
-        v_d = dv.dot(baseline_vec_r)
+        v_d = dv.dot(baseline_vec_r)* -self.parent.get_cur_sign()
+        if v_d < 0:
+            v_d = 0
 
-        self.parent.side = SIDE.Bottom if v_d < 0 else SIDE.Top
+
         self.parent._model.pin_width = abs(v_d)
 
     def unset(self, v):
         pass
 
     def get(self):
-        sign = 1
-        if self.parent.side == SIDE.Bottom:
-            sign = -1
-
-        baseline_vec_r = self.__baseline() * self.parent._model.pin_width * sign
+        baseline_vec_r = self.__baseline() * self.parent._model.pin_width * -self.parent.get_cur_sign()
         return self.parent.p_bottom_corner.get() + baseline_vec_r
 
 
@@ -55,15 +53,14 @@ class WidthProjectedPoint:
 
 
 class DIPEditFlow(MultipointEditFlow):
-    def __init__(self, view, model):
+    def __init__(self, view, model, cmodel):
         self._model = model
+        self._cmodel = cmodel
 
         self.p1_point = EditablePoint(Point2(0,0))
 
-        self.__theta = 0
-        self.__corner = Point2(0,0)
 
-        rmat = rotate(self.theta)
+        rmat = rotate(self._cmodel.theta)
 
         dy = -(model.pin_count / 2 - 1) * model.pin_space
 
@@ -82,11 +79,6 @@ class DIPEditFlow(MultipointEditFlow):
 
         super(DIPEditFlow, self).__init__(view, points, True)
 
-        if self.view.viewState.current_layer is None:
-            self.side = SIDE.Top
-
-        else:
-            self.side = self.view.viewState.current_layer.side
 
         self.update_matrix()
 
@@ -98,38 +90,35 @@ class DIPEditFlow(MultipointEditFlow):
 
             # Calculate theta from placement
             theta = math.atan2(dv.y, dv.x) + math.pi/2
-            self.__theta = theta
+            self._cmodel.theta = theta
 
             # Calculate pin count
             self._model.pin_count = int(round(dv.mag() / self._model.pin_space)) * 2 + 2
 
         self.update_matrix()
 
-    def update_matrix(self):
-
-        rot = rotate(self.theta)
-
-        if self.side == SIDE.Top:
+    def get_cur_sign(self):
+        if self.view.current_side() is SIDE.Top:
             sign = -1
         else:
             sign = 1
+        return sign
+
+    def update_matrix(self):
+
+        rot = rotate(self._cmodel.theta)
+
+        sign = self.get_cur_sign()
 
         center_to_corner = Vec2(sign * self._model.pin_width/2,
                                 self._model.pin_space * (self._model.pin_count / 2 - 1) / 2)
 
         center_to_corner_w = projectPoint(rot, center_to_corner)
 
-        self.center = self.p1_point.get() - center_to_corner_w
+        self._cmodel.center = self.p1_point.get() - center_to_corner_w
 
-        self.matrix = translate(self.center.x, self.center.y).dot(rotate(self.theta))
+        self.matrix = translate(self._cmodel.center.x, self._cmodel.center.y).dot(rotate(self._cmodel.theta))
 
-    @property
-    def theta(self):
-        return self.__theta
-
-    @theta.setter
-    def theta(self, theta):
-        self.__theta = theta
 
 
 
@@ -164,5 +153,6 @@ class DIPEditWidget(AutoSettingsWidget):
 
 
 def DIP_getComponent(mdl, ctrl, flow):
-    return DIPComponent(flow.center, flow.theta, flow.side, ctrl.project,
+    ctrl.flow.update_matrix()
+    return DIPComponent(flow.center, flow.theta, ctrl.view.current_side(), ctrl.project,
                         mdl.pin_count, mdl.pin_space, mdl.pin_width, mdl.pad_diameter)

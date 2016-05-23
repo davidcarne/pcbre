@@ -17,15 +17,15 @@ class BodyCornerPoint:
         self.enabled = True
 
     def set(self, val):
-        r = rotate(-self.parent.theta)
-        p = projectPoint(r, val - self.parent.center)
+        r = rotate(-self.parent._cmodel.theta)
+        p = projectPoint(r, val - self.parent._cmodel.center)
         self.parent._model.dim_1_body = abs(p.x) * 2
         self.parent._model.dim_2_body = abs(p.y) * 2
 
     def get(self):
-        r = rotate(self.parent.theta)
+        r = rotate(self.parent._cmodel.theta)
         cv = Vec2(-self.parent._model.dim_1_body/2, -self.parent._model.dim_2_body/2)
-        return self.parent.center + projectPoint(r, cv)
+        return self.parent._cmodel.center + projectPoint(r, cv)
 
     def save(self):
         return self.parent._model.dim_1_body, self.parent._model.dim_2_body
@@ -36,17 +36,16 @@ class BodyCornerPoint:
 
 
 class BasicSMDFlow(MultipointEditFlow):
-    def __init__(self, view, model):
+    def __init__(self, view, model, cmodel):
         self._model = model
+        self._cmodel = cmodel
 
-        self.__theta = 0
-        self.center = Point2(0,0)
 
         self.p1_point = EditablePoint()
 
         def corner_offset():
             mag = self._model.pin_spacing * (self._model.side1_pins - 1)
-            return Vec2.fromPolar(self.__theta, mag)
+            return Vec2.fromPolar(self._cmodel.theta, mag)
 
         self.p_bottom_corner = OffsetDefaultPoint(self.p1_point, corner_offset)
 
@@ -54,7 +53,7 @@ class BasicSMDFlow(MultipointEditFlow):
             x = self._model.pin_spacing * ((self._model.side1_pins - 1) / 2 + (self._model.side3_pins - 1) / 2)
             y = self._model.dim_2_pincenter
 
-            r = rotate(self.__theta)
+            r = rotate(self._cmodel.theta)
             return projectPoint(r, Point2(x, y))
 
         self.p_side_3_1 = OffsetDefaultPoint(self.p1_point, other_corner_offset)
@@ -63,7 +62,7 @@ class BasicSMDFlow(MultipointEditFlow):
             x = self._model.pin_spacing * ((self._model.side1_pins - 1) / 2) + self._model.dim_1_pincenter/2
             y = self._model.dim_2_pincenter / 2 - (self._model.side2_pins - 1) / 2 * self._model.pin_spacing
 
-            r = rotate(self.__theta)
+            r = rotate(self._cmodel.theta)
             return projectPoint(r, Point2(x, y))
 
         def p2_corner_ena():
@@ -76,7 +75,6 @@ class BasicSMDFlow(MultipointEditFlow):
         points = [self.p1_point, self.p_bottom_corner, self.p_side_3_1, self.p_side_2_1, self.p_body_corner]
         super(BasicSMDFlow, self).__init__(view, points, True)
 
-        self.__side = None
         self.__update_matrix()
 
     def updated(self, ep):
@@ -85,12 +83,12 @@ class BasicSMDFlow(MultipointEditFlow):
                 v = (self.p_bottom_corner.get() - self.p1_point.get())
                 mag = v.mag()
                 v = v.norm()
-                self.__theta = v.angle()
+                self._cmodel.theta = v.angle()
 
                 self._model.pin_spacing = mag / (self._model.side1_pins - 1)
 
 
-            self.v_base = Vec2.fromPolar(self.__theta, 1)
+            self.v_base = Vec2.fromPolar(self._cmodel.theta, 1)
             self.v_vert = Vec2(-self.v_base.y, self.v_base.x).norm()
 
             p_edge_center = self.v_base * self._model.pin_spacing * (self._model.side1_pins - 1) / 2
@@ -102,47 +100,22 @@ class BasicSMDFlow(MultipointEditFlow):
                 v, _ = project_point_line(dv, Point2(0,0), self.v_vert, False)
                 self._model.dim_2_pincenter = v.mag()
 
-            self.center = self.v_vert * self._model.dim_2_pincenter / 2 + p_edge_center + self.p1_point.get()
+            self._cmodel.center = self.v_vert * self._model.dim_2_pincenter / 2 + p_edge_center + self.p1_point.get()
 
             if self.p_side_2_1.is_set:
-                v, _ = project_point_line(self.p_side_2_1.get() - self.center, Point2(0,0), self.v_base, False)
+                v, _ = project_point_line(self.p_side_2_1.get() - self._cmodel.center, Point2(0,0), self.v_base, False)
 
                 self._model.dim_1_pincenter = v.mag() * 2
 
 
     @property
-    def theta(self):
-        return self.__theta
-
-    @theta.setter
-    def theta(self, v):
-        self.__theta = v
-        # TODO: For each of the points, if set, rotate around center
-
-    @property
     def side(self):
-        if self.__side is None:
-            if self.view.viewState.current_layer is None:
-                return SIDE.Top
-            else:
-                return self.view.viewState.current_layer.side
-
-        return self.__side
+        return self.view.current_side
 
     def __update_matrix(self):
-        rot = rotate(self.__theta)
+        rot = rotate(self._cmodel.theta)
 
-        if self.side == SIDE.Top:
-            sign = -1
-        else:
-            sign = 1
-
-        self.matrix = translate(self.center.x, self.center.y).dot(rotate(self.__theta))
-
-
-
-
-
+        self.matrix = translate(self._cmodel.center.x, self._cmodel.center.y).dot(rotate(self._cmodel.theta))
 
 
 SYM_4_SQUARE = 0
@@ -291,7 +264,7 @@ class BasicSMDICModel(GenModel):
 
 
 def BasicSMD_getComponent(mdl, ctrl, flow):
-    return SMD4Component(flow.center, flow.theta + math.pi/2, flow.side, ctrl.project,
+    return SMD4Component(flow.center, flow.theta + math.pi/2, ctrl.view.current_side, ctrl.project,
                        mdl.side1_pins, mdl.side2_pins, mdl.side3_pins, mdl.side4_pins,
                        mdl.dim_1_body, mdl.dim_1_pincenter, mdl.dim_2_body, mdl.dim_2_pincenter,
                        mdl.pin_contact_length, mdl. pin_contact_width, mdl.pin_spacing)
