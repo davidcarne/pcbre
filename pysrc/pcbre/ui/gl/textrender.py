@@ -2,6 +2,7 @@
 
 from OpenGL.arrays.vbo import VBO
 from collections import namedtuple, defaultdict
+from pcbre.accel.vert_array import VA_tex
 from pcbre.matrix import Rect, translate, scale, Point2, projectPoint
 from pcbre.ui.gl import Texture, vbobind, VAO
 from OpenGL import GL
@@ -24,6 +25,9 @@ class TextBatch:
     def initializeGL(self):
         self.vbo = VBO(numpy.ndarray(0, dtype=self.__text_render.buffer_dtype), GL.GL_STATIC_DRAW, GL.GL_ARRAY_BUFFER)
         self.vao = VAO()
+
+
+        self._va = VA_tex(1024)
 
         with self.vao, self.vbo:
             self.__text_render.b1.assign()
@@ -56,20 +60,15 @@ class TextBatch:
         self.__text_render.updateTexture()
 
 
-        clist = []
+        self._va.clear()
 
         for mat, str_info in self.__strs:
-            for (x,y), (u,v) in str_info.arr:
-                newpt = projectPoint(mat, Point2(x,y))
-                clist.append(((newpt.x,newpt.y), (u,v)))
+            self._va.extend_project(mat, str_info.arr)
 
-        arr = numpy.array(clist, dtype=self.__text_render.buffer_dtype)
-
-        self.vbo.data = arr
-        self.vbo.copied = False
+        self.vbo.set_array(self._va.buffer()[:])
         self.vbo.bind()
 
-        self.__elem_count = len(arr)
+        self.__elem_count = self._va.count()
 
 
     def render(self, mat):
@@ -80,27 +79,27 @@ class TextBatch:
 
             GL.glDrawArrays(GL.GL_TRIANGLES, 0, self.__elem_count)
 
-        #print("Drawing %d elements" % self.__elem_count)
-
 class TextBatcher(object):
     __tag_type = namedtuple("render_tag", ["textinfo", "matrix", "color"])
 
     def __init__(self, tr):
         self.text_render = tr
         self.__cached = {}
-
-        self.__clist = []
+        self._va = VA_tex(1024)
 
         self.restart()
 
     def restart(self):
         self.__render_tags = defaultdict(list)
+        self._va.clear()
 
 
     def initializeGL(self):
         # Working VBO that will contain glyph data
         self.vbo = VBO(numpy.ndarray(0, dtype=self.text_render.buffer_dtype), GL.GL_DYNAMIC_DRAW, GL.GL_ARRAY_BUFFER)
         self.vao = VAO()
+
+
 
         with self.vao, self.vbo:
             self.text_render.b1.assign()
@@ -110,10 +109,8 @@ class TextBatcher(object):
 
     def render(self, key=None):
         if self.__vbo_needs_update:
-            arr = numpy.array(self.__clist, dtype=self.text_render.buffer_dtype)
 
-            self.vbo.data = arr
-            self.vbo.copied = False
+            self.vbo.data = self._va.buffer()[:]
             self.vbo.bind()
             self.__vbo_needs_update = False
 
@@ -125,7 +122,7 @@ class TextBatcher(object):
             for tag in self.__render_tags[key]:
                 mat_calc = tag.matrix
                 GL.glUniformMatrix3fv(self.text_render.sdf_shader.uniforms.mat, 1, True, mat_calc.astype(numpy.float32))
-                GL.glUniform4f(self.text_render.sdf_shader.uniforms.color, *tag.color)
+                GL.glUniform4ui(self.text_render.sdf_shader.uniforms.layer_info, 255, COL_TEXT, 0, 255)
 
                 GL.glDrawArrays(GL.GL_TRIANGLES, tag.textinfo.start, tag.textinfo.count)
 
@@ -143,9 +140,11 @@ class TextBatcher(object):
 
         self.__cached[text] = ti = self.text_render.getStringMetrics(text)
 
-        ti.start = len(self.__clist)
+        ti.start = self._va.tell()
 
-        self.__clist.extend(ti.arr)
+        for (x, y), (tx, ty) in ti.arr:
+            self._va.add_tex(x, y, tx, ty)
+
         ti.count = len(ti.arr)
         self.__vbo_needs_update = True
         return ti
@@ -164,21 +163,21 @@ class _StringMetrics(object):
         """
         return self.__rect
 
+    def get_actual_scale(self, rect):
+        hscale = rect.width / self.__rect.width
+        vscale = rect.height / self.__rect.height
+
+        return min(hscale, vscale)
+
     def get_render_to_wh(self, rect):
         """
 
         """
-        hscale = rect.width / self.__rect.width
-        vscale = rect.height / self.__rect.height
-
-        actual_scale = min(hscale, vscale)
+        actual_scale = self.get_actual_scale(rect)
         return actual_scale * self.__rect.width, actual_scale * self.__rect.height
 
     def get_render_to_mat(self, rect):
-        hscale = rect.width / self.__rect.width
-        vscale = rect.height / self.__rect.height
-
-        actual_scale = min(hscale, vscale)
+        actual_scale = self.get_actual_scale(rect)
 
         cx = self.__rect.center
         cx *= actual_scale
@@ -256,7 +255,8 @@ class TextRender(object):
         # With this, streaming text to the GPU would be much more effective
 
         # Starting pen X coordinate
-        q = []
+        va = VA_tex(1024)
+
         pen_x = 0
 
         left, right, top, bottom = 0, 0, 0, 0
@@ -285,16 +285,17 @@ class TextRender(object):
             x1 = (c_off_x + w) / BASE_FONT
             y1 = (c_off_y + h) / BASE_FONT
 
-            q.append(((x0, y0), (gp.sx, gp.sy)))
-            q.append(((x0, y1), (gp.sx, gp.ty)))
-            q.append(((x1, y0), (gp.tx, gp.sy)))
-            q.append(((x1, y0), (gp.tx, gp.sy)))
-            q.append(((x0, y1), (gp.sx, gp.ty)))
-            q.append(((x1, y1), (gp.tx, gp.ty)))
+
+            va.add_tex(x0, y0, gp.sx, gp.sy)
+            va.add_tex(x0, y1, gp.sx, gp.ty)
+            va.add_tex(x1, y0, gp.tx, gp.sy)
+            va.add_tex(x1, y0, gp.tx, gp.sy)
+            va.add_tex(x0, y1, gp.sx, gp.ty)
+            va.add_tex(x1, y1, gp.tx, gp.ty)
 
             # And increment to the next character
             pen_x += gp.hb
-        return _StringMetrics(q, (left, right, bottom, top))
+        return _StringMetrics(va, (left, right, bottom, top))
 
 
 

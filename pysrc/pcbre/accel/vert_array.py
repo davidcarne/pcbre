@@ -31,6 +31,12 @@ void vertex_xy_array_arc(struct vertex_array * va, float cx, float cy, float r, 
 void trace_array_append(struct vertex_array * va, float ax, float ay, float bx, float by, float t);
 
 void via_array_append(struct vertex_array * va, float x, float y, float r, float r_inside);
+
+void tex_array_append(struct vertex_array * va, float x, float y, float tx, float ty);
+void tex_extend_project(struct vertex_array * dest, struct vertex_array * src,
+	float c0, float c1, float c2, float c3, float c4, float c5);
+
+
 """)
 
 
@@ -124,3 +130,17 @@ class VA_via(VA):
 
     def add_via(self, via):
         lib.via_array_append(self._va, via.pt.x, via.pt.y, via.r, 0)
+
+class VA_tex(VA):
+    def __init__(self, size):
+        super(VA_tex, self).__init__(size, 16)
+
+    def add_tex(self, x, y, tx, ty):
+        lib.tex_array_append(self._va, x, y, tx, ty)
+
+    def extend(self, va):
+        return lib.vertex_array_concat(self._va, va._va)
+
+    def extend_project(self, mat, src):
+        return lib.tex_extend_project(self._va, src._va,
+                mat[0][0], mat[0][1], mat[0][2], mat[1][0], mat[1][1], mat[1][2])

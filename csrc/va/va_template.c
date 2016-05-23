@@ -41,8 +41,8 @@ void _vertex_array_check_grow(struct vertex_array * va, size_t n) {
 
 	size_t new_size = va->size;
 
-	while (new_size > va->size + n)
-		va->size = va->size * 2;
+	while (new_size < va->size + n)
+		new_size = new_size * 2;
 
 	// Ensure we can grow a 0-sized array
 	if (new_size == 0)

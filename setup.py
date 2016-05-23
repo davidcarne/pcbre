@@ -2,7 +2,18 @@ from setuptools import setup, find_packages, Extension
 
 extmods = [
         
-        Extension('pcbre.accel._edtaa3', sources=['csrc/edtaa3func.c'])
+        Extension('pcbre.accel._edtaa3', sources=['csrc/edtaa3func.c']),
+        Extension('pcbre.accel._va', sources=[
+            'csrc/va/va_template.c',
+            'csrc/va/va_trace.c',
+            'csrc/va/va_via.c',
+            'csrc/va/va_xy.c',
+            'csrc/va/va_char.c'
+
+            ],
+            include_dirs=['csrc/va'],
+            extra_compile_args=['--std=c99','-Wall','-Wextra','-Werror']
+        )
         ]
 setup(  name="pcbre",
         version='0',
