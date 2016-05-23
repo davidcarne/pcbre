@@ -10,7 +10,7 @@ from pcbre.model import serialization as ser
 from pcbre.model.artwork_geom import Trace, Via, Polygon, Airwire
 from pcbre.model.component import Component
 from pcbre.model.const import IntersectionClass
-from pcbre.model.dipcomponent import DIPComponent
+from pcbre.model.dipcomponent import DIPComponent, SIPComponent
 from pcbre.model.net import Net
 from pcbre.model.pad import Pad
 from pcbre.model.passivecomponent import Passive2Component
@@ -276,7 +276,7 @@ class Artwork:
 
         return acc
 
-    def query_point(self, pt, layers_include=None, layers_exclude=None):
+    def query_point(self, pt, return_multiple=False):
         """
         Queries a single point to identify geometry at that location
 
@@ -286,11 +286,10 @@ class Artwork:
         :param layers_exclude:
         :return:
         """
-        pt = Point2(pt)
 
-        # layers_include / layers_exclude specify IDs of the layers to search, or exclude from the search
-        # since exclude implicitly means "all layers minus the specified", the combination of both is invalid
-        assert layers_include is None or layers_exclude is None
+        assert not return_multiple
+
+        pt = Point2(pt)
 
         for aw in self.get_all_artwork():
             if point_inside(aw, pt):
@@ -753,9 +752,12 @@ class Artwork:
         for i in msg.components:
             if i.which() == "dip":
                 cmp = DIPComponent.deserialize(self.__project, i)
+            elif i.which() == "sip":
+                cmp = SIPComponent.deserialize(self.__project, i)
+
             elif i.which() == "smd4":
                 cmp = SMD4Component.deserialize(self.__project, i)
-            elif i.which() == "passive":
+            elif i.which() == "passive2":
                 cmp = Passive2Component.deserialize(self.__project, i)
             else:
                 raise NotImplementedError()

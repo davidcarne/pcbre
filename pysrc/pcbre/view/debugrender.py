@@ -1,3 +1,4 @@
+from pcbre.model.component import Component
 from pcbre.util import Timer
 import OpenGL.GL as GL
 from OpenGL.arrays.vbo import VBO
@@ -46,13 +47,12 @@ class DebugRender:
 
                 # Build a list of all bboxes we're going to draw
                 bboxes = []
-                for i in self.parent.getVisibleArtwork():
+                for i in self.parent.getVisible():
                     bboxes.append((i.bbox, i in self.parent.selectionList))
 
-                for i in self.parent.project.artwork.components:
-                    bboxes.append((i.bbox, i in self.parent.selectionList))
-                    for j in i.get_pads():
-                        bboxes.append((j.bbox, j in self.parent.selectionList))
+                    if isinstance(i, Component):
+                        for j in i.get_pads():
+                            bboxes.append((j.bbox, j in self.parent.selectionList))
 
             with Timer() as t_debug_bbox_add:
                 # Add bboxes to buffers

@@ -227,6 +227,12 @@ struct DipComponent {
 	padSize  @3 :DIM;
 }
 
+struct SipComponent {
+	pinCount @0 :DIM;
+	pinSpace @1 :DIM;
+	padSize  @2 :DIM;
+}
+
 struct SMD4Component {
 	dim1Body @0: DIM;
 	dim1PinEdge @1: DIM;
@@ -279,6 +285,7 @@ struct Component {
 		dip @1 :DipComponent;
 		smd4 @2 :SMD4Component;
 		passive2 @3 :Passive2Component;
+		sip @4 :SipComponent;
 	}
 }
 

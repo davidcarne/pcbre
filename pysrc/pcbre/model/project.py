@@ -108,6 +108,14 @@ class Stackup(QtCore.QObject):
         else:
             return self.top_layer
 
+    def side_for_layer(self, layer):
+        if layer == self.bottom_layer:
+            return SIDE.Bottom
+        elif layer == self.top_layer:
+            return SIDE.Top
+
+        return None
+
 
     def serialize(self):
         _stackup = ser.Stackup.new_message()

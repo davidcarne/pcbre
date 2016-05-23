@@ -94,7 +94,6 @@ class ViewState(QtCore.QObject, ViewPort):
         self.__current_layer = None
         self.currentLayerChanged.connect(self.changed)
         self.__show_images = True
-        self.__draw_other_layers = True
         self.layer_permute = 0
 
     def permute_layer_order(self):
@@ -143,14 +142,6 @@ class ViewState(QtCore.QObject, ViewPort):
         self.__show_images = value
         self.changed.emit()
 
-    @property
-    def draw_other_layers(self):
-        return self.__draw_other_layers
-
-    @draw_other_layers.setter
-    def draw_other_layers(self, value):
-        self.__draw_other_layers = value
-        self.changed.emit()
 
 class BaseViewWidget(QtOpenGL.QGLWidget):
     def __init__(self, parent=None):
@@ -481,27 +472,70 @@ class BoardViewWidget(BaseViewWidget):
         for i in list(self.image_view_cache.values()):
             i.initGL()
 
-        self.XX = 0
+    def current_side(self):
+        side = self.project.stackup.side_for_layer(self.viewState.current_layer)
+        return side
 
+    def vp_is_visible(self, via_pair):
+        if self.viewState.current_layer is None:
+            return False
 
+        if self.render_mode == MODE_CAD:
+            return True
+        else:
+            # In layer mode, viapair is visible if we're on any layer
+            layer = self.viewState.current_layer
+            f, s = via_pair.layers
+            return f.order <= layer.order <= s.order
 
-
-
-
-
-    def getVisibleArtwork(self):
+    def getVisible(self):
         objects = []
-        objects += self.project.artwork.vias
-        objects += self.project.artwork.traces
-        objects += self.project.artwork.polygons
+
+        # Add visible vias
+        vp_visible = {}
+        for i in self.project.stackup.via_pairs:
+            vp_visible[i] = self.vp_is_visible(i)
+
+        for via in self.project.artwork.vias:
+            if vp_visible[via.viapair]:
+                objects.append(via)
+
+        # Traces
+        for trace in self.project.artwork.traces:
+            if self.layer_visible(trace.layer):
+                objects.append(trace)
+
+        for polygon in self.project.artwork.polygons:
+            if self.layer_visible(polygon):
+                objects.append(polygon)
+
+        if self.render_mode == MODE_CAD:
+            objects.extend(self.project.artwork.components)
+            for cmp in self.project.artwork.components:
+                objects.extend(cmp.get_pads())
+        elif self.viewState.current_layer is None:
+            pass
+        else:
+                cur_side = self.current_side()
+                print("Current side is %s" % cur_side)
+                for cmp in self.project.artwork.components:
+                    if cmp.side == cur_side:
+                        objects.append(cmp)
+
+                    for pad in cmp.get_pads():
+                        if pad.is_through():
+                            objects.append(pad)
+                        elif pad.side == cur_side:
+                            objects.append(pad)
+
+        # TODO: Airwires are always visible
         objects += self.project.artwork.airwires
+
         return objects
 
 
     def render_component(self, mat, cmp, render_mode=RENDER_STANDARD, render_hint=RENDER_HINT_NORMAL):
-        if not self.layer_visible_m(cmp.on_layers()):
-            return
-
+        pass
         #if isinstance(cmp, DIPComponent):
         #    self.dip_renderer.render(mat, cmp, render_mode, render_hint)
         #elif isinstance(cmp, SMD4Component):
@@ -525,33 +559,40 @@ class BoardViewWidget(BaseViewWidget):
 
 
     def _layer_visible(self, l):
-        return l is self.viewState.current_layer or self.viewState.draw_other_layers
+        if self.render_mode == MODE_CAD:
+            return True
+        else:
+            return l is self.viewState.current_layer
 
     def layer_visible(self, l):
         return self.__layer_visible_lut[l.number]
 
     def layer_visible_m(self, l):
-        return self.viewState.current_layer in l or self.viewState.draw_other_layers
+        return self.viewState.current_layer in l
+
+
+    def query_point(self, pt):
+        all_aw = self.project.artwork.query_point(pt)
+
+        vis_aw = set(self.getVisible())
+        print(all_aw, all_aw in vis_aw)
+
+        # Todo: return multiple
+        if all_aw in vis_aw:
+            return all_aw
 
 
     def __build_batches(self):
-        artwork = self.getVisibleArtwork()
-
         # Build rendering batches
         with Timer() as t_aw:
             sx = set()
-            for i in artwork:
+            for i in self.project.artwork.traces:
                 rs = RENDER_SELECTED if i in self.selectionList else 0
+                sx.add((i,rs))
 
-                if isinstance(i, Trace):
-                        sx.add((i,rs))
-
-                elif isinstance(i, Polygon):
-                        self.poly_renderer.deferred(i, rs, RENDER_HINT_NORMAL)
-                elif isinstance(i, (Via, Airwire)):
-                    pass
-                else:
-                    raise NotImplementedError()
+            for i in self.project.artwork.polygons:
+                rs = RENDER_SELECTED if i in self.selectionList else 0
+                self.poly_renderer.deferred(i, rs, RENDER_HINT_NORMAL)
 
             with Timer() as t_vt_gen:
                 self.__via_project_batch.update_if_necessary(self.selectionList)
@@ -565,6 +606,8 @@ class BoardViewWidget(BaseViewWidget):
 
     def __render_top_half(self):
         self.__build_batches()
+
+        self.cmp_text_batch.update_if_necessary()
 
 
         # "Render" all the components
@@ -598,10 +641,14 @@ class BoardViewWidget(BaseViewWidget):
         l0 = self.compositor.get("LINEART_FS")
         with l0:
             self.hairline_batcher.render_frontside(self.viewState.glMatrix)
+            self.cmp_text_batch.render_layer(self.viewState.glMatrix, SIDE.Top, False)
+            self.cmp_text_batch.render_layer(self.viewState.glMatrix, SIDE.Top, True)
 
         l0 = self.compositor.get("LINEART_BS")
         with l0:
             self.hairline_batcher.render_backside(self.viewState.glMatrix)
+            self.cmp_text_batch.render_layer(self.viewState.glMatrix, SIDE.Bottom, False)
+            self.cmp_text_batch.render_layer(self.viewState.glMatrix, SIDE.Bottom, True)
 
 
         l0 = self.compositor.get("OVERLAY")
@@ -656,6 +703,8 @@ class BoardViewWidget(BaseViewWidget):
 
         return
 
+
+
     def render_mode_trace(self):
 
         # Composite all the layers
@@ -688,6 +737,11 @@ class BoardViewWidget(BaseViewWidget):
                 if layer in via_pair.layers:
                     pb.composite(via_pair, (255, 0, 255, 255))
 
+            if layer == self.project.stackup.layer_for_side(SIDE.Top):
+                pb.composite("LINEART_FS", (255,255,255,255))
+            elif layer == self.project.stackup.layer_for_side(SIDE.Bottom):
+                pb.composite("LINEART_BS", (255,255,255,255))
+
             pb.composite("MULTI", (255,255,255,255))
             pb.composite("OVERLAY", (255,255,255,255))
 
@@ -716,6 +770,7 @@ class BoardViewWidget(BaseViewWidget):
                     (255,255,255,255),  # Color of Selection
                     (128, 128, 128, 255),  # Color of Vias
                     (128,128,0,255),  # Color of Airwires
+                    (190, 190, 0, 255),
                 ]
             )
 

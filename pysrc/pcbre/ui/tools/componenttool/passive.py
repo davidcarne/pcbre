@@ -89,18 +89,17 @@ class PassiveModel(GenModel):
 
 
 class PassiveEditFlow(MultipointEditFlow):
-    def __init__(self, view, model):
+    def __init__(self, view, model, cmodel):
         self.view = view
         self.model = model
+        self._cmodel = cmodel
         
         self.first_point = EditablePoint(Point2(0,0))
 
-        self.theta = 0
 
-        self.side = SIDE.Top
 
         def other_point():
-            return Vec2.fromPolar(self.theta, self.model.pin_d)
+            return Vec2.fromPolar(self._cmodel.theta, self.model.pin_d)
 
         self.second_point = OffsetDefaultPoint(self.first_point, other_point)
 
@@ -108,12 +107,10 @@ class PassiveEditFlow(MultipointEditFlow):
 
     def updated(self, ep):
         v = (self.second_point.get() - self.first_point.get())
-        self.theta = v.angle()
+        self._cmodel.center = self.first_point.get() / 2 + self.second_point.get() / 2
+        self._cmodel.theta = v.angle()
         self.model.pin_d = v.mag()
 
-    @property
-    def center(self):
-        return self.first_point.get() / 2 + self.second_point.get() / 2
 
 class PassiveEditWidget(AutoSettingsWidget):
 
@@ -179,7 +176,7 @@ class PassiveEditWidget(AutoSettingsWidget):
         self.__model.snap_well = self.cb_snap.isChecked()
 
 def Passive_getComponent(model, ctrl, flow):
-    return Passive2Component(flow.center, flow.theta, flow.side,
+    return Passive2Component(flow.center, flow.theta, ctrl.view.current_side(),
                              model.sym_type, model.body_type, model.pin_d / 2,
                              model.body_corner_vec / 2, model.pin_corner_vec / 2,
                              side_layer_oracle=ctrl.project)

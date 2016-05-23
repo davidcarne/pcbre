@@ -26,10 +26,10 @@ class NameToolController(BaseToolController):
     def mousePressEvent(self, evt):
         pos = evt.pos()
         pt = Point2(self.view.viewState.tfV2W(Point2(pos)))
-        g = self.project.artwork.query_point(pt)
+        g = self.view.query_point(pt)
 
         if g:
-            dlg = NetDialog(self.view, g)
+            dlg = NetDialog(self.view.project, self.view, g)
             dlg.exec_()
 
     def mouseReleaseEvent(self, evt):

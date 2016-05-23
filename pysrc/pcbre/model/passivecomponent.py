@@ -2,6 +2,7 @@ from enum import Enum
 from pcbre.matrix import Vec2, Rect, Point2
 from pcbre.model.const import OnSide, IntersectionClass
 from pcbre.model.pad import Pad
+from pcbre.model.serialization import serialize_point2f, serialize_point2, deserialize_point2
 
 __author__ = 'davidc'
 
@@ -59,8 +60,8 @@ class Passive2Component(Component):
 
 
         self.__pads = [
-            Pad(self, 1, v, 0, y, x, td, self.side),
-            Pad(self, 2, -v, 0, y, x, td, self.side),
+            Pad(self, "1", v, 0, y, x, td, self.side),
+            Pad(self, "2", -v, 0, y, x, td, self.side),
         ]
 
     def get_pads(self):
@@ -78,18 +79,35 @@ class Passive2Component(Component):
 
     def serializeTo(self, pasv_msg):
         self._serializeTo(pasv_msg.common)
+        pasv_msg.init("passive2")
 
-        m = pasv_msg.dip
-        raise NotImplementedError()
+        m = pasv_msg.passive2
 
+        m.symType = self.sym_type.value
+        m.bodyType = self.body_type.value
+        m.pinD = int(self.pin_d)
+        m.bodyCornerVec = serialize_point2(self.body_corner_vec)
+        m.pinCornerVec = serialize_point2(self.pin_corner_vec)
 
     @staticmethod
-    def deserialize(project, dip_msg):
-        m = dip_msg.dip
+    def deserialize(project, pasv_msg):
+        m = pasv_msg.passive2
         cmp = Passive2Component.__new__(Passive2Component)
-        Component.deserializeTo(project, m.common, cmp)
-        raise NotImplementedError()
-        #cmp.__my_init(m.pinCount, m.pinSpace, m.pinWidth, m.padSize, project)
+        Component.deserializeTo(project, pasv_msg.common, cmp)
+
+
+
+        cmp.sym_type = PassiveSymType(m.symType)
+        cmp.body_type = Passive2BodyType(m.bodyType)
+
+        # Distance from center to pin
+        cmp.pin_d = m.pinD
+
+        cmp.body_corner_vec = deserialize_point2(m.bodyCornerVec)
+        cmp.pin_corner_vec = deserialize_point2(m.pinCornerVec)
+        cmp.__pads = []
+
+
         return cmp
 
 

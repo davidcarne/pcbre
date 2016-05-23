@@ -2,6 +2,7 @@ from collections import defaultdict
 from pcbre.accel.vert_array import VA_via
 from pcbre.model.artwork_geom import Via
 from pcbre.model.component import Component
+from pcbre.model.pad import Pad
 from pcbre.view.rendersettings import RENDER_SELECTED, RENDER_OUTLINES, RENDER_HINT_NORMAL
 import weakref
 from pcbre.view.target_const import COL_VIA, COL_SEL, COL_CMP_LINE
@@ -47,7 +48,7 @@ class ViaBoardBatcher:
         if self.__last_via_generation != self.project.artwork.vias_generation:
             ok = False
 
-        via_sel_list = set(i for i in selection_list if isinstance(i, (Via, Component)))
+        via_sel_list = set(i for i in selection_list if isinstance(i, (Pad, Via, Component)))
 
         if via_sel_list != self.__selected_set:
             ok = False
@@ -80,12 +81,12 @@ class ViaBoardBatcher:
         component_batch = self.__batch_for_vp["CMP"]
 
         for component in self.project.artwork.components:
-            if component in selection_list:
-                dest = component_batch.sel
-            else:
-                dest = component_batch.nonsel
 
             for pad in component.get_pads():
+                if component in selection_list or pad in selection_list:
+                    dest = component_batch.sel
+                else:
+                    dest = component_batch.nonsel
                 if pad.is_through():
                     dest.add_donut(pad.center.x, pad.center.y, pad.w/2, pad.th_diam/2)
 

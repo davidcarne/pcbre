@@ -49,7 +49,8 @@ class AirwireToolController(BaseToolController):
     def mouseReleaseEvent(self, evt):
         pt = self.view.viewState.tfV2W(Point2(evt.pos()))
 
-        aw = self.project.artwork.query_point(pt)
+
+        aw = self.view.query_point(pt)
         aw_l = layer_for(aw)
 
         if aw is None:

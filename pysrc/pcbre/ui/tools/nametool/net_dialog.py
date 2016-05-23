@@ -6,8 +6,10 @@ __author__ = 'davidc'
 from PySide import QtCore, QtGui
 
 class NetDialog(QtGui.QDialog):
-    def __init__(self, parent, obj):
+    def __init__(self, project, parent, obj):
         super(NetDialog, self).__init__(parent)
+
+        self.project = project
 
         buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel,
                                            QtCore.Qt.Horizontal, self)
@@ -86,9 +88,15 @@ class NetDialog(QtGui.QDialog):
         if isinstance(self.obj, Pad):
             self.obj.pad_name = str(self.pad_name_input.text())
 
+            # Bump the components generation to force a component redraw
+            self.project.artwork.components_generation += 1
+
         if self.cmp:
             self.cmp.refdes = str(self.refdes_input.text())
             self.cmp.partno = str(self.partname_input.text())
+
+            # Bump the components generation to force a component redraw
+            self.project.artwork.components_generation += 1
 
 
 

@@ -1,5 +1,6 @@
 from collections import namedtuple
 from pcbre.accel.vert_array import VA_xy
+from pcbre.model.const import SIDE
 from pcbre.ui.tools.componenttool.passive import PassiveModel, PassiveEditWidget, Passive_getComponent, PassiveEditFlow
 from pcbre.ui.tools.multipoint import MultipointEditRenderer, DONE_REASON
 from pcbre.ui.widgets.unitedit import UNIT_GROUP_MM
@@ -17,6 +18,7 @@ from pcbre.ui.uimodel import mdlacc, GenModel
 
 from pcbre.ui.tools.componenttool.basicsmd import BasicSMDICModel, BasicSMD_getComponent, BasicSMDFlow
 from pcbre.ui.tools.componenttool.dip import DIPModel, DIPEditWidget, DIP_getComponent, DIPEditFlow
+from pcbre.ui.tools.componenttool.sip import SIPModel, SIPEditWidget, SIP_getComponent, SIPEditFlow
 
 from pcbre.ui.dialogs.settingsdialog import MultiAutoSettingsDialog, UnitEditable, FloatTrait, LineEditable, \
     DegreeEditable
@@ -27,13 +29,15 @@ from pcbre.matrix import translate, rotate, Point2
 MDL_TYPE_BASICSMD = 0
 MDL_TYPE_DIP = 1
 MDL_TYPE_PASSIVE = 2
+MDL_TYPE_SIP = 3
 
 
 mdl_meta_t = namedtuple("mdl_meta", ["cons", "widget_cons", "flow_cons", "get_comp", "text"])
 mdl_meta = {
     MDL_TYPE_BASICSMD: mdl_meta_t(BasicSMDICModel, BasicSMDICEditWidget, BasicSMDFlow, BasicSMD_getComponent, "Basic 4-sided SMT"),
     MDL_TYPE_DIP: mdl_meta_t(DIPModel, DIPEditWidget, DIPEditFlow, DIP_getComponent, "DIP Component"),
-    MDL_TYPE_PASSIVE: mdl_meta_t(PassiveModel, PassiveEditWidget, PassiveEditFlow, Passive_getComponent, "2-lead passive")
+    MDL_TYPE_PASSIVE: mdl_meta_t(PassiveModel, PassiveEditWidget, PassiveEditFlow, Passive_getComponent, "2-lead passive"),
+    MDL_TYPE_SIP: mdl_meta_t(SIPModel, SIPEditWidget, SIPEditFlow, SIP_getComponent, "SIP Component"),
 }
 
 class ComponentSettings(MultiAutoSettingsDialog):
@@ -54,11 +58,11 @@ class ComponentSettings(MultiAutoSettingsDialog):
         hfl.addRow("Component Type", ct_cmb)
 
 
-        self.w_x = UnitEditable(ctrl.flow, "center.x", UNIT_GROUP_MM)
+        self.w_x = UnitEditable(ctrl.mdl, "center.x", UNIT_GROUP_MM)
         hfl.addRow("Position X:", self.w_x.widget)
-        self.w_y = UnitEditable(ctrl.flow, "center.y", UNIT_GROUP_MM)
+        self.w_y = UnitEditable(ctrl.mdl, "center.y", UNIT_GROUP_MM)
         hfl.addRow("Position Y:", self.w_y.widget)
-        self.w_theta = DegreeEditable(ctrl.flow, "theta")
+        self.w_theta = DegreeEditable(ctrl.mdl, "theta")
         hfl.addRow("Theta:", self.w_theta.widget)
 
         self.headerWidget.setLayout(hfl)
@@ -94,6 +98,8 @@ class ComponentModel(GenModel):
             i.changed.connect(self.changed)
 
     cmptype = mdlacc(MDL_TYPE_BASICSMD)
+    center = mdlacc(Point2(0,0))
+    theta = mdlacc(0)
 
     def get_selected_model(self):
         return self.model_instances[self.cmptype]
@@ -120,6 +126,9 @@ class ComponentOverlay:
     def render(self, vs, compositor):
         with Timer() as t_get:
             cmp = self.parent.get_component()
+
+        if not cmp:
+            return
 
         cmp._project = self.parent.project
 
@@ -165,7 +174,10 @@ class ComponentController(BaseToolController):
         self.restartFlow()
 
     def get_component(self):
-        return mdl_meta[self.mdl.cmptype].get_comp(self.mdl.get_selected_model(), self, self.flow)
+        if self.view.current_side() is None:
+            return
+
+        return mdl_meta[self.mdl.cmptype].get_comp(self.mdl.get_selected_model(), self, self.mdl)
 
     def showSettingsDialog(self):
         dlg = ComponentSettings(self.mdl, self)
@@ -199,16 +211,15 @@ class ComponentController(BaseToolController):
 
         if self.flow.done == DONE_REASON.ACCEPT:
             cmp = self.get_component()
+            if not cmp:
+                return
+
             self.project.artwork.merge_component(cmp)
             self.restartFlow()
 
     def restartFlow(self):
-        self.flow = mdl_meta[self.mdl.cmptype].flow_cons(self.view, self.mdl.get_selected_model())
+        self.flow = mdl_meta[self.mdl.cmptype].flow_cons(self.view, self.mdl.get_selected_model(), self.mdl)
         self.flow.make_active(True)
-
-    @property
-    def side(self):
-        return self.view.viewState.current_layer.side
 
 
 class ComponentTool(BaseTool):

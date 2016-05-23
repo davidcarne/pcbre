@@ -261,7 +261,7 @@ class MultipointEditFlow:
             self.abort_entry()
         elif keycode in (QtCore.Qt.Key_Enter, QtCore.Qt.Key_Return):
             if self.__point_active:
-                self.commit_entry()
+                self.commit_entry(evt.modifiers() & QtCore.Qt.ShiftModifier)
             else:
                 self.__done = DONE_REASON.ACCEPT
 
