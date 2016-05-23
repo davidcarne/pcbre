@@ -1,13 +1,7 @@
 import os.path
 import ctypes
-import pkg_resources
-import sysconfig
-
-# This terrible hack seems to be able to find the compiled acceleration library
-extension = sysconfig.get_config_var('SO')
-dllname = pkg_resources.resource_filename('pcbre.accel', '_edtaa3' + extension)
-
-dll = ctypes.CDLL(dllname)
+from .find_so import find_so
+dll = ctypes.CDLL(find_so("_edtaa3"))
 
 c_double_p = ctypes.POINTER(ctypes.c_double)
 c_short_p = ctypes.POINTER(ctypes.c_short)
