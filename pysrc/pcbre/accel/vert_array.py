@@ -128,6 +128,9 @@ class VA_via(VA):
     def add_donut(self, x, y, r, r_inside=0):
         lib.via_array_append(self._va, x, y, r, r_inside)
 
+    def add_th_pad(self, pad):
+        self.add_donut(pad.center.x, pad.center.y, pad.w/2, pad.th_diam/2)
+
     def add_via(self, via):
         lib.via_array_append(self._va, via.pt.x, via.pt.y, via.r, 0)
 

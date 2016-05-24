@@ -160,7 +160,11 @@ class CompositeManager:
         class _PREBIND:
             def composite(self, n, layer_primary_color):
                 alpha = 0.5 * 255
-                l = layer_list[n]
+                try:
+                    l = layer_list[n]
+                except KeyError:
+                    return
+
                 GL.glActiveTexture(GL.GL_TEXTURE0)
                 GL.glBindTexture(GL.GL_TEXTURE_2D, l.info_texture)
 
@@ -212,7 +216,6 @@ class RenderLayer:
         GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
 
     def __setup(self, width, height):
-        print (width,height)
         if self.__is_setup:
             self.__teardown()
 

@@ -1,4 +1,6 @@
 import enum
+
+from pcbre.model.pad import Pad
 from .basetool import BaseTool, BaseToolController
 from pcbre.model.artwork_geom import Trace
 from pcbre.ui.boardviewwidget import MODE_CAD, MODE_TRACE
@@ -84,7 +86,12 @@ class SelectToolController(BaseToolController):
     def keyPressEvent(self, evt):
         if evt.key() == QtCore.Qt.Key_Backspace or evt.key() == QtCore.Qt.Key_Delete:
             for v in self.view.selectionList:
+                if isinstance(v, Pad):
+                    continue
+
                 self.project.artwork.remove(v)
+
+            self.view.selectionList = []
             return True
 
         return False

@@ -1,5 +1,5 @@
 from collections import namedtuple
-from pcbre.accel.vert_array import VA_xy
+from pcbre.accel.vert_array import VA_xy, VA_thickline
 from pcbre.model.const import SIDE
 from pcbre.ui.tools.componenttool.passive import PassiveModel, PassiveEditWidget, Passive_getComponent, PassiveEditFlow
 from pcbre.ui.tools.multipoint import MultipointEditRenderer, DONE_REASON
@@ -8,7 +8,6 @@ from pcbre.util import Timer
 from pcbre.view.componentview import cmp_border_va, cmp_pad_periph_va
 from pcbre.view.rendersettings import RENDER_OUTLINES, RENDER_HINT_ONCE
 from pcbre.view.target_const import COL_SEL
-from pcbre.view.traceview import trace_batch_and_draw
 
 __author__ = 'davidc'
 
@@ -120,37 +119,38 @@ class ComponentOverlay:
         """
         self.parent = parent
 
+        self.__outline = VA_xy(1024)
+        self.__trace   = VA_thickline(1024)
+
     def initializeGL(self, gls):
         pass
 
-    def render(self, vs, compositor):
-        with Timer() as t_get:
-            cmp = self.parent.get_component()
+    def update(self):
+        cmp = self.parent.get_component()
 
         if not cmp:
             return
 
         cmp._project = self.parent.project
 
-        outline = VA_xy(1024)
-        cmp_border_va(outline, cmp)
-        cmp_pad_periph_va(outline, cmp)
+        self.__outline.clear()
+        self.__trace.clear()
 
+        cmp_border_va(self.__outline, cmp)
+        cmp_pad_periph_va(self.__outline, self.__trace, cmp)
+
+
+    def render(self, vs, compositor):
+
+        self.update()
 
         pr = MultipointEditRenderer(self.parent.flow, self.parent.view)
-
         with compositor.get("OVERLAY"):
             # Render all the traces
-            self.parent.view.hairline_renderer.render_va(self.parent.view.viewState.glMatrix, outline, 0, COL_SEL)
-
+            self.parent.view.hairline_renderer.render_va(self.parent.view.viewState.glMatrix, self.__outline, 0)
+            self.parent.view.trace_renderer.render_va(self.__trace, self.parent.view.viewState.glMatrix, COL_SEL, True)
             pr.render()
 
-        traces = []
-        for i in cmp.get_pads():
-            if not i.is_through():
-                traces.append(i.trace_repr)
-
-        trace_batch_and_draw(self.parent.view, traces)
 
 
 class ComponentController(BaseToolController):

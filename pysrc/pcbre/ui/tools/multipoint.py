@@ -132,9 +132,9 @@ class MultipointEditRenderer:
 
                 dest.add_line(pa_.x, pa_.y, pb_.x, pb_.y)
 
-        self.view.hairline_renderer.render_va(self.view.viewState.glWMatrix,va_current,va_current.tell(),COL_SEL)
-        self.view.hairline_renderer.render_va(self.view.viewState.glWMatrix,va_unset, va_unset.tell(),COL_UNSET_MARK)
-        self.view.hairline_renderer.render_va(self.view.viewState.glWMatrix,va_set, va_set.tell(),COL_SET_MARK)
+        self.view.hairline_renderer.render_va(self.view.viewState.glWMatrix,va_current,COL_SEL)
+        self.view.hairline_renderer.render_va(self.view.viewState.glWMatrix,va_unset, COL_UNSET_MARK)
+        self.view.hairline_renderer.render_va(self.view.viewState.glWMatrix,va_set, COL_SET_MARK)
 
 
 class MultipointEditFlow:

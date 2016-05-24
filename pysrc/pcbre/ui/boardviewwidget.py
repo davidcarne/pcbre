@@ -9,6 +9,7 @@ import OpenGL.GL as GL
 import numpy
 from OpenGL.arrays.vbo import VBO
 from pcbre import units
+from pcbre.accel.vert_array import VA_thickline, VA_xy, VA_via, VA_tex
 from pcbre.matrix import scale, translate, Point2, projectPoint
 from pcbre.model.const import SIDE
 from pcbre.model.dipcomponent import DIPComponent
@@ -24,15 +25,18 @@ from pcbre.ui.gl.textrender import TextBatcher, TextBatch
 from pcbre.ui.tools.airwiretool import AIRWIRE_COLOR
 from pcbre.util import Timer
 from pcbre.view.cachedpolygonrenderer import PolygonVBOPair, CachedPolygonRenderer
+from pcbre.view.cad_cache import CADCache, StackupRenderCommands, SelectionHighlightCache
 from pcbre.view.componenttext import ComponentTextBatcher
+from pcbre.view.componentview import cmp_border_va
 from pcbre.view.debugrender import DebugRender
-from pcbre.view.hairlinerenderer import HairlineRenderer, HairlineBatcher
+from pcbre.view.hairlinerenderer import HairlineRenderer
 from pcbre.view.imageview import ImageView
 from pcbre.view.layer_render_target import RenderLayer, CompositeManager
 from pcbre.view.rendersettings import RENDER_OUTLINES, RENDER_STANDARD, RENDER_SELECTED, RENDER_HINT_NORMAL, \
     RENDER_HINT_ONCE
+from pcbre.view.target_const import COL_LAYER_MAIN, COL_CMP_LINE, COL_SEL
 from pcbre.view.traceview import TraceRender
-from pcbre.view.viaview import THRenderer, ViaBoardBatcher
+from pcbre.view.viaview import THRenderer
 from pcbre.view.viewport import ViewPort
 from pcbre.model.artwork import Via
 from pcbre.model.artwork_geom import Trace, Via, Polygon, Airwire
@@ -377,6 +381,7 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
     def isModified(self):
         return self.modified
 
+
 class BoardViewWidget(BaseViewWidget):
     def __init__(self, project):
         BaseViewWidget.__init__(self)
@@ -385,37 +390,32 @@ class BoardViewWidget(BaseViewWidget):
 
         self.image_view_cache = { }
 
-        #self.pad_renderer = PadRender(self)
-
-        #self.dip_renderer = DIPRender(self)
-        #self.smd_renderer = SMDRender(self)
-        #self.passive_renderer = PassiveRender(self)
+        self.compositor = CompositeManager()
 
         self.trace_renderer = TraceRender(self)
         self.via_renderer = THRenderer(self)
-        self.__via_project_batch = ViaBoardBatcher(self.via_renderer, self.project)
-
-        self.text_batch = TextBatcher(self.gls.text)
-        self.cmp_text_batch = ComponentTextBatcher(self, self.project, self.gls.text)
-
-        self.poly_renderer = CachedPolygonRenderer(self)
         self.hairline_renderer = HairlineRenderer(self)
-
-
-        self.hairline_batcher = HairlineBatcher(self.hairline_renderer, self.project)
-
 
         self.debug_renderer = DebugRender(self)
 
+        self.render_commands = StackupRenderCommands()
+        self.__cad_cache = CADCache(self.project)
+        self.__sel_cache = SelectionHighlightCache(self.project)
 
-        self.compositor = CompositeManager()
+        # TODO, currently broken
+        self.poly_renderer = CachedPolygonRenderer(self)
+
+
+
+
+
+
+
 
         # Initial view is a normalized 1-1-1 area.
         # Shift to be 10cm max
         self.viewState.transform = translate(-0.9, -0.9).dot(scale(1./100000))
 
-
-        self.__deferred_last_text = False
 
         self.render_mode = MODE_CAD
 
@@ -463,11 +463,8 @@ class BoardViewWidget(BaseViewWidget):
         return self.image_view_cache[key]
 
     def reinit(self):
-        #self.pad_renderer.initializeGL(self, self.gls)
         self.trace_renderer.initializeGL(self.gls)
         self.via_renderer.initializeGL(self.gls)
-        self.text_batch.initializeGL()
-        self.cmp_text_batch.initializeGL()
         self.poly_renderer.initializeGL()
         self.hairline_renderer.initializeGL()
         self.debug_renderer.initializeGL(self.gls)
@@ -522,7 +519,6 @@ class BoardViewWidget(BaseViewWidget):
             pass
         else:
                 cur_side = self.current_side()
-                print("Current side is %s" % cur_side)
                 for cmp in self.project.artwork.components:
                     if cmp.side == cur_side:
                         objects.append(cmp)
@@ -537,10 +533,6 @@ class BoardViewWidget(BaseViewWidget):
         objects += self.project.artwork.airwires
 
         return objects
-
-
-    def render_component(self, mat, cmp, render_mode=RENDER_STANDARD, render_hint=RENDER_HINT_NORMAL):
-        pass
 
 
     def _layer_visible(self, l):
@@ -560,79 +552,63 @@ class BoardViewWidget(BaseViewWidget):
         all_aw = self.project.artwork.query_point(pt)
 
         vis_aw = set(self.getVisible())
-        print(all_aw, all_aw in vis_aw)
 
         # Todo: return multiple
         if all_aw in vis_aw:
             return all_aw
 
 
-    def __build_batches(self):
-        # Build rendering batches
-        with Timer() as t_aw:
-            sx = set()
-            for i in self.project.artwork.traces:
-                rs = RENDER_SELECTED if i in self.selectionList else 0
-                sx.add((i,rs))
-
-            for i in self.project.artwork.polygons:
-                rs = RENDER_SELECTED if i in self.selectionList else 0
-                self.poly_renderer.deferred(i, rs, RENDER_HINT_NORMAL)
-
-            with Timer() as t_vt_gen:
-                self.__via_project_batch.update_if_necessary(self.selectionList)
-                self.hairline_batcher.update_if_necessary(self.selectionList, self.__layer_visible_lut)
-
-
-            with Timer() as t_tr_gen:
-                for i,rs in sx:
-                    self.trace_renderer.deferred(i, rs)
-
 
     def __render_top_half(self):
-        self.__build_batches()
+        """
+        :return:
+        """
 
-        self.cmp_text_batch.update_if_necessary()
+        # Forcibly init all layers
+        for l in self.project.stackup.layers:
+            self.render_commands.layers[l]
 
-        # Build all artwork layers
-        for n, layer in enumerate(self.project.stackup.layers):
-            with self.compositor.get(layer):
+        for v in self.project.stackup.via_pairs:
+            self.render_commands.vias[v]
 
-                # Draw artwork
+        self.render_commands.clear()
 
-                # Draw polygon
-                self.poly_renderer.render(self.viewState.glMatrix, layer)
+        # Update CAD cache
+        self.__cad_cache.update_if_necessary()
+        self.__cad_cache.extendTo(self.render_commands)
 
-        self.trace_renderer.render(self.viewState.glMatrix)
+        # Update Selection cache
+        self.__sel_cache.update_if_necessary(self.selectionList)
 
-        for via_pair in self.project.stackup.via_pairs:
-            with self.compositor.get(via_pair):
-                self.__via_project_batch.render_viapair(self.viewState.glMatrix, via_pair)
+        for k, v in self.render_commands.layers.items():
+            with self.compositor.get(k):
+                self.trace_renderer.render_va(v.va_traces, self.viewState.glMatrix, COL_LAYER_MAIN)
+                # TODO: Render Text
+
+        # Draw all the viapairs
+        for k, v in self.render_commands.vias.items():
+            with self.compositor.get(k):
+                self.via_renderer.render_filled(self.viewState.glMatrix, v.va_vias)
+
+        # Draw the multilayer components
+        with self.compositor.get("MULTI"):
+            self.via_renderer.render_filled(self.viewState.glMatrix, self.render_commands.multi.va_vias)
+            # TODO: Render text
+
+        # Draw the front and back sides
+        for k, v in self.render_commands.sides.items():
+            with self.compositor.get(("LINEART", k)):
+                self.hairline_renderer.render_va(self.viewState.glMatrix, v.va_outlines, COL_CMP_LINE)
+                # TODO: Render text
 
 
-        # Draw full-stack components
-        l0 = self.compositor.get("MULTI")
-        with l0:
-            self.__via_project_batch.render_component_pads(self.viewState.glMatrix)
-
-        l0 = self.compositor.get("LINEART_FS")
-        with l0:
-            self.hairline_batcher.render_frontside(self.viewState.glMatrix)
-            self.cmp_text_batch.render_layer(self.viewState.glMatrix, SIDE.Top, False)
-            self.cmp_text_batch.render_layer(self.viewState.glMatrix, SIDE.Top, True)
-
-        l0 = self.compositor.get("LINEART_BS")
-        with l0:
-            self.hairline_batcher.render_backside(self.viewState.glMatrix)
-            self.cmp_text_batch.render_layer(self.viewState.glMatrix, SIDE.Bottom, False)
-            self.cmp_text_batch.render_layer(self.viewState.glMatrix, SIDE.Bottom, True)
-
-
-        l0 = self.compositor.get("OVERLAY")
+        # Just create (don't actually bind) the overlay layer
+        with self.compositor.get("OVERLAY"):
+            self.hairline_renderer.render_va(self.viewState.glMatrix, self.__sel_cache.thinline_va, COL_SEL)
+            self.trace_renderer.render_va(self.__sel_cache.thickline_va, self.viewState.glMatrix, COL_SEL)
+            self.via_renderer.render_filled(self.viewState.glMatrix, self.__sel_cache.via_va, COL_SEL)
 
         self.render_tool()
-            #self.hairline_renderer.render_group(self.viewState.glMatrix, None)
-            #self.hairline_renderer.render_group(self.viewState.glWMatrix, "OVERLAY_VS")
 
     def render_mode_cad(self):
 
@@ -680,9 +656,9 @@ class BoardViewWidget(BaseViewWidget):
 
 
         draw_things.sort(key=layer_key)
-        draw_things.insert(0, ("LINEART_BS", (255,255,255)))
+        draw_things.insert(0, (("LINEART", SIDE.Top), (255,255,255)))
         draw_things.append(("MULTI", (255,255,255)))
-        draw_things.append(("LINEART_FS", (255,255,255)))
+        draw_things.append((("LINEART", SIDE.Bottom), (255,255,255)))
 
         with self.compositor.composite_prebind() as pb:
             for key, color in draw_things:
@@ -704,8 +680,7 @@ class BoardViewWidget(BaseViewWidget):
         if layer is None:
             return
 
-
-        # Draw the
+        # Draw the imagery
         stackup_layer = self.viewState.current_layer
 
         if stackup_layer is not None and self.viewState.show_images and (len(stackup_layer.imagelayers) > 0):
@@ -715,23 +690,25 @@ class BoardViewWidget(BaseViewWidget):
             for l in images_cycled:
                 self.image_view_cache_load(l).render(self.viewState.glMatrix)
 
-        # Draw order doesn't matter
         with self.compositor.composite_prebind() as pb:
 
             # Render the traced geometry
             color = self.color_for_layer(layer)
             pb.composite(layer, color)
 
+            # Render any viapairs on this layer
             for via_pair in self.project.stackup.via_pairs:
-                if layer in via_pair.layers:
+                if self.vp_is_visible(via_pair):
                     pb.composite(via_pair, (255, 0, 255))
 
-            if layer == self.project.stackup.layer_for_side(SIDE.Top):
-                pb.composite("LINEART_FS", (255,255,255))
-            elif layer == self.project.stackup.layer_for_side(SIDE.Bottom):
-                pb.composite("LINEART_BS", (255,255,255))
+            # Render the line-art
+            side = self.project.stackup.side_for_layer(layer)
+            pb.composite(("LINEART", side), (255,255,255))
 
+            # Multilayer through-holes
             pb.composite("MULTI", (255,255,255))
+
+            # And the tool overlay
             pb.composite("OVERLAY", (255,255,255))
 
 
@@ -745,7 +722,6 @@ class BoardViewWidget(BaseViewWidget):
 
             # zero accuum buffers for restarts
             self.trace_renderer.restart()
-            self.text_batch.restart()
             self.poly_renderer.restart()
 
             # Update the Compositor
