@@ -1,4 +1,6 @@
 from OpenGL.arrays.vbo import VBO
+
+from pcbre.accel.vert_array import VA_xy
 from pcbre.ui.gl import VAO
 
 __author__ = 'davidc'
@@ -32,15 +34,15 @@ class BackgroundGridRender:
         self.resize(width, height)
 
     def __get_vbo_data(self):
-        data = numpy.ndarray(self.n_steps * 2, dtype=self.__vbo_dtype)
+        va = VA_xy(1024)
+
 
         # Unit steps from -n/2..n/2 along X axis. Y lines from -1 to +1
         for i in range(0, self.n_steps * 2, 2):
             i_ = i - int(self.n_steps / 2)
-            data[i]["vertex"] = (i_, -1)
-            data[i+1]["vertex"] = (i_, 1)
+            va.add_line(i_, -1, i_, 1)
 
-        return data
+        return va
 
 
 

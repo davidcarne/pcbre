@@ -264,7 +264,7 @@ class BasicSMDICModel(GenModel):
 
 
 def BasicSMD_getComponent(mdl, ctrl, flow):
-    return SMD4Component(flow.center, flow.theta + math.pi/2, ctrl.view.current_side, ctrl.project,
+    return SMD4Component(flow.center, flow.theta + math.pi/2, ctrl.view.current_side(), ctrl.project,
                        mdl.side1_pins, mdl.side2_pins, mdl.side3_pins, mdl.side4_pins,
                        mdl.dim_1_body, mdl.dim_1_pincenter, mdl.dim_2_body, mdl.dim_2_pincenter,
                        mdl.pin_contact_length, mdl. pin_contact_width, mdl.pin_spacing)

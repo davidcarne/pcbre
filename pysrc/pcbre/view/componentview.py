@@ -64,89 +64,6 @@ def _text_to(view, pad, r, mat, textcol_a):
 
 
 
-
-
-
-
-#class PadRender:
-    #def __init__(self, parent_view):
-    #    self.parent = parent_view
-    #    pass
-
-    #def initializeGL(self, view, gls):
-    #    """
-    #    :type gls: GLShared
-    #    :param gls:
-    #    :return:
-    #    """
-    #    self.gls = gls
-    #    self.view = view
-    #    self.text_cache = {}
-
-
-    #def render(self, mat, pad, render_mode=RENDER_STANDARD, render_hint=RENDER_HINT_NORMAL):
-    #    """
-    #    :type pad: Pad
-    #    :param mat:
-    #    :param pad:
-    #    :return:
-    #    """
-
-
-        #textcol = self.parent.text_color()
-        #textcol_a = textcol + [1]
-
-        #color = self.parent.color_for_pad(pad)
-        #color_a = color + [1]
-        #if render_mode & RENDER_SELECTED:
-        #    color_a = [1,1,1,1]
-
-
-        #if pad.is_through():
-        #    self.parent.via_renderer.deferred(pad.center, pad.l/2, pad.th_diam/2, render_mode, render_hint)
-
-            #r = Rect.fromCenterSize(Point2(0,0), pad.l * 0.6, pad.w * 0.6)
-
-            #_text_to(self.view, pad,r, mat, textcol_a)
-        #else:
-        #    t = pad.trace_repr
-        #    self.parent.trace_renderer.deferred(t, render_mode, render_hint)
-            #r = Rect.fromCenterSize(Point2(0,0), pad.l*0.8, pad.w*0.8)
-            #_text_to(self.view, pad, r, mat, textcol_a)
-
-
-class _SideVA:
-    def __init__(self):
-        self.silk = VA_xy(1024)
-        self.side_cmp = VA_thickline(1024)
-
-    def clear(self):
-        self.silk.clear()
-        self.side_cmp.clear()
-
-class ComponentRender:
-    def __init__(self, view):
-        self.__cache = weakref.WeakKeyDictionary()
-        self.view = view
-
-        self._top = _SideVA()
-        self._bottom = _SideVA()
-        self._through = VA_via(1024)
-
-
-    def initializeGL(self, gls):
-        pass
-
-
-    def update_if_necessary(self):
-
-        #if self.c
-        # We build VA's for top
-        group = None
-        pass
-
-
-
 def passive_border_va(va, cmp):
     """
     :type cmp: pcbre.model.passivecomponent.Passive2Component
@@ -217,9 +134,9 @@ def cmp_border_va(dest, component):
     elif isinstance(component, Passive2Component):
         passive_border_va(dest, component)
 
-def cmp_pad_periph_va(va_xy, component):
+def cmp_pad_periph_va(va_xy, va_trace, component):
     for i in component.get_pads():
         if i.is_through():
             va_xy.add_circle(i.center.x, i.center.y, i.w/2)
-        #else:
-        #    va_xy.add_box(i.center.x, i.center.y, i.w, i.l, i.theta)
+        else:
+            va_trace.add_trace(i.trace_repr)

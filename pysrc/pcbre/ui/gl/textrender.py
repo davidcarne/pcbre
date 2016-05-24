@@ -99,11 +99,10 @@ class TextBatcher(object):
         self.vbo = VBO(numpy.ndarray(0, dtype=self.text_render.buffer_dtype), GL.GL_DYNAMIC_DRAW, GL.GL_ARRAY_BUFFER)
         self.vao = VAO()
 
-
-
         with self.vao, self.vbo:
             self.text_render.b1.assign()
             self.text_render.b2.assign()
+
         self.__vbo_needs_update = True
 
 
@@ -118,12 +117,11 @@ class TextBatcher(object):
 
         with self.text_render.sdf_shader, self.text_render.tex.on(GL.GL_TEXTURE_2D), self.vao:
             GL.glUniform1i(self.text_render.sdf_shader.uniforms.tex1, 0)
+            GL.glUniform4ui(self.text_render.sdf_shader.uniforms.layer_info, 255, COL_TEXT, 0, 255)
 
             for tag in self.__render_tags[key]:
                 mat_calc = tag.matrix
                 GL.glUniformMatrix3fv(self.text_render.sdf_shader.uniforms.mat, 1, True, mat_calc.astype(numpy.float32))
-                GL.glUniform4ui(self.text_render.sdf_shader.uniforms.layer_info, 255, COL_TEXT, 0, 255)
-
                 GL.glDrawArrays(GL.GL_TRIANGLES, tag.textinfo.start, tag.textinfo.count)
 
     def submit(self, ts, mat, color, k=None):
@@ -219,6 +217,7 @@ class TextRender(object):
         self.sdf_atlas = sdf_atlas
 
         self.last_glyph_count = 0
+        self.__cached_metrics = {}
 
     def initializeGL(self):
         self.sdf_shader = self.gls.shader_cache.get("image_vert", "tex_frag")
@@ -247,12 +246,10 @@ class TextRender(object):
         :return:
         """
 
-        # In the future, we'll probably want to move to a texture-buffer-object
-        # approach for storing glyph metrics, such that all we need to submit is an
-        # array of character indicies and X-offsets
-        #
-        # This would pack into 8 bytes/char quite nicely (4 byte char index, float32 left)
-        # With this, streaming text to the GPU would be much more effective
+        try:
+            return self.__cached_metrics[text]
+        except KeyError:
+            pass
 
         # Starting pen X coordinate
         va = VA_tex(1024)
@@ -271,21 +268,24 @@ class TextRender(object):
             h = (gp.h + margin * 2)
             # Calculate the offset to the corner of the character.
             c_off_x = pen_x + gp.l - margin
+
             # Y position is a bit tricky. the "top" of the glyph is whats specified, but we care about the bottom-left
             # so subtract the height
             c_off_y = gp.t - gp.h - margin
 
+            # Update the bounding rect
             left = min(left, (c_off_x + margin) / BASE_FONT)
             right = max(right, (c_off_x + w - margin) / BASE_FONT)
             bottom = min(bottom, (c_off_y + margin) / BASE_FONT)
             top = max(top, (c_off_y + h - margin) / BASE_FONT)
 
+            # Calculate the draw rect positions
             x0 = (c_off_x) / BASE_FONT
             y0 = (c_off_y) / BASE_FONT
             x1 = (c_off_x + w) / BASE_FONT
             y1 = (c_off_y + h) / BASE_FONT
 
-
+            # Add two triangles for the rect
             va.add_tex(x0, y0, gp.sx, gp.sy)
             va.add_tex(x0, y1, gp.sx, gp.ty)
             va.add_tex(x1, y0, gp.tx, gp.sy)
@@ -295,7 +295,11 @@ class TextRender(object):
 
             # And increment to the next character
             pen_x += gp.hb
-        return _StringMetrics(va, (left, right, bottom, top))
+
+        cm = _StringMetrics(va, (left, right, bottom, top))
+
+        self.__cached_metrics[text] = cm
+        return cm
 
 
 

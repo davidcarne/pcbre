@@ -1,6 +1,6 @@
 from PySide import QtCore, QtGui
 
-from pcbre.accel.vert_array import VA_xy
+from pcbre.accel.vert_array import VA_xy, VA_via
 from .basetool import BaseTool, BaseToolController
 from pcbre.matrix import Point2, translate
 from pcbre.model.artwork_geom import Via
@@ -38,8 +38,7 @@ class ViaToolOverlay:
         self.tpm = ctrl.toolparammodel
         self.ctrl = ctrl
 
-        self.__hl = ctrl.view.hairline_renderer
-        self.__va = VA_xy(1024)
+        self.__va = VA_via(1024)
 
     def initializeGL(self, gls):
         """
@@ -54,11 +53,11 @@ class ViaToolOverlay:
         self.__va.clear()
 
         if self.tpm.current_layer_pair is not None:
-            self.__va.add_circle(self.ctrl.x, self.ctrl.y, self.tpm.radius)
+            self.__va.add_donut(self.ctrl.x, self.ctrl.y, self.tpm.radius, 0)
             #self.render_b.deferred(Point2(self.ctrl.x, self.ctrl.y), self.tpm.radius, 0, RENDER_OUTLINES)
 
         with compositor.get("OVERLAY"):
-            self.__hl.render_va(viewport.glMatrix, self.__va, 0, None)
+            self.view.via_renderer.render_outlines(viewport.glMatrix, self.__va)
 
 
 

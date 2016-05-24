@@ -4,7 +4,6 @@ from PySide import QtCore, QtGui
 
 from pcbre.accel.vert_array import VA_thickline
 from pcbre.view.target_const import COL_LAYER_MAIN
-from pcbre.view.traceview import trace_batch_and_draw
 from .basetool import BaseTool, BaseToolController
 from pcbre import units
 from pcbre.matrix import Point2, translate, Vec2
@@ -45,7 +44,20 @@ class TraceToolOverlay:
         if not traces:
             return
 
-        trace_batch_and_draw(self.view, traces)
+        # Render by drawing the VA
+        va_for_ly = defaultdict(lambda: VA_thickline(1024))
+
+        for t in traces:
+            va_for_ly[t.layer].add_trace(t)
+
+        for layer, va in va_for_ly.items():
+            with self.ctrl.view.compositor.get(layer):
+                self.ctrl.view.trace_renderer.render_va(
+                    va,
+                    self.ctrl.view.viewState.glMatrix,
+                    COL_LAYER_MAIN, True)
+
+
 
 
 class TraceToolController(BaseToolController):

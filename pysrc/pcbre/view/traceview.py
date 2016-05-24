@@ -25,54 +25,14 @@ FIRST_LINE_LOOP = NUM_ENDCAP_SEGMENTS * 2 + 2
 LINE_LOOP_SIZE = NUM_ENDCAP_SEGMENTS * 2
 
 
-def trace_batch_and_draw(view, traces):
-    va = VA_thickline(1024)
-
-    t_by_l = defaultdict(list)
-
-    # Layer batches
-    for i in traces:
-        t_by_l[i.layer].append(i)
-
-    # We build the VA such that each layer may be drawn contiguously
-    layer_meta = {}
-    for layer, traces in t_by_l.items():
-        layer_meta[layer] = va.tell(), len(traces)
-        for t in traces:
-            va.add_trace(t)
-
-    for layer, (first, count) in layer_meta.items():
-        with view.compositor.get(layer):
-            view.trace_renderer.render_va(va, view.viewState.glMatrix, COL_LAYER_MAIN, True,
-                                               first, count)
 
 # TODO: Detect automatically
 has_base_instance = True
 
-class TraceLayer:
-    def __init__(self):
-        self.nonsel = VA_thickline(1024)
-        self.sel = VA_thickline(1024)
-
 class TraceRender:
     def __init__(self, parent_view):
         self.parent = parent_view
-        self.__deferred_layer = defaultdict(TraceLayer)
         self.restart()
-
-    def __initialize_uniform(self, gls):
-        self.__uniform_shader_vao = VAO()
-        self.__uniform_shader = gls.shader_cache.get(
-                "line_vertex_shader","basic_fill_frag",
-                defines={"INPUT_TYPE":"uniform"},
-                fragment_bindings={"alpha" : 0, "type": 1}
-        )
-
-        with self.__uniform_shader_vao, self.trace_vbo:
-            vbobind(self.__uniform_shader, self.trace_vbo.dtype, "vertex").assign()
-            vbobind(self.__uniform_shader, self.trace_vbo.dtype, "ptid").assign()
-            self.index_vbo.bind()
-
 
     def initializeGL(self, gls):
         # Build trace vertex VBO and associated vertex data
@@ -140,24 +100,14 @@ class TraceRender:
 
             self.index_vbo.bind()
 
-        self.__initialize_uniform(gls)
-
-        self.__last_prepared = weakref.WeakKeyDictionary()
-
     def __base_rebind(self, base):
         self.__bind_pos_a.assign(base)
         self.__bind_pos_b.assign(base)
         self.__bind_thickness.assign(base)
 
     def restart(self):
-        self.__prepared = False
+        pass
 
-        # Reset all VBOs
-        for v in self.__deferred_layer.values():
-            v.sel.clear()
-            v.nonsel.clear()
-
-        self.__needs_rebuild = False
 
     def __build_trace(self):
         # Update trace VBO
@@ -178,20 +128,6 @@ class TraceRender:
         # Force data copy
         self.trace_vbo.copied = False
         self.trace_vbo.bind()
-
-
-    def deferred(self, trace, render_settings):
-        assert not self.__prepared
-        assert not render_settings & RENDER_OUTLINES
-
-        ls = self.__deferred_layer[trace.layer]
-
-        if render_settings & RENDER_SELECTED:
-            dest = ls.sel
-        else:
-            dest = ls.nonsel
-
-        dest.add_thickline(trace.p0.x, trace.p0.y, trace.p1.x, trace.p1.y, trace.thickness/2)
 
     def render(self, mat):
 
@@ -264,27 +200,10 @@ class TraceRender:
         self.instance_vbo.bind()
 
         if count is None:
-            count = va.count() - va.first()
+            count = va.count() - first
 
         with self.__attribute_shader, self.__attribute_shader_vao:
             GL.glUniformMatrix3fv(self.__attribute_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
 
             self.__render_va_inner(col, is_outline, first, count)
 
-
-
-    # Immediate-mode render of a single trace
-    # SLOW (at least for bulk-rendering)
-    # Useful for rendering Ua elements
-    def render_OLD(self, mat, trace, render_settings=RENDER_STANDARD):
-        with self.__uniform_shader, self.__uniform_shader_vao:
-            GL.glUniform1f(self.__uniform_shader.uniforms.thickness, trace.thickness/2)
-            GL.glUniform2f(self.__uniform_shader.uniforms.pos_a, trace.p0.x, trace.p0.y)
-            GL.glUniform2f(self.__uniform_shader.uniforms.pos_b, trace.p1.x, trace.p1.y)
-            GL.glUniformMatrix3fv(self.__uniform_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
-            GL.glUniform4ui(self.__uniform_shader.uniforms.layer_info, 255, COL_LAYER_MAIN, 0, 0)
-
-            if render_settings & RENDER_OUTLINES:
-                GL.glDrawArrays(GL.GL_LINE_LOOP, 2, NUM_ENDCAP_SEGMENTS * 2)
-            else:
-                GL.glDrawElements(GL.GL_TRIANGLES, TRIANGLES_SIZE, GL.GL_UNSIGNED_INT, ctypes.c_void_p(0))

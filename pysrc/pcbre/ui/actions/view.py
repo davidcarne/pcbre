@@ -124,7 +124,6 @@ class CycleModeAction(QtGui.QAction):
         self.triggered.connect(self.__cycle)
 
     def __cycle(self):
-        print("Trigger")
         mode = self.va.render_mode
 
         if mode == MODE_CAD:

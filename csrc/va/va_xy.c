@@ -242,3 +242,4 @@ void vertex_xy_array_arc(struct vertex_array * va, float cx, float cy, float r, 
 
 	}
 }
+
