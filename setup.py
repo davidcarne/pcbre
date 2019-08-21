@@ -18,7 +18,8 @@ setup(  name="pcbre",
         },
 
         entry_points = { 'console_scripts': [
-                "pcbre = pcbre.ui.main_gui:main"
+                "pcbre-launcher = pcbre.launcher:launcher_main",
+                "pcbre-app = pcbre.ui.main_gui:main"
             ],
         },
 

@@ -8,6 +8,12 @@ PCBRE currently doesn't have any documentation. This will likely change fairly s
 
 For support, please join #pcbre on freenode.
 
+## Launching PCBRE
+
+For versions distributed with a package manager, you probably want to start `pcbre-app`. This assumes the package manager has done its job, and hence all dependencies are installed.
+
+For versions distributed standalone, or when working within a venv or test environment, use `pcbre-launcher`. This will check all dependencies and provide advice on how to resolve them.
+
 ## Install
 
 PCBRE requires the following dependencies. Some will probably need to come from your systems package manager. Some might come from pip. Some need to be custom installed.
