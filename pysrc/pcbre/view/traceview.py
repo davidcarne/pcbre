@@ -141,8 +141,8 @@ class TraceRender:
             self.working_array["ptid"][2 + i + NUM_ENDCAP_SEGMENTS] = 1
 
         # Force data copy
-        self.trace_vbo.copied = False
         self.trace_vbo.bind()
+        self.trace_vbo.set_array(self.working_array)
 
 
 
@@ -196,10 +196,8 @@ class TraceRender:
                 pos += 1
 
         # Force full resend of VBO
-        self.instance_vbo.data = instance_array
-        self.instance_vbo.size = None
-        self.instance_vbo.copied = False
         self.instance_vbo.bind()
+        self.instance_vbo.set_array(instance_array)
 
 
     def render_deferred_layer(self, mat, layer):

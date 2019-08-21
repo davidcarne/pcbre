@@ -1,35 +1,35 @@
 __author__ = 'davidc'
 
-from PySide import QtGui, QtCore
+from PySide2 import QtGui, QtCore, QtWidgets
 
 def _nudge(dx, dy):
     pos = QtGui.QCursor.pos()
     QtGui.QCursor.setPos(pos.x() + dx, pos.y() + dy)
 
 
-class NudgeLeftAction(QtGui.QAction):
+class NudgeLeftAction(QtWidgets.QAction):
     def __init__(self, window):
-        QtGui.QAction.__init__(self, "nudge left", window, triggered=lambda: _nudge(-1, 0))
+        QtWidgets.QAction.__init__(self, "nudge left", window, triggered=lambda: _nudge(-1, 0))
         self.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Left))
 
-class NudgeRightAction(QtGui.QAction):
+class NudgeRightAction(QtWidgets.QAction):
     def __init__(self, window):
-        QtGui.QAction.__init__(self, "nudge right", window, triggered=lambda: _nudge(1, 0))
+        QtWidgets.QAction.__init__(self, "nudge right", window, triggered=lambda: _nudge(1, 0))
         self.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Right))
 
-class NudgeUpAction(QtGui.QAction):
+class NudgeUpAction(QtWidgets.QAction):
     def __init__(self, window):
-        QtGui.QAction.__init__(self, "nudge up", window, triggered=lambda: _nudge(0, -1))
+        QtWidgets.QAction.__init__(self, "nudge up", window, triggered=lambda: _nudge(0, -1))
         self.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Up))
 
-class NudgeDownAction(QtGui.QAction):
+class NudgeDownAction(QtWidgets.QAction):
     def __init__(self, window):
-        QtGui.QAction.__init__(self, "nudge up", window, triggered=lambda: _nudge(0, 1))
+        QtWidgets.QAction.__init__(self, "nudge up", window, triggered=lambda: _nudge(0, 1))
         self.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Down))
 
-class ShowToolSettingsAction(QtGui.QAction):
+class ShowToolSettingsAction(QtWidgets.QAction):
     def __init__(self, window):
-        QtGui.QAction.__init__(self, "Show tool settings", window, triggered=self.showToolSettings)
+        QtWidgets.QAction.__init__(self, "Show tool settings", window, triggered=self.showToolSettings)
         self.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Tab))
 
         self.window = window

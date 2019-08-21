@@ -1,10 +1,10 @@
-from PySide import QtGui, QtCore
+from PySide2 import QtGui, QtCore, QtWidgets
 import functools
 import collections
 
 __author__ = 'davidc'
 
-class UndoStack(QtGui.QUndoStack):
+class UndoStack(QtWidgets.QUndoStack):
     def setup_actions(self, target, menu=None):
         undoAction = self.createUndoAction(target)
         undoAction.setShortcuts(QtGui.QKeySequence.Undo)
@@ -20,7 +20,7 @@ class UndoStack(QtGui.QUndoStack):
 
 
 
-class undo_helper_fncall(QtGui.QUndoCommand):
+class undo_helper_fncall(QtWidgets.QUndoCommand):
     def __init__(self, set_state, *args, **kwargs):
         super(undo_helper_fncall, self).__init__()
 
@@ -92,7 +92,7 @@ class undofunc(object):
         self.merge_check = fn
         return self
 
-class undo_set_params(QtGui.QUndoCommand):
+class undo_set_params(QtWidgets.QUndoCommand):
     def __init__(self, target, **kwargs):
         super(undo_set_params, self).__init__()
         self._id = -1

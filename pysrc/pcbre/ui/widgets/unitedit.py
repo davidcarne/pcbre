@@ -2,7 +2,7 @@ from pcbre.ui.widgets.lineedit import PLineEdit
 
 __author__ = 'davidc'
 from collections import OrderedDict
-from PySide import QtGui, QtCore
+from PySide2 import QtCore, QtWidgets
 
 class UnitGroup(object):
     def __init__(self, items, default_index=0):
@@ -35,7 +35,7 @@ class UnitGroup(object):
 UNIT_GROUP_MM = UnitGroup([("\u00B5m", 1), ("mm", 1000), ("in", 25400)], 1)
 UNIT_GROUP_PX = UnitGroup([("px", 1)])
 
-class UnitLineEdit(QtGui.QWidget):
+class UnitLineEdit(QtWidgets.QWidget):
     edited = QtCore.Signal()
 
     def __init__(self, unitGroup, field_type=int):
@@ -44,13 +44,13 @@ class UnitLineEdit(QtGui.QWidget):
         self._value = 0
         self._field_type = float
 
-        self.layout = QtGui.QHBoxLayout()
+        self.layout = QtWidgets.QHBoxLayout()
         self.layout.setContentsMargins(0,0,0,0)
 
         self.__lineEdit = PLineEdit()
         self.__lineEdit.editingFinished.connect(self.text_changed)
 
-        self.__unitDropDown = QtGui.QComboBox()
+        self.__unitDropDown = QtWidgets.QComboBox()
         self.__unitDropDown.currentIndexChanged.connect(self.indexChanged)
 
         self._placeholder_value = None

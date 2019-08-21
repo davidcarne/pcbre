@@ -150,7 +150,6 @@ class _THBatch:
             instance_array[n] = (center, r1, r_frac_sq, color_mod)
 
         self.filled_instance_vbo.data = instance_array
-        self.filled_instance_vbo.size = None
         self.filled_instance_vbo.copied = False
         self.filled_instance_vbo.bind()
 
@@ -185,7 +184,6 @@ class _THBatch:
                 n += 1
 
         self.outline_instance_vbo.data = instance_array
-        self.outline_instance_vbo.size = None
         self.outline_instance_vbo.copied = False
         self.outline_instance_vbo.bind()
 

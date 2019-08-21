@@ -7,7 +7,7 @@ import scipy.ndimage.interpolation
 import time
 import freetype
 import numpy
-from PySide import QtCore, QtGui
+from PySide2 import QtCore, QtGui
 from pcbre.ui.misc import QImage_from_numpy
 import json
 
@@ -137,8 +137,8 @@ def distance_transform_bitmap(input, margin):
     # Combine inside and outside distance transform
     inside -= outside
 
-    old_w = inside.shape[1]/PRESCALE
-    old_h = inside.shape[0]/PRESCALE
+    old_w = inside.shape[1]//PRESCALE
+    old_h = inside.shape[0]//PRESCALE
 
     # Resample down to the low res version
     rescaled = scipy.ndimage.interpolation.zoom(inside, 1./PRESCALE, order=1)
@@ -185,7 +185,7 @@ class AtlasEntry(object):
 
     @staticmethod
     def fromGlyph(glyph):
-        return AtlasEntry(glyph.bitmap.width/PRESCALE, glyph.bitmap.rows/PRESCALE,
+        return AtlasEntry(glyph.bitmap.width//PRESCALE, glyph.bitmap.rows//PRESCALE,
                           0, 0, 0, 0,
                           glyph.metrics.horiBearingX/64.0/PRESCALE, glyph.metrics.horiBearingY/64.0/PRESCALE,
                           glyph.metrics.horiAdvance/64.0/PRESCALE)
@@ -310,10 +310,11 @@ class SDFTextAtlas(object):
 
 
     def getGlyph(self, char):
-        try:
-            return self.atlas[char]
-        except KeyError:
-            self.addGlyph(char)
+        v = self.atlas.get(char)
+        if v is not None:
+            return v
+
+        self.addGlyph(char)
 
         return self.atlas[char]
 

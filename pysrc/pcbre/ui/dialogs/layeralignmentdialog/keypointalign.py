@@ -1,4 +1,4 @@
-from PySide import QtCore, QtGui
+from PySide2 import QtCore, QtGui, QtWidgets
 from pcbre.model.imagelayer import KeyPointAlignment, KeyPoint
 from pcbre.ui.tools.basetool import BaseToolController
 from pcbre.matrix import translate, scale, Vec2, project_point_line, rotate, line_intersect, INTERSECT_NORMAL, Point2, \
@@ -348,7 +348,7 @@ class KeypointAlignmentModel(GenModel):
 
 # Command objects for undo.
 
-class cmd_add_keypoint(QtGui.QUndoCommand):
+class cmd_add_keypoint(QtWidgets.QUndoCommand):
     def __init__(self, model):
         super(cmd_add_keypoint, self).__init__()
         self.index = None
@@ -360,7 +360,7 @@ class cmd_add_keypoint(QtGui.QUndoCommand):
     def undo(self):
         self.model.del_keypoint(self.index)
 
-class cmd_set_keypoint_world(QtGui.QUndoCommand):
+class cmd_set_keypoint_world(QtWidgets.QUndoCommand):
     def __init__(self, model, index, world, merge=False, final=False):
         super(cmd_set_keypoint_world, self).__init__()
         self.world =  world
@@ -392,7 +392,7 @@ class cmd_set_keypoint_world(QtGui.QUndoCommand):
         self.model.set_keypoint_world(self.index, self.old_world)
 
 
-class cmd_set_keypoint_px(QtGui.QUndoCommand):
+class cmd_set_keypoint_px(QtWidgets.QUndoCommand):
     def __init__(self, model, index, pxpos, merge=False, final=False):
         super(cmd_set_keypoint_px, self).__init__()
         self.model = model
@@ -427,7 +427,7 @@ class cmd_set_keypoint_px(QtGui.QUndoCommand):
         self.model.set_keypoint_px(self.index, self.oldpos)
 
 
-class cmd_set_keypoint_used(QtGui.QUndoCommand):
+class cmd_set_keypoint_used(QtWidgets.QUndoCommand):
     def __init__(self, model, idx, use):
         super(cmd_set_keypoint_used, self).__init__()
         self.model = model
@@ -441,7 +441,7 @@ class cmd_set_keypoint_used(QtGui.QUndoCommand):
     def undo(self):
         self.model.set_keypoint_used(self.idx, self.used)
 
-class cmd_del_keypoint(QtGui.QUndoCommand):
+class cmd_del_keypoint(QtWidgets.QUndoCommand):
     def __init__(self, model, idx):
         super(cmd_del_keypoint, self).__init__()
         self.model = model
@@ -745,23 +745,23 @@ class KeypointAlignmentControllerView(BaseToolController):
                 self.do_set_cmd(current + nudge, True)
 
 
-class KeypointAlignmentWidget(QtGui.QWidget):
+class KeypointAlignmentWidget(QtWidgets.QWidget):
     def __init__(self, parent, model):
         super(KeypointAlignmentWidget, self).__init__()
         self.model = model
         self._parent = parent
 
-        layout = QtGui.QFormLayout()
+        layout = QtWidgets.QFormLayout()
         self.setLayout(layout)
 
-        keypoint_gb = QtGui.QGroupBox("Keypoint")
+        keypoint_gb = QtWidgets.QGroupBox("Keypoint")
         layout.addWidget(keypoint_gb)
 
-        edit_layout = QtGui.QFormLayout()
+        edit_layout = QtWidgets.QFormLayout()
         keypoint_gb.setLayout(edit_layout)
 
 
-        self.kpts_sel = QtGui.QComboBox()
+        self.kpts_sel = QtWidgets.QComboBox()
         self.kpts_sel.setModel(self.model.combo_adapter)
         self.kpts_sel.currentIndexChanged.connect(self.kptChanged)
         edit_layout.addRow("Keypoint:", self.kpts_sel)
@@ -781,21 +781,21 @@ class KeypointAlignmentWidget(QtGui.QWidget):
         self.py.edited.connect(self.update_layer)
 
 
-        self.use_for_alignment = QtGui.QCheckBox()
+        self.use_for_alignment = QtWidgets.QCheckBox()
         edit_layout.addRow("Use", self.use_for_alignment)
         self.use_for_alignment.clicked.connect(self.update_used)
 
-        self.add_btn = QtGui.QPushButton("Add New")
+        self.add_btn = QtWidgets.QPushButton("Add New")
         self.add_btn.clicked.connect(self.addKeypoint)
-        self.del_btn = QtGui.QPushButton("Remove Current")
+        self.del_btn = QtWidgets.QPushButton("Remove Current")
         self.del_btn.clicked.connect(self.delKeypoint)
-        bhl = QtGui.QHBoxLayout()
+        bhl = QtWidgets.QHBoxLayout()
         bhl.addWidget(self.add_btn)
         bhl.addWidget(self.del_btn)
         edit_layout.addRow(bhl)
 
 
-        self.constraint_status_lbl = QtGui.QLabel("")
+        self.constraint_status_lbl = QtWidgets.QLabel("")
         self.constraint_status_lbl.setWordWrap(True)
         layout.addRow(self.constraint_status_lbl)
 

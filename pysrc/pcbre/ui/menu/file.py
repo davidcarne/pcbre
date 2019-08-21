@@ -1,11 +1,11 @@
 __author__ = 'davidc'
 
-from PySide import QtGui
+from PySide2 import QtWidgets
 
 
-class FileMenu(QtGui.QMenu):
+class FileMenu(QtWidgets.QMenu):
     def __init__(self, mw):
-        QtGui.QMenu.__init__(self, "&File", mw)
+        QtWidgets.QMenu.__init__(self, "&File", mw)
 
         # Build the "Add" menu
         self.__menu_add = self.addMenu("Add")

@@ -1,4 +1,4 @@
-from PySide import QtCore, QtGui
+from PySide2 import QtCore, QtGui, QtWidgets
 
 class LayerListModel(QtCore.QAbstractListModel):
     def __init__(self, project, parent=None):
@@ -18,13 +18,13 @@ class LayerListModel(QtCore.QAbstractListModel):
             return self.p.stackup.layers[index.row()].name
         return None
 
-class LayerListWidget(QtGui.QDockWidget):
+class LayerListWidget(QtWidgets.QDockWidget):
     def __init__(self, project, viewState):
         super(LayerListWidget, self).__init__("Layer List")
         self.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
 
         model = LayerListModel(project)
-        customerList = QtGui.QListView(self)
+        customerList = QtWidgets.QListView(self)
         customerList.setModel(model)
         selm = customerList.selectionModel()
         self.p = project

@@ -1,21 +1,21 @@
-from PySide import QtGui, QtCore
+from PySide2 import QtGui, QtCore, QtWidgets
 import math
 from pcbre.matrix import Point2
 from pcbre.ui.widgets.unitedit import UnitLineEdit
 
 
-class SettingsDialog(QtGui.QDialog):
+class SettingsDialog(QtWidgets.QDialog):
     def __init__(self):
         super(SettingsDialog, self).__init__()
 
-        vl = QtGui.QVBoxLayout()
+        vl = QtWidgets.QVBoxLayout()
 
-        self.layout = QtGui.QFormLayout()
+        self.layout = QtWidgets.QFormLayout()
 
         self.setLayout(vl)
         vl.addLayout(self.layout)
 
-        bb = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         vl.addWidget(bb)
 
         bb.accepted.connect(self.accept)
@@ -187,7 +187,7 @@ class AutoSettingsDialog(SettingsDialog):
         super(AutoSettingsDialog, self).accept()
 
 
-class AutoSettingsWidget(QtGui.QWidget):
+class AutoSettingsWidget(QtWidgets.QWidget):
     """
     Widget similar to AutoSettingsDialog; for use with MultiAutoSettingsDialog
     """
@@ -207,7 +207,7 @@ class AutoSettingsWidget(QtGui.QWidget):
         for i in self.editables:
             i.save()
 
-class MultiAutoSettingsDialog(QtGui.QDialog):
+class MultiAutoSettingsDialog(QtWidgets.QDialog):
     def __init__(self):
         super(MultiAutoSettingsDialog, self).__init__()
 
@@ -215,7 +215,7 @@ class MultiAutoSettingsDialog(QtGui.QDialog):
         self.setLayout(vl)
 
 
-        self.headerWidget = QtGui.QWidget()
+        self.headerWidget = QtWidgets.QWidget()
         vl.addWidget(self.headerWidget)
 
         self.__qsw = QtGui.QStackedLayout()
@@ -223,7 +223,7 @@ class MultiAutoSettingsDialog(QtGui.QDialog):
 
         vl.addLayout(self.__qsw)
 
-        bb = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         vl.addWidget(bb)
 
         bb.accepted.connect(self.accept)

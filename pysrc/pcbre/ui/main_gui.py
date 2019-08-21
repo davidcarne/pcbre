@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from PySide import QtCore, QtGui
+from PySide2 import QtCore, QtGui, QtWidgets
 
 import pcbre.model.project as P
 from pcbre.ui.actions.add import AddImageDialogAction
@@ -52,7 +52,7 @@ class MainWindowActions:
         window.addAction(NudgeLeftAction(window))
         window.addAction(NudgeRightAction(window))
 
-class MainWindow(QtGui.QMainWindow):
+class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, p):
         super(MainWindow, self).__init__()
 
@@ -84,7 +84,7 @@ class MainWindow(QtGui.QMainWindow):
 
     def createToolbars(self):
         self.createViewToolbar()
-        self.bg = QtGui.QButtonGroup()
+        self.bg = QtWidgets.QButtonGroup()
         self.bg.setExclusive(True)
         self.bg.buttonClicked.connect(self.toolBarChanged)
 
@@ -173,7 +173,7 @@ def main():
             print("File not found")
             exit()
 
-    app = QtGui.QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
 
     gl_version = probe()
 

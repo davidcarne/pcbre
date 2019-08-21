@@ -1,4 +1,4 @@
-from PySide import QtCore, QtGui
+from PySide2 import QtCore, QtGui
 from .basetool import BaseTool, BaseToolController
 from pcbre import units
 from pcbre.matrix import Point2, translate

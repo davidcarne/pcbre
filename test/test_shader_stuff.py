@@ -3,7 +3,7 @@ __author__ = 'davidc'
 
 import pcbre.ui.gl.shader as S
 import unittest
-from PySide import QtOpenGL, QtGui, QtCore
+from PySide2 import QtOpenGL, QtGui, QtCore
 import OpenGL.GL as GL
 import numpy
 

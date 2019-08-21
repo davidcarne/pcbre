@@ -1,8 +1,8 @@
-from PySide import QtGui
+from PySide2 import QtWidgets
 
-class ViewMenu(QtGui.QMenu):
+class ViewMenu(QtWidgets.QMenu):
     def __init__(self, mw):
-        QtGui.QMenu.__init__(self, "&View", mw)
+        QtWidgets.QMenu.__init__(self, "&View", mw)
 
         self.subWindowMenu = self.addMenu("Sub-Windows")
         self.addSeparator()

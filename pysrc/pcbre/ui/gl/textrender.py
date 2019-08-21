@@ -65,7 +65,6 @@ class TextBatch:
         arr = numpy.array(clist, dtype=self.__text_render.buffer_dtype)
 
         self.vbo.data = arr
-        self.vbo.size = None
         self.vbo.copied = False
         self.vbo.bind()
 
@@ -80,7 +79,7 @@ class TextBatch:
 
             GL.glDrawArrays(GL.GL_TRIANGLES, 0, self.__elem_count)
 
-        print("Drawing %d elements" % self.__elem_count)
+        #print("Drawing %d elements" % self.__elem_count)
 
 class TextBatcher(object):
     __tag_type = namedtuple("render_tag", ["textinfo", "matrix", "color"])
@@ -113,7 +112,6 @@ class TextBatcher(object):
             arr = numpy.array(self.__clist, dtype=self.text_render.buffer_dtype)
 
             self.vbo.data = arr
-            self.vbo.size = None
             self.vbo.copied = False
             self.vbo.bind()
             self.__vbo_needs_update = False

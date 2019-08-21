@@ -1,6 +1,6 @@
 __author__ = 'davidc'
 import numpy
-from PySide import QtCore, QtGui
+from PySide2 import QtCore, QtGui
 
 KEEP = None
 def QImage_from_numpy(arr):

@@ -1,16 +1,19 @@
 import random
 import numpy
 
-from PySide.QtCore import *
-from PySide.QtGui import *
+from PySide2 import QtCore
+from PySide2 import QtGui
+from PySide2 import QtWidgets
+from PySide2.QtCore import Qt
+
 
 import pcbre.model.project
 import pcbre.model.stackup
 
 FIRST_VIEW_COL = 1
-class LayerViewSetupDialog(QDialog):
+class LayerViewSetupDialog(QtWidgets.QDialog):
     def __init__(self, parent, data_list):
-        QDialog.__init__(self, parent)
+        QtWidgets.QDialog.__init__(self, parent)
 
         self.resize(470, 350)
         self.setWindowTitle("Layer imagery")
@@ -18,27 +21,27 @@ class LayerViewSetupDialog(QDialog):
         self.table_model = MyTableModel(self, data_list)
 
 
-        self.table_view = QTableView()
+        self.table_view = QtWidgets.QTableView()
 
-        self.table_view.setSelectionMode(QAbstractItemView.SingleSelection) 
-        self.table_view.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table_view.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection) 
+        self.table_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
 
 
 
         self.table_view.setModel(self.table_model)
         # set font
-        font = QFont("Courier New", 10)
+        font = QtGui.QFont("Courier New", 10)
         self.table_view.setFont(font)
         self.table_view.resizeColumnsToContents()
 
 
-        layout = QHBoxLayout(self)
+        layout = QtWidgets.QHBoxLayout(self)
         layout.addWidget(self.table_view)
-        l2 = QVBoxLayout()
+        l2 = QtWidgets.QVBoxLayout()
 
-        self.cancelButton = QPushButton("cancel")
+        self.cancelButton = QtWidgets.QPushButton("cancel")
         self.cancelButton.clicked.connect(self.reject)
-        self.okButton = QPushButton("apply")
+        self.okButton = QtWidgets.QPushButton("apply")
         self.okButton.setDefault(True)
         self.okButton.clicked.connect(self.accept)
 
@@ -57,7 +60,7 @@ class LayerViewSetupDialog(QDialog):
 
     def accept(self):
         self.table_model.update()
-        return QDialog.accept(self)
+        return QtWidgets.QDialog.accept(self)
 
 class EditableLayer(object):
     def __init__(self, mdl, ref, name, ils):
@@ -67,9 +70,9 @@ class EditableLayer(object):
         self.view_set = set(ils)
 
 
-class MyTableModel(QAbstractTableModel):
+class MyTableModel(QtCore.QAbstractTableModel):
     def __init__(self, parent, project, *args):
-        QAbstractTableModel.__init__(self, parent, *args)
+        QtCore.QAbstractTableModel.__init__(self, parent, *args)
         self.p = project
         self._layers =  [
             EditableLayer(self, pl, pl.name, pl.imagelayers)
@@ -149,7 +152,7 @@ class MyTableModel(QAbstractTableModel):
 
 # Test harness
 if __name__ == "__main__":
-    app = QApplication([])
+    app = QtWidgets.QtQApplication([])
     import os.path
     PATH = '/tmp/test.pcbre'
     if os.path.exists(PATH):

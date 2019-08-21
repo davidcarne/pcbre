@@ -2,8 +2,7 @@ import random
 import colorsys
 import numpy
 
-from PySide.QtCore import *
-from PySide.QtGui import *
+from PySide2 import QtCore, QtGui, QtWidgets
 
 import pcbre.model.project
 import pcbre.model.stackup
@@ -12,17 +11,17 @@ NAME_COL = 0
 FIRST_VP_COL = 1
 
 # Header with fixed size
-class HHeader(QHeaderView):
+class HHeader(QtWidgets.QHeaderView):
     def __init__(self, *args, **kwargs):
-        QHeaderView.__init__(self, *args, **kwargs)
-        self.setResizeMode(self.Fixed)
+        QtWidgets.QHeaderView.__init__(self, *args, **kwargs)
+        self.setSectionResizeMode(self.Fixed)
 
     def sizeHint(self):
-        return QSize(30, 0)
+        return QtCore.QSize(30, 0)
 
-class StackupSetupDialog(QDialog):
+class StackupSetupDialog(QtWidgets.QDialog):
     def __init__(self, parent, data_list, *args):
-        QDialog.__init__(self, parent, *args)
+        QtWidgets.QDialog.__init__(self, parent, *args)
 
         self.resize(470, 350)
         self.setWindowTitle("Layer parameters")
@@ -30,20 +29,20 @@ class StackupSetupDialog(QDialog):
         self.table_model = MyTableModel(self, data_list)
 
 
-        self.table_view = QTableView()
+        self.table_view = QtWidgets.QTableView()
 
-        self.table_view.setSelectionMode(QAbstractItemView.SingleSelection) 
-        self.table_view.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table_view.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection) 
+        self.table_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
 
-        self.table_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.table_view.customContextMenuRequested.connect(self.handleAreaMenu)
 
 
         header = self.table_view.horizontalHeader()
-        header.setContextMenuPolicy(Qt.CustomContextMenu)
+        header.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         header.customContextMenuRequested.connect(self.handleHeaderMenu) 
 
-        lb = HHeader(Qt.Vertical, self.table_view) 
+        lb = HHeader(QtCore.Qt.Vertical, self.table_view) 
         lb.sectionDoubleClicked.connect(self.selectColor)
         self.table_view.setVerticalHeader(lb)
         lbar = self.table_view.verticalHeader()
@@ -54,28 +53,28 @@ class StackupSetupDialog(QDialog):
 
         self.table_view.setModel(self.table_model)
         # set font
-        font = QFont("Courier New", 10)
+        font = QtGui.QFont("Courier New", 10)
         self.table_view.setFont(font)
         self.table_view.resizeColumnsToContents()
 
 
-        layout = QHBoxLayout(self)
+        layout = QtWidgets.QHBoxLayout(self)
         layout.addWidget(self.table_view)
-        l2 = QVBoxLayout()
+        l2 = QtWidgets.QVBoxLayout()
 
-        self.newButton = QPushButton("add layer")
+        self.newButton = QtWidgets.QPushButton("add layer")
         self.newButton.clicked.connect(self.addLayer)
-        self.deleteButton = QPushButton("delete layer")
+        self.deleteButton = QtWidgets.QPushButton("delete layer")
         self.deleteButton.clicked.connect(self.deleteLayer)
 
-        self.upButton = QPushButton("move up")
+        self.upButton = QtWidgets.QPushButton("move up")
         self.upButton.clicked.connect(self.moveUpButtonPressed)
-        self.downButton = QPushButton("move down")
+        self.downButton = QtWidgets.QPushButton("move down")
         self.downButton.clicked.connect(self.moveDownButtonPressed)
 
-        self.cancelButton = QPushButton("cancel")
+        self.cancelButton = QtWidgets.QPushButton("cancel")
         self.cancelButton.clicked.connect(self.reject)
-        self.okButton = QPushButton("apply")
+        self.okButton = QtWidgets.QPushButton("apply")
         self.okButton.setDefault(True)
         self.okButton.clicked.connect(self.accept)
 
@@ -101,7 +100,7 @@ class StackupSetupDialog(QDialog):
 
     def accept(self):
         self.table_model.update()
-        return QDialog.accept(self)
+        return QtWidgets.QDialog.accept(self)
 
     def moveUpButtonPressed(self):
         row = self.table_view.selectedIndexes()[0].row()
@@ -155,7 +154,7 @@ class StackupSetupDialog(QDialog):
 
 
     def doMenu(self, row, col, is_header=False):
-        menu = QMenu()
+        menu = QtWidgets.QMenu()
 
         layer = None
         vp = None
@@ -191,7 +190,7 @@ class StackupSetupDialog(QDialog):
             )
             act.setEnabled(vp.startIndex < row)
 
-        menu.exec_(QCursor.pos())
+        menu.exec_(QtGui.QCursor.pos())
 
     def handleHeaderMenu(self, pos):
         col = self.table_view.horizontalHeader().logicalIndexAt(pos)
@@ -206,12 +205,12 @@ class StackupSetupDialog(QDialog):
 
     def selectColor(self, idx):
         cur = numpy.array(self.table_model.layer(idx).color) * 255
-        initial = QColor(*cur)
-        c = QColorDialog.getColor(initial)
+        initial = QtGui.QColor(*cur)
+        c = QtWidgets.QColorDialog.getColor(initial)
         if c.isValid():
             r,g,b,_ = c.getRgb()
             self.table_model.layer(idx).color = numpy.array([r,g,b])/255.0
-            self.table_model.headerDataChanged.emit(Qt.Vertical, idx, idx)
+            self.table_model.headerDataChanged.emit(QtCore.Qt.Vertical, idx, idx)
 
 class EditableLayer(object):
     def __init__(self, mdl, ref, name, col):
@@ -260,9 +259,9 @@ class EditableVP(object):
         self.startLayer = self.mdl._layers[value]
    
 
-class MyTableModel(QAbstractTableModel):
+class MyTableModel(QtCore.QAbstractTableModel):
     def __init__(self, parent, project, *args):
-        QAbstractTableModel.__init__(self, parent, *args)
+        QtCore.QAbstractTableModel.__init__(self, parent, *args)
         self.p = project
         self._layers = [EditableLayer(self, l, l.name, l.color) for l in
                         self.p.stackup.layers]
@@ -339,27 +338,27 @@ class MyTableModel(QAbstractTableModel):
         return self._via_pairs[n]
 
     def addLayer(self, idx):
-        self.emit(SIGNAL("layoutAboutToBeChanged()"))
+        self.emit(QtCore.SIGNAL("layoutAboutToBeChanged()"))
 
         col = numpy.array(colorsys.hsv_to_rgb(random.random(), 1, 1))
 
         l = EditableLayer(self, None, "New Layer", col)
         self._layers.insert(idx, l)
-        self.emit(SIGNAL("layoutChanged()"))
+        self.emit(QtCore.SIGNAL("layoutChanged()"))
 
     def delLayer(self, idx):
-        self.emit(SIGNAL("layoutAboutToBeChanged()"))
+        self.emit(QtCore.SIGNAL("layoutAboutToBeChanged()"))
         del self._layers[idx]
-        self.emit(SIGNAL("layoutChanged()"))
+        self.emit(QtCore.SIGNAL("layoutChanged()"))
 
     def layerCount(self):
         return len(self._layers)
 
     def addViaPair(self):
         if len(self._layers) >= 2:
-            self.emit(SIGNAL("layoutAboutToBeChanged()"))
+            self.emit(QtCore.SIGNAL("layoutAboutToBeChanged()"))
             self._via_pairs.append(EditableVP(self, None, self._layers[0], self._layers[-1]))
-            self.emit(SIGNAL("layoutChanged()"))
+            self.emit(QtCore.SIGNAL("layoutChanged()"))
             return True
         else:
             return False
@@ -383,11 +382,11 @@ class MyTableModel(QAbstractTableModel):
         self.vpChanged(vp)
 
     def delViaPair(self, vp):
-        self.emit(SIGNAL("layoutAboutToBeChanged()"))
+        self.emit(QtCore.SIGNAL("layoutAboutToBeChanged()"))
 
         del self._via_pairs[self._via_pairs.index(vp)]
 
-        self.emit(SIGNAL("layoutChanged()"))
+        self.emit(QtCore.SIGNAL("layoutChanged()"))
 
     def rowCount(self, parent):
         return len(self._layers)
@@ -402,20 +401,20 @@ class MyTableModel(QAbstractTableModel):
         col = index.column()
         row = index.row()
 
-        if role == Qt.DisplayRole:
+        if role == QtCore.Qt.DisplayRole:
             if col == 0:
                 return self._layers[row].name
 
             return None
 
-        elif role == Qt.BackgroundRole:
+        elif role == QtCore.Qt.BackgroundRole:
             if col == NAME_COL:
                 return None
 
             elif col >= FIRST_VP_COL:
                 vp = self._via_pairs[col-FIRST_VP_COL]
                 if vp.startIndex <= row <= vp.endIndex:
-                    return QBrush(QColor(0,0,0))
+                    return QtGui.QBrush(QtGui.QColor(0,0,0))
                 return None
 
         return None
@@ -437,30 +436,30 @@ class MyTableModel(QAbstractTableModel):
         row = index.row()
 
 
-        flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
+        flags = QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
 
         if col == 0:
-            flags |= Qt.ItemIsEditable 
-            flags |= Qt.ItemIsDragEnabled | Qt.ItemIsDropEnabled
+            flags |= QtCore.Qt.ItemIsEditable 
+            flags |= QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsDropEnabled
         
 
         return flags
 
     def headerData(self, index, orientation, role):
-        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+        if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
             if index == 0:
                 return "Layer Name"
             else:
                 return "Via pair"
-        elif orientation == Qt.Vertical and role == Qt.BackgroundRole:
+        elif orientation == QtCore.Qt.Vertical and role == QtCore.Qt.BackgroundRole:
             colors = [i * 255 for i in self._layers[index].color]
-            return QBrush(QColor(*colors))
+            return QtGui.QBrush(QtGui.QColor(*colors))
 
         return None
 
 # Test harness
 if __name__ == "__main__":
-    app = QApplication([])
+    app = QtWidgets.QApplication([])
     import os.path
     PATH = '/tmp/test.pcbre'
     if os.path.exists(PATH):

@@ -2,9 +2,9 @@ from collections import defaultdict
 import math
 import time
 
-from PySide import QtOpenGL
-import PySide.QtCore as QtCore
-import PySide.QtGui as QtGui
+from PySide2 import QtOpenGL
+import PySide2.QtCore as QtCore
+import PySide2.QtGui as QtGui
 import OpenGL.GL as GL
 import OpenGL.arrays.vbo as VBO
 import numpy

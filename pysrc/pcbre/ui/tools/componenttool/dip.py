@@ -6,7 +6,7 @@ from pcbre.ui.tools.multipoint import MultipointEditFlow, EditablePoint, OffsetD
 
 
 __author__ = 'davidc'
-from PySide import QtCore
+from PySide2 import QtCore
 from pcbre.ui.dialogs.settingsdialog import AutoSettingsWidget, LineEditable, IntTrait, UnitEditable
 from pcbre.ui.uimodel import mdlacc, GenModel
 from pcbre.ui.widgets.unitedit import UNIT_GROUP_MM

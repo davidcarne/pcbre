@@ -3,7 +3,7 @@ from pcbre.ui.uimodel import GenModel
 __author__ = 'davidc'
 
 
-from PySide import QtGui, QtCore
+from PySide2 import QtGui, QtCore, QtWidgets
 
 VISIBLE_NO = 0
 VISIBLE_MAYBE = 1
@@ -205,7 +205,7 @@ class VisibilityAdaptor(QtCore.QAbstractItemModel):
 
 
 
-class VisibilityTree(QtGui.QTreeView):
+class VisibilityTree(QtWidgets.QTreeView):
     def __init__(self, model):
         super(VisibilityTree, self).__init__()
         self.model = model
@@ -215,14 +215,14 @@ class VisibilityTree(QtGui.QTreeView):
         header = self.header()
         header.setStretchLastSection(False)
 
-        header.setResizeMode(0,QtGui.QHeaderView.Stretch)
-        header.setResizeMode(1,QtGui.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(0,QtWidgets.QHeaderView.Stretch)
+        header.setSectionResizeMode(1,QtWidgets.QHeaderView.ResizeToContents)
         header.hide()
 
 
 
 if __name__ == "__main__":
-    app = QtGui.QApplication([])
+    app = QtWidgets.QApplication([])
 
     model = VisibilityModel()
     child1 = VisibilityModelLeaf("test1")

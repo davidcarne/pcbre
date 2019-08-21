@@ -55,7 +55,6 @@ class HairlineRenderer:
             ar = numpy.array(built_list, dtype=self.__dtype)
 
             self.batch_vbo.data = ar
-            self.batch_vbo.size = None
             self.batch_vbo.copied = False
             self.batch_vbo.bind()
 

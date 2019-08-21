@@ -68,7 +68,6 @@ class PolygonVBOPair:
         ar = numpy.ndarray(len(self.__position_list), dtype=self.__vert_vbo_dtype)
         ar["vertex"] = self.__position_list
         self.__vert_vbo.data = ar
-        self.__vert_vbo.size = None
         self.__vert_vbo.copied = False
         self.__vert_vbo.bind()
         self.__vert_vbo_current = True
@@ -79,7 +78,6 @@ class PolygonVBOPair:
 
         self.__outline_index_offset = len(self.__tri_index_list)
         self.__index_vbo.data = numpy.array(self.__tri_index_list + self.__outline_index_list, dtype=self.__index_vbo_dtype)
-        self.__index_vbo.size = None
         self.__index_vbo.copied = False
         self.__index_vbo.bind()
         self.__index_vbo_current = True

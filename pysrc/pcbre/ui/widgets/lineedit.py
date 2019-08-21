@@ -1,7 +1,7 @@
 __author__ = 'davidc'
-from PySide import QtCore, QtGui
+from PySide2 import QtCore, QtGui, QtWidgets
 
-class PLineEdit(QtGui.QLineEdit):
+class PLineEdit(QtWidgets.QLineEdit):
     def __init__(self, *args, **kwargs):
         super(PLineEdit, self).__init__(*args, **kwargs)
         self.suppress_enter = True

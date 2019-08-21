@@ -5,7 +5,7 @@ from pcbre.ui.widgets.unitedit import UnitLineEdit, UNIT_GROUP_MM
 
 __author__ = 'davidc'
 
-from PySide import QtCore, QtGui
+from PySide2 import QtCore, QtGui, QtWidgets
 from pcbre.ui.tools.basetool import BaseToolController
 from pcbre.matrix import translate, scale, Vec2, project_point_line, rotate, line_intersect, INTERSECT_NORMAL, Point2, \
     projectPoint
@@ -99,7 +99,7 @@ def cmd_set_rotate(model, theta, flip_x, flip_y):
         model.flip_y = flip_y
     return av
 
-class cmd_set_handle_position(QtGui.QUndoCommand):
+class cmd_set_handle_position(QtWidgets.QUndoCommand):
     def __init__(self, model, index, position, merge=False):
         super(cmd_set_handle_position, self).__init__()
 
@@ -881,21 +881,21 @@ class ThetaLineEdit(PLineEdit):
     def sizeHint(self):
         size = super(ThetaLineEdit, self).sizeHint()
         return QtCore.QSize(2.5 * size.height(), size.height())
-class RectAlignSettingsWidget(QtGui.QWidget):
+class RectAlignSettingsWidget(QtWidgets.QWidget):
     def __init__(self, parent, model):
         super(RectAlignSettingsWidget, self).__init__()
         self._parent = parent
         self.model = model
 
-        layout = QtGui.QFormLayout()
+        layout = QtWidgets.QFormLayout()
         self.setLayout(layout)
 
-        dims_gb = QtGui.QGroupBox("Scale")
-        dims_gb_layout = QtGui.QFormLayout()
+        dims_gb = QtWidgets.QGroupBox("Scale")
+        dims_gb_layout = QtWidgets.QFormLayout()
         dims_gb.setLayout(dims_gb_layout)
         layout.addWidget(dims_gb)
 
-        self.dims_locked_cb = QtGui.QCheckBox()
+        self.dims_locked_cb = QtWidgets.QCheckBox()
         self.dims_locked_cb.clicked.connect(self.set_dims_locked)
         self.dims_1 = UnitLineEdit(UNIT_GROUP_MM)
         self.dims_2 = UnitLineEdit(UNIT_GROUP_MM)
@@ -908,12 +908,12 @@ class RectAlignSettingsWidget(QtGui.QWidget):
         dims_gb_layout.addRow("Dimension 1", self.dims_1)
         dims_gb_layout.addRow("Dimension 2", self.dims_2)
 
-        origin_gb = QtGui.QGroupBox("Origin")
-        origin_gb_layout = QtGui.QFormLayout()
+        origin_gb = QtWidgets.QGroupBox("Origin")
+        origin_gb_layout = QtWidgets.QFormLayout()
         origin_gb.setLayout(origin_gb_layout)
         layout.addWidget(origin_gb)
 
-        self.origin_ref = QtGui.QComboBox()
+        self.origin_ref = QtWidgets.QComboBox()
         self.origin_ref.addItem("Lower-left")
         self.origin_ref.addItem("Lower-right")
         self.origin_ref.addItem("Upper-left")
@@ -932,23 +932,23 @@ class RectAlignSettingsWidget(QtGui.QWidget):
 
         layout.addWidget(origin_gb)
 
-        fr_gb = QtGui.QGroupBox("Flip/Rotate")
-        fr_gb_layout = QtGui.QHBoxLayout()
+        fr_gb = QtWidgets.QGroupBox("Flip/Rotate")
+        fr_gb_layout = QtWidgets.QHBoxLayout()
         fr_gb.setLayout(fr_gb_layout)
 
-        self.flip_x_btn = QtGui.QPushButton("Flip X")
+        self.flip_x_btn = QtWidgets.QPushButton("Flip X")
         self.flip_x_btn.setCheckable(True)
         fr_gb_layout.addWidget(self.flip_x_btn)
 
-        self.flip_y_btn = QtGui.QPushButton("Flip Y")
+        self.flip_y_btn = QtWidgets.QPushButton("Flip Y")
         self.flip_y_btn.setCheckable(True)
         fr_gb_layout.addWidget(self.flip_y_btn)
 
         fr_gb_layout.addStretch()
-        fr_gb_layout.addWidget(QtGui.QLabel("Rotate:"))
+        fr_gb_layout.addWidget(QtWidgets.QLabel("Rotate:"))
         self.theta_le = ThetaLineEdit()
         fr_gb_layout.addWidget(self.theta_le)
-        fr_gb_layout.addWidget(QtGui.QLabel("\u00b0"))
+        fr_gb_layout.addWidget(QtWidgets.QLabel("\u00b0"))
 
         self.flip_x_btn.clicked.connect(self.rotate_changed)
         self.flip_y_btn.clicked.connect(self.rotate_changed)

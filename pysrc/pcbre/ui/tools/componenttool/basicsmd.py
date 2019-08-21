@@ -1,4 +1,4 @@
-from PySide import QtGui, QtCore
+from PySide2 import QtGui, QtCore
 from pcbre.matrix import Point2, rotate, Vec2, projectPoint, translate, project_point_line
 from pcbre.model.const import SIDE
 from pcbre.model.smd4component import SMD4Component

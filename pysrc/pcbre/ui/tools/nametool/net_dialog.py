@@ -3,13 +3,13 @@ from pcbre.model.pad import Pad
 
 __author__ = 'davidc'
 
-from PySide import QtCore, QtGui
+from PySide2 import QtCore, QtGui, QtWidgets
 
-class NetDialog(QtGui.QDialog):
+class NetDialog(QtWidgets.QDialog):
     def __init__(self, parent, obj):
         super(NetDialog, self).__init__(parent)
 
-        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel,
+        buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel,
                                            QtCore.Qt.Horizontal, self)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
