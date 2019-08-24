@@ -3,7 +3,7 @@ __author__ = 'davidc'
 
 import pcbre.ui.gl.shader as S
 import unittest
-from PySide2 import QtOpenGL, QtGui, QtCore
+from PySide2 import QtOpenGL, QtGui, QtCore, QtWidgets
 import OpenGL.GL as GL
 import numpy
 
@@ -37,13 +37,16 @@ void main(void)
 """
 
 
-# Ensure we have a qapplication - another testcase might have created it though
-if QtGui.qApp == None: QtGui.QApplication([])
-
+@unittest.skip("Only functional with displays")
 class test_shader_stuff(unittest.TestCase):
     ctx = None
 
     def setUp(self):
+        # Ensure we have a qapplication - another testcase might have created it though
+        try:
+            app =  QtWidgets.QApplication([])
+        except RuntimeError:
+            pass
 
         if self.ctx is None:
             f = QtOpenGL.QGLFormat()
