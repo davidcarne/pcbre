@@ -1,0 +1,50 @@
+Source: pcbre
+Maintainer: David Carne <davidcarne@gmail.com>
+Section: misc
+Priority: optional
+Build-Depends: 
+ python3-all (>= 2.6.6-3),
+ debhelper (>= 9),
+ python3-setuptools,
+ python3-numpy,
+ python3-scipy,
+ python3-pyside2.qtcore,
+ python3-pyside2.qtgui,
+ python3-pyside2.qtwidgets,
+ python3-pyside2.qtopengl,
+ python3-freetype,
+ cython3,
+ python3-shapely,
+ python3-poly2tri,
+ python3-capnp,
+ python3-rtree,
+ python3-opencv,
+ python3-opengl,
+ python3-mock,
+ dh-python
+Standards-Version: 3.9.5
+
+Package: pcbre
+Architecture: any
+Depends: ${misc:Depends},
+ ${python3:Depends},
+ ${shlibs:Depends},
+ python3-pyside2.qtcore,
+ python3-pyside2.qtgui,
+ python3-pyside2.qtwidgets,
+ python3-pyside2.qtopengl,
+ python3-capnp,
+ python3-numpy,
+ python3-scipy,
+ python3-shapely,
+ python3-poly2tri,
+ python3-rtree,
+ python3-opencv,
+ python3-opengl,
+ python3-freetype
+Description: Freetype python bindings
+ Freetype python provides bindings for the FreeType library. Only the
+ high-level API is bound.
+ .
+ Documentation available at:
+ http://freetype-py.readthedocs.org/en/latest/
