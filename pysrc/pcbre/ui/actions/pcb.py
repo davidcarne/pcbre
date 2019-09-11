@@ -4,7 +4,7 @@ import time
 __author__ = 'davidc'
 
 
-from PySide2 import QtGui, QtCore, QtWidgets
+from qtpy import QtGui, QtCore, QtWidgets
 
 class StackupSetupDialogAction(QtWidgets.QAction):
     def __init__(self, window):

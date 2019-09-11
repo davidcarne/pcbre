@@ -1,12 +1,13 @@
 __author__ = 'davidc'
 
-from PySide2 import QtWidgets
+from qtpy import QtWidgets
 from pcbre.ui.menu.imageselectionmenu import ImageSelectionMenu
 
 class PCBMenu(QtWidgets.QMenu):
 
     def __init__(self, pw):
-        QtWidgets.QMenu.__init__(self, "&PCB")
+        super(PCBMenu, self).__init__("&PCB", pw)
+
         self.addAction(pw.actions.pcb_stackup_setup_dialog)
         self.addAction(pw.actions.pcb_layer_view_setup_dialog)
         self.addMenu(ImageSelectionMenu(pw))

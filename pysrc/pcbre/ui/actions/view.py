@@ -2,7 +2,7 @@ from pcbre.ui.icon import Icon
 
 __author__ = 'davidc'
 
-from PySide2 import QtGui, QtWidgets
+from qtpy import QtGui, QtWidgets
 
 class LayerJumpAction(QtWidgets.QAction):
     def __init__(self, window, layer_no):

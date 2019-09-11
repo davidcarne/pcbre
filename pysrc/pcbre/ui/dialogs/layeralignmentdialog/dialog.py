@@ -14,7 +14,7 @@ from pcbre.view.imageview import ImageView
 from pcbre.view.originview import OriginView
 from .rectalign import RectAlignmentControllerView, RectAlignmentModel
 
-from PySide2 import QtGui, QtCore, QtWidgets
+from qtpy import QtGui, QtCore, QtWidgets
 import numpy
 from pcbre.ui.uimodel import mdlacc, GenModel
 

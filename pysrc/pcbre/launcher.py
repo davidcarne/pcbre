@@ -1,11 +1,11 @@
 # Launcher to look for required packages and fail with a nice error and suggestions on how to proceed
 
 required_packages = [
-        "PySide2",
-        "PySide2.QtCore",
-        "PySide2.QtGui",
-        "PySide2.QtWidgets",
-        "PySide2.QtOpenGL",
+        "qtpy",
+        "qtpy.QtCore",
+        "qtpy.QtGui",
+        "qtpy.QtWidgets",
+        "qtpy.QtOpenGL",
         "capnp",
         "numpy",
         "shapely",
@@ -85,10 +85,10 @@ class AptDistroInstaller(DependencyInstaller):
 
 class DebianBusterInstaller(AptDistroInstaller):
     PY_PKG_STEPS={
-        "PySide2.QtCore": ("apt", "python3-pyside2.qtcore"),
-        "PySide2.QtGui": ("apt", "python3-pyside2.qtgui"),
-        "PySide2.QtWidgets": ("apt", "python3-pyside2.qtwidgets"),
-        "PySide2.QtOpenGL": ("apt", "python3-pyside2.qtopengl"),
+        "qtpy.QtCore": ("apt", "python3-pyside2.qtcore"),
+        "qtpy.QtGui": ("apt", "python3-pyside2.qtgui"),
+        "qtpy.QtWidgets": ("apt", "python3-pyside2.qtwidgets"),
+        "qtpy.QtOpenGL": ("apt", "python3-pyside2.qtopengl"),
         "capnp": ("pip", "pycapnp"),
         "numpy": ("apt", "python3-numpy"),
         "shapely": ("apt", "python3-shapely"),

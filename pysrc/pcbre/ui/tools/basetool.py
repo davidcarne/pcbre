@@ -1,4 +1,4 @@
-from PySide2 import QtGui, QtCore, QtWidgets
+from qtpy import QtGui, QtCore, QtWidgets
 from pcbre.ui.icon import Icon
 import pkg_resources
 

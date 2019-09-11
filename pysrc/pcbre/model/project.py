@@ -1,4 +1,4 @@
-from PySide2 import QtCore
+from qtpy import QtCore
 import os
 from pcbre.model.const import SIDE
 

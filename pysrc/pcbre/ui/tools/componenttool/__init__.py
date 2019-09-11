@@ -7,7 +7,7 @@ from pcbre.view.rendersettings import RENDER_OUTLINES, RENDER_HINT_ONCE
 
 __author__ = 'davidc'
 
-from PySide2 import QtCore, QtGui
+from qtpy import QtCore, QtGui
 from pcbre.ui.tools.basetool import BaseToolController, BaseTool
 from pcbre.ui.uimodel import mdlacc, GenModel
 

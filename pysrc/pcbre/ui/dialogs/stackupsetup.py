@@ -2,7 +2,7 @@ import random
 import colorsys
 import numpy
 
-from PySide2 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 import pcbre.model.project
 import pcbre.model.stackup
@@ -338,27 +338,27 @@ class MyTableModel(QtCore.QAbstractTableModel):
         return self._via_pairs[n]
 
     def addLayer(self, idx):
-        self.emit(QtCore.SIGNAL("layoutAboutToBeChanged()"))
+        self.layoutAboutToBeChanged.emit()
 
         col = numpy.array(colorsys.hsv_to_rgb(random.random(), 1, 1))
 
         l = EditableLayer(self, None, "New Layer", col)
         self._layers.insert(idx, l)
-        self.emit(QtCore.SIGNAL("layoutChanged()"))
+        self.layoutChanged.emit()
 
     def delLayer(self, idx):
-        self.emit(QtCore.SIGNAL("layoutAboutToBeChanged()"))
+        self.layoutAboutToBeChanged.emit()
         del self._layers[idx]
-        self.emit(QtCore.SIGNAL("layoutChanged()"))
+        self.layoutChanged.emit()
 
     def layerCount(self):
         return len(self._layers)
 
     def addViaPair(self):
         if len(self._layers) >= 2:
-            self.emit(QtCore.SIGNAL("layoutAboutToBeChanged()"))
+            self.layoutAboutToBeChanged.emit()
             self._via_pairs.append(EditableVP(self, None, self._layers[0], self._layers[-1]))
-            self.emit(QtCore.SIGNAL("layoutChanged()"))
+            self.layoutChanged.emit()
             return True
         else:
             return False

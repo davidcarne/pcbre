@@ -2,9 +2,9 @@ from collections import defaultdict
 import math
 import time
 
-from PySide2 import QtOpenGL
-import PySide2.QtCore as QtCore
-import PySide2.QtGui as QtGui
+from qtpy import QtOpenGL
+import qtpy.QtCore as QtCore
+import qtpy.QtGui as QtGui
 import OpenGL.GL as GL
 import OpenGL.arrays.vbo as VBO
 import numpy
@@ -74,14 +74,19 @@ def getSelectColor(c, selected):
 
     return (r,g,b)
 
-# Full view state for the multilayer view
-class ViewState(QtCore.QObject, ViewPort):
+class ViewStateO(QtCore.QObject):
     changed = QtCore.Signal()
-    currentLayerChanged  = QtCore.Signal()
+    currentLayerChanged = QtCore.Signal()
+
+# Full view state for the multilayer view
+class ViewState(ViewPort):
 
     def __init__(self, x, y):
-        ViewPort.__init__(self, x, y)
-        QtCore.QObject.__init__(self)
+        super(ViewState,self).__init__(x, y)
+
+        self.obj = ViewStateO()
+        self.changed = self.obj.changed
+        self.currentLayerChanged = self.obj.currentLayerChanged
 
         self.__current_layer = None
         self.currentLayerChanged.connect(self.changed)
@@ -310,7 +315,7 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
         :return:
         """
         if not event.modifiers():
-            step = event.delta()/120.0
+            step = event.angleDelta().y()/120.0
 
             sf = 1.1 ** step
             fixed_center_dot(self.viewState, M.scale(sf), QPoint_to_pair(event.pos()))

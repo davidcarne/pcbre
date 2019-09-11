@@ -1,6 +1,6 @@
 __author__ = 'davidc'
 
-from PySide2 import QtGui, QtCore, QtWidgets
+from qtpy import QtGui, QtCore, QtWidgets
 
 def _nudge(dx, dy):
     pos = QtGui.QCursor.pos()

@@ -1,6 +1,6 @@
 __author__ = 'davidc'
 
-from PySide2 import QtWidgets
+from qtpy import QtWidgets
 
 
 class FileMenu(QtWidgets.QMenu):

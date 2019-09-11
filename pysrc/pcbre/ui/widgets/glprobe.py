@@ -1,6 +1,6 @@
 __author__ = 'davidc'
 
-from PySide2 import QtCore, QtGui, QtOpenGL
+from qtpy import QtCore, QtGui, QtOpenGL
 from OpenGL import GL
 import re
 

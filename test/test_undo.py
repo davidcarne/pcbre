@@ -3,7 +3,7 @@ __author__ = 'davidc'
 
 import unittest
 import pcbre.ui.undo as U
-from PySide2 import QtGui, QtCore
+from qtpy import QtGui, QtCore
 
 
 if QtGui.qApp == None: QtGui.QApplication([])

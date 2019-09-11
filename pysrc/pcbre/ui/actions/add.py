@@ -1,5 +1,5 @@
 import itertools
-from PySide2 import QtGui, QtWidgets
+from qtpy import QtGui, QtWidgets
 from pcbre.model.imagelayer import ImageLayer
 from pcbre.ui.dialogs.layeralignmentdialog.dialog import LayerAlignmentDialog
 

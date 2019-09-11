@@ -1,4 +1,4 @@
-from PySide2 import QtCore, QtGui
+from qtpy import QtCore, QtGui
 from pcbre import units
 from pcbre.matrix import Point2, Vec2
 from pcbre.model.const import SIDE

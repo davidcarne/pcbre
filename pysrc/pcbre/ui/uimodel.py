@@ -1,6 +1,6 @@
 __author__ = "davidc"
 
-from PySide2 import QtCore
+from qtpy import QtCore
 from contextlib import contextmanager
 import numpy
 

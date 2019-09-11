@@ -2,7 +2,7 @@ from pcbre.ui.widgets.lineedit import PLineEdit
 
 __author__ = 'davidc'
 from collections import OrderedDict
-from PySide2 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 
 class UnitGroup(object):
     def __init__(self, items, default_index=0):

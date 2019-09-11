@@ -3,7 +3,7 @@ from pcbre.model.pad import Pad
 
 __author__ = 'davidc'
 
-from PySide2 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 class NetDialog(QtWidgets.QDialog):
     def __init__(self, parent, obj):

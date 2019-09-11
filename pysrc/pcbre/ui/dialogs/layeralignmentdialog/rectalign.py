@@ -5,7 +5,7 @@ from pcbre.ui.widgets.unitedit import UnitLineEdit, UNIT_GROUP_MM
 
 __author__ = 'davidc'
 
-from PySide2 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from pcbre.ui.tools.basetool import BaseToolController
 from pcbre.matrix import translate, scale, Vec2, project_point_line, rotate, line_intersect, INTERSECT_NORMAL, Point2, \
     projectPoint

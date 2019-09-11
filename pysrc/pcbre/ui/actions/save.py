@@ -1,6 +1,6 @@
 __author__ = 'davidc'
 
-from PySide2 import QtGui, QtWidgets
+from qtpy import QtGui, QtWidgets
 
 pcbre_filter = "PCBRE Project Files (*.pcbre)"
 

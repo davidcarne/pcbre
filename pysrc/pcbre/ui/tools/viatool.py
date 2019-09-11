@@ -1,4 +1,4 @@
-from PySide2 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from .basetool import BaseTool, BaseToolController
 from pcbre.matrix import Point2, translate
 from pcbre.model.artwork_geom import Via

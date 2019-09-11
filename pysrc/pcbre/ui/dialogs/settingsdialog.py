@@ -1,4 +1,4 @@
-from PySide2 import QtGui, QtCore, QtWidgets
+from qtpy import QtGui, QtCore, QtWidgets
 import math
 from pcbre.matrix import Point2
 from pcbre.ui.widgets.unitedit import UnitLineEdit

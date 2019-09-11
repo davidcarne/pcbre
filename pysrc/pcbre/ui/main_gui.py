@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from PySide2 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 import pcbre.model.project as P
 from pcbre.ui.actions.add import AddImageDialogAction

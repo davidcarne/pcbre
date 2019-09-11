@@ -1,4 +1,4 @@
-from PySide2 import QtWidgets
+from qtpy import QtWidgets
 
 class ViewMenu(QtWidgets.QMenu):
     def __init__(self, mw):

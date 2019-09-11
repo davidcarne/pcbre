@@ -3,7 +3,7 @@ from pcbre.ui.uimodel import GenModel
 __author__ = 'davidc'
 
 
-from PySide2 import QtGui, QtCore, QtWidgets
+from qtpy import QtGui, QtCore, QtWidgets
 
 VISIBLE_NO = 0
 VISIBLE_MAYBE = 1

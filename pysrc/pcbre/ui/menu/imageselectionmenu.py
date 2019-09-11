@@ -4,7 +4,7 @@ from pcbre.ui.dialogs.layeralignmentdialog.dialog import LayerAlignmentDialog
 __author__ = 'davidc'
 
 
-from PySide2 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 
 class ImageSelectionMenu(QtWidgets.QMenu):
     def __init__(self, window):

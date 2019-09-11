@@ -7,7 +7,8 @@ import scipy.ndimage.interpolation
 import time
 import freetype
 import numpy
-from PySide2 import QtCore, QtGui
+import qtpy
+from qtpy import QtCore, QtGui
 from pcbre.ui.misc import QImage_from_numpy
 import json
 
@@ -53,8 +54,13 @@ def loadCached():
             shape = newimg.height(), newimg.width()
             ptr = newimg.constBits()
 
+            # PySide2 and PyQt represent a void pointer slightly differently
+            if qtpy.PYQT4 or qtpy.PYQT5:
+                import ctypes
+                ptr = ctypes.cast(ptr.__int__(), ctypes.POINTER(ctypes.c_uint8))
+
             # Extract the first channel
-            data = numpy.array(ptr, dtype=numpy.uint8).reshape(newimg.height(), newimg.width(), 4)[:,:,0].copy()
+            data = numpy.ctypeslib.as_array(ptr, (newimg.height(), newimg.width(), 4))[:,:,0].copy()
 
             st = json.load(open("/tmp/shader.json","r"))
 
