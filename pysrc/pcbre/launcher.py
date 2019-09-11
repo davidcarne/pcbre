@@ -6,7 +6,6 @@ required_packages = [
         "PySide2.QtGui",
         "PySide2.QtWidgets",
         "PySide2.QtOpenGL",
-        "Cython",
         "capnp",
         "numpy",
         "shapely",
@@ -90,7 +89,6 @@ class DebianBusterInstaller(AptDistroInstaller):
         "PySide2.QtGui": ("apt", "python3-pyside2.qtgui"),
         "PySide2.QtWidgets": ("apt", "python3-pyside2.qtwidgets"),
         "PySide2.QtOpenGL": ("apt", "python3-pyside2.qtopengl"),
-        "Cython": ("apt", "cython3"),
         "capnp": ("pip", "pycapnp"),
         "numpy": ("apt", "python3-numpy"),
         "shapely": ("apt", "python3-shapely"),
@@ -174,8 +172,12 @@ def launcher_main():
 
     missing_pkgs = []
     for pkg_name in required_packages:
-        if not pkgutil.get_loader(pkg_name):
-            missing_pkgs.append(pkg_name)
+        mods = pkg_name.split('.')
+        for n in range(len(mods)):
+            gen_pkg_name = ".".join(mods[:n+1])
+            if not pkgutil.get_loader(gen_pkg_name):
+                missing_pkgs.append(pkg_name)
+                break
 
     if missing_pkgs:
         distro_helper = detect_distro()
