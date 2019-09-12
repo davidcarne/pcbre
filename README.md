@@ -24,7 +24,8 @@ PCBRE requires the following dependencies. Some will probably need to come from 
 - python3-pip (for installing python packages)
 - numpy
 - scipy
-- PySide
+- qtpy
+- PySide **or** PyQt5
 
 <!-- begin list -->
 - Cython (required by poly2tri and pypotrace)
@@ -105,6 +106,10 @@ Binary .whl packages for rtree, freetype_py, and poly2tri will be available soon
 
 PCBRE is still in the process of being ported to Mac OS X, and does not yet function correctly. It is being developed with the above-listed dependencies installed from [Homebrew](http://brew.sh) with some packages from the [Homebrew-science](https://github.com/Homebrew/homebrew-science) tap.
 
+## Troubleshooting
+
+- `Cannot mix incompatible Qt library (version 0x....) with this library (version 0x.....)` when launching PCBRE. 
+    - Your PySide2 and QT library versions are out of sync. Make sure PySide2 is built for the same Qt as your system QT. Double-check for PySide2 in a venv or python user directory
 
 ## License and Contribution Information
 

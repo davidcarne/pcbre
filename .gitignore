@@ -1,6 +1,6 @@
 *.pyc
 __pycache__
-.*.swp
+*.swp
 .env*
 
 *.o
