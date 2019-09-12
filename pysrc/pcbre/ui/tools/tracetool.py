@@ -60,7 +60,11 @@ class TraceToolController(BaseToolController):
         if sp is None:
             sp = self.cur_pt
 
-        return Trace(sp, self.cur_pt, self.toolparammodel.thickness, self.view.current_layer_hack(), None)
+        layer = self.view.current_layer_hack()
+        if layer is None:
+            return
+
+        return Trace(sp, self.cur_pt, self.toolparammodel.thickness, layer, None)
 
 
 
@@ -71,19 +75,37 @@ class TraceToolController(BaseToolController):
     def __modelchanged(self):
         self.changed.emit()
 
-    def mousePressEvent(self, evt):
-        pos = evt.pos()
-        pt = QPoint_to_pair(pos)
-        end_point = Point2(self.view.viewState.tfV2W(pt))
+    def keyPressEvent(self, evt):
+        if evt.key() == QtCore.Qt.Key_Escape:
+            self.last_pt = None
+            return True
+
+        if evt.key() == QtCore.Qt.Key_Enter or evt.key() == QtCore.Qt.Key_Return:
+            self.traceEnterPoint()
+            return True
+
+        return False
+
+    def traceEnterPoint(self):
+        layer = self.view.current_layer_hack()
+        if layer is None:
+            return
 
         if self.last_pt is not None:
-            t = Trace(self.last_pt, end_point, self.toolparammodel.thickness,
-                      self.view.current_layer_hack(),
+            t = Trace(self.last_pt, self.cur_pt, self.toolparammodel.thickness,
+                      layer,
                       None)
             self.project.artwork.merge_artwork(t)
 
-        self.last_pt = end_point
+        self.last_pt = self.cur_pt
 
+
+    def mousePressEvent(self, evt):
+        pos = evt.pos()
+        pt = QPoint_to_pair(pos)
+        self.cur_pt = Point2(self.view.viewState.tfV2W(pt))
+
+        self.traceEnterPoint()
 
     def mouseReleaseEvent(self, evt):
         pass

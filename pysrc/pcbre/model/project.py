@@ -131,6 +131,8 @@ class Stackup(QtCore.QObject):
         for i in msg.viapairs:
             self.__via_pairs.append(ViaPair.deserialize(self.__project, i))
 
+        self.__renumber_layers()
+
 
 class Imagery:
     def __init__(self, project):

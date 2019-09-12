@@ -39,6 +39,9 @@ class BaseToolController(QtCore.QObject):
     def focusOutEvent(self, evt):
         pass
 
+    def showSettingsDialog(self):
+        pass
+
 class BaseTool(object):
     SHORTCUT=None
     TOOLTIP=None

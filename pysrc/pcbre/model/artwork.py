@@ -670,7 +670,7 @@ class Artwork:
             t = _aw.traces[n]
             t.p0 = serialize_point2(i.p0)
             t.p1 = serialize_point2(i.p1)
-            t.thickness = i.thickness
+            t.thickness = int(i.thickness)
             t.netSid = self.__project.scontext.sid_for(i.net)
             t.layerSid = self.__project.scontext.sid_for(i.layer)
 
