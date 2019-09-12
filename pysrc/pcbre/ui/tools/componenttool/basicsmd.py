@@ -1,4 +1,4 @@
-from qtpy import QtGui, QtCore
+from qtpy import QtGui, QtCore, QtWidgets
 from pcbre.matrix import Point2, rotate, Vec2, projectPoint, translate, project_point_line
 from pcbre.model.const import SIDE
 from pcbre.model.smd4component import SMD4Component
@@ -184,7 +184,7 @@ class BasicSMDICEditWidget(AutoSettingsWidget):
 
         self.mdl = icmdl
         # Symmetry
-        self.symw = QtGui.QComboBox()
+        self.symw = QtWidgets.QComboBox()
         syms = [SYM_4_SQUARE, SYM_4_RECT, SYM_2, SYM_ARB]
         for s in syms:
             self.symw.addItem(text_for_sym(s), s)
@@ -214,7 +214,7 @@ class BasicSMDICEditWidget(AutoSettingsWidget):
         self.addEdit("(E1) Dimension 2 Body", UnitEditable(self.mdl, "dim_2_body", UNIT_GROUP_MM))
         self.addEdit("(E) Dimension 2 Pin Center-to-Center", UnitEditable(self.mdl, "dim_2_pincenter", UNIT_GROUP_MM))
 
-        self.layout.addWidget(QtGui.QLabel("Dimension 1 is along pin 1 edge"))
+        self.layout.addWidget(QtWidgets.QLabel("Dimension 1 is along pin 1 edge"))
 
         self.addEdit("(e) Pin Spacing", UnitEditable(self.mdl, "pin_spacing", UNIT_GROUP_MM))
         self.addEdit("(L) Pin PCB contact length", UnitEditable(self.mdl, "pin_contact_length", UNIT_GROUP_MM))

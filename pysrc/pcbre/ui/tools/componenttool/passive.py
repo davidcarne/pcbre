@@ -1,4 +1,4 @@
-from qtpy import QtCore, QtGui
+from qtpy import QtCore, QtGui, QtWidgets
 from pcbre import units
 from pcbre.matrix import Point2, Vec2
 from pcbre.model.const import SIDE
@@ -135,7 +135,7 @@ class PassiveEditWidget(AutoSettingsWidget):
         self.__idx_to_wk = {}
         self.__wk_to_idx = {}
 
-        self.cb_well_known = QtGui.QComboBox()
+        self.cb_well_known = QtWidgets.QComboBox()
         self.layout.addRow("Package", self.cb_well_known)
 
         self.__add_wk(None, "Custom")
@@ -149,7 +149,7 @@ class PassiveEditWidget(AutoSettingsWidget):
         self.pkg_changed(self.cb_well_known.currentIndex())
 
         # Snap checkbox
-        self.cb_snap = QtGui.QCheckBox()
+        self.cb_snap = QtWidgets.QCheckBox()
         self.cb_snap.setChecked(self.__model.snap_well)
         self.layout.addRow("Snap to Well Known", self.cb_snap)
 

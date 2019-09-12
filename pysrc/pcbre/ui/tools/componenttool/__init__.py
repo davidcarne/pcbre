@@ -7,7 +7,7 @@ from pcbre.view.rendersettings import RENDER_OUTLINES, RENDER_HINT_ONCE
 
 __author__ = 'davidc'
 
-from qtpy import QtCore, QtGui
+from qtpy import QtCore, QtGui, QtWidgets
 from pcbre.ui.tools.basetool import BaseToolController, BaseTool
 from pcbre.ui.uimodel import mdlacc, GenModel
 
@@ -38,8 +38,8 @@ class ComponentSettings(MultiAutoSettingsDialog):
 
         self.mdl = mdl
 
-        hfl = QtGui.QFormLayout()
-        ct_cmb = QtGui.QComboBox()
+        hfl = QtWidgets.QFormLayout()
+        ct_cmb = QtWidgets.QComboBox()
         for _, i in sorted(mdl_meta.items(), key=lambda i: i[0]):
             ct_cmb.addItem(i.text)
 

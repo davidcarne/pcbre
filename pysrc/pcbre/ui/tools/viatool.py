@@ -105,7 +105,7 @@ class ViaToolController(BaseToolController):
     def mouseWheelEvent(self, event):
         if event.modifiers() & QtCore.Qt.ShiftModifier:
             # TODO: Remove hack on step
-            step = event.delta()/120.0
+            step = event.angleDelta().y()/120.0
             self.toolparammodel.radius += step
             if self.toolparammodel.radius <= 0:
                 self.toolparammodel.radius = 0.00001

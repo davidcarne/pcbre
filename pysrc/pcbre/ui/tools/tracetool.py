@@ -96,7 +96,7 @@ class TraceToolController(BaseToolController):
     def mouseWheelEvent(self, event):
         if event.modifiers() & QtCore.Qt.ShiftModifier:
             # TODO: Remove hack on step
-            step = event.delta()/120.0 * 0.050 * units.MM
+            step = event.angleDelta().y()/120.0 * 0.050 * units.MM
             self.toolparammodel.thickness += step
             if self.toolparammodel.thickness <= 100:
                 self.toolparammodel.thickness = 100
