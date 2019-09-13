@@ -1,8 +1,8 @@
-from PySide import QtGui
+from qtpy import QtWidgets
 
-class DebugMenu(QtGui.QMenu):
+class DebugMenu(QtWidgets.QMenu):
     def __init__(self, mw):
-        QtGui.QMenu.__init__(self, "&Debug", mw)
+        QtWidgets.QMenu.__init__(self, "&Debug", mw)
 
         self.addAction(mw.debug_actions.debug_draw)
         self.addAction(mw.debug_actions.debug_draw_bbox)

@@ -54,19 +54,19 @@ class DebugRender:
                         for j in i.get_pads():
                             bboxes.append((j.bbox, j in self.parent.selectionList))
 
-            with Timer() as t_debug_bbox_add:
-                # Add bboxes to buffers
-                for bbox, selected in bboxes:
-                    cx = (bbox.left + bbox.right) / 2
-                    cy = (bbox.bottom + bbox.top) / 2
-                    h = bbox.top - bbox.bottom
-                    w = bbox.right - bbox.left
+                with Timer() as t_debug_bbox_add:
+                    # Add bboxes to buffers
+                    for bbox, selected in bboxes:
+                        cx = (bbox.left + bbox.right) / 2
+                        cy = (bbox.bottom + bbox.top) / 2
+                        h = bbox.top - bbox.bottom
+                        w = bbox.right - bbox.left
 
-                    dest = buf
-                    if selected:
-                        dest = buf_sel
+                        dest = buf
+                        if selected:
+                            dest = buf_sel
 
-                    dest.add_aligned_box(cx, cy, w, h)
+                        dest.add_aligned_box(cx, cy, w, h)
 
 
         with Timer() as t_debug_draw:

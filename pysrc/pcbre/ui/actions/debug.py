@@ -1,8 +1,8 @@
-from PySide import QtGui
+from qtpy import QtWidgets
 
-class ToggleDrawBBoxAction(QtGui.QAction):
+class ToggleDrawBBoxAction(QtWidgets.QAction):
     def __init__(self, mw, va):
-        QtGui.QAction.__init__(self, "Draw Bounding Boxes", mw)
+        QtWidgets.QAction.__init__(self, "Draw Bounding Boxes", mw)
         self.va = va
 
         self.setCheckable(True)
@@ -16,9 +16,9 @@ class ToggleDrawBBoxAction(QtGui.QAction):
     def update_from_prop(self):
         self.setChecked(self.va.debug_renderer.debug_draw_bbox)
 
-class ToggleDrawDebugAction(QtGui.QAction):
+class ToggleDrawDebugAction(QtWidgets.QAction):
     def __init__(self, mw, va):
-        QtGui.QAction.__init__(self, "Debug Draws", mw)
+        QtWidgets.QAction.__init__(self, "Debug Draws", mw)
         self.va = va
 
         self.setCheckable(True)
