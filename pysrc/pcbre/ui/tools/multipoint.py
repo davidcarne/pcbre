@@ -132,7 +132,7 @@ class MultipointEditRenderer:
 
                 dest.add_line(pa_.x, pa_.y, pb_.x, pb_.y)
 
-        self.view.hairline_renderer.render_va(self.view.viewState.glWMatrix,va_current,COL_SEL)
+        self.view.hairline_renderer.render_va(self.view.viewState.glWMatrix,va_current, COL_SEL)
         self.view.hairline_renderer.render_va(self.view.viewState.glWMatrix,va_unset, COL_UNSET_MARK)
         self.view.hairline_renderer.render_va(self.view.viewState.glWMatrix,va_set, COL_SET_MARK)
 
@@ -144,7 +144,7 @@ class MultipointEditFlow:
         self.__current_point_index = 0
         self.__point_active = False
         self.is_initial_active = True
-        self.is_first_point = True
+        self.simple_entry = True
         self.can_shortcut = can_shortcut
 
         self.__done = DONE_REASON.NOT_DONE
@@ -184,27 +184,28 @@ class MultipointEditFlow:
 
     def abort_entry(self):
         self.is_initial_active = False
-        if self.__point_active:
+
+        if self.simple_entry or not self.__point_active:
+            self.__done = DONE_REASON.REJECT
+        else:
             self.__point_active = False
             self.current_point.restore(self.__saved_point)
-        else:
-            self.__done = DONE_REASON.REJECT
 
     def commit_entry(self, shift_pressed):
-        if self.is_first_point and not shift_pressed:
+        if self.simple_entry and not shift_pressed:
             self.__done = DONE_REASON.ACCEPT
             self.__point_active = False
-        self.is_first_point = False
-
-        if self.__point_active:
-            self.__point_active = False
-            self.next_point()
-            if not self.current_point.is_set:
-                if self.is_initial_active:
-                    self.__grab_delta = Vec2(0,0)
-                    self.make_active()
-            else:
-                self.is_initial_active = False
+        else:
+            self.simple_entry = False
+            if self.__point_active:
+                self.__point_active = False
+                self.next_point()
+                if not self.current_point.is_set:
+                    if self.is_initial_active:
+                        self.__grab_delta = Vec2(0,0)
+                        self.make_active()
+                else:
+                    self.is_initial_active = False
 
 
     def __step_point(self, step):

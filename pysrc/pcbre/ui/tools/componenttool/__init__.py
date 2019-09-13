@@ -1,7 +1,6 @@
 from collections import namedtuple
 from pcbre.accel.vert_array import VA_xy, VA_thickline
 from pcbre.model.const import SIDE
-from pcbre.ui.tools.componenttool.passive import PassiveModel, PassiveEditWidget, Passive_getComponent, PassiveEditFlow
 from pcbre.ui.tools.multipoint import MultipointEditRenderer, DONE_REASON
 from pcbre.ui.widgets.unitedit import UNIT_GROUP_MM
 from pcbre.util import Timer
@@ -15,6 +14,7 @@ from qtpy import QtCore, QtGui, QtWidgets
 from pcbre.ui.tools.basetool import BaseToolController, BaseTool
 from pcbre.ui.uimodel import mdlacc, GenModel
 
+from pcbre.ui.tools.componenttool.passive import PassiveModel, PassiveEditWidget, Passive_getComponent, PassiveEditFlow
 from pcbre.ui.tools.componenttool.basicsmd import BasicSMDICModel, BasicSMD_getComponent, BasicSMDFlow
 from pcbre.ui.tools.componenttool.dip import DIPModel, DIPEditWidget, DIP_getComponent, DIPEditFlow
 from pcbre.ui.tools.componenttool.sip import SIPModel, SIPEditWidget, SIP_getComponent, SIPEditFlow
@@ -215,7 +215,9 @@ class ComponentController(BaseToolController):
                 return
 
             self.project.artwork.merge_component(cmp)
-            self.restartFlow()
+        
+        self.restartFlow()
+
 
     def restartFlow(self):
         self.flow = mdl_meta[self.mdl.cmptype].flow_cons(self.view, self.mdl.get_selected_model(), self.mdl)

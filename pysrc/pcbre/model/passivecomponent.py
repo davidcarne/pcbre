@@ -97,8 +97,8 @@ class Passive2Component(Component):
 
 
 
-        cmp.sym_type = PassiveSymType(m.symType)
-        cmp.body_type = Passive2BodyType(m.bodyType)
+        cmp.sym_type = PassiveSymType(m.symType.raw)
+        cmp.body_type = Passive2BodyType(m.bodyType.raw)
 
         # Distance from center to pin
         cmp.pin_d = m.pinD

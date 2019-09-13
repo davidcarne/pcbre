@@ -86,10 +86,13 @@ class TraceToolController(BaseToolController):
             return []
 
         sp = self.last_pt
-        if sp is None:
-            return []
 
         layer = self.view.current_layer_hack()
+
+        # If no last-point is set, we return a trace stub 'circle' to visualize where the trace will go
+        if sp is None:
+            return [Trace(self.cur_pt, self.cur_pt, self.toolparammodel.thickness, layer, None)]
+
 
         # Single straight trace
         if self.toolparammodel.routing_mode == ROUTING_STRAIGHT:
@@ -157,8 +160,8 @@ class TraceToolController(BaseToolController):
             evt.accept()
             self.last_pt = None
             return True
-        #elif evt.key() == QtCore.Qt.Key_Enter or evt.key() == QtCore.Qt.Key_Return:
-        #    self.traceEnterPoint()
+        elif evt.key() == QtCore.Qt.Key_Enter or evt.key() == QtCore.Qt.Key_Return:
+            self.traceEnterPoint(evt)
         elif evt.key() == QtCore.Qt.Key_Space and evt.modifiers() & QtCore.Qt.ShiftModifier:
             self.cycle_routing_modes()
             evt.accept()
@@ -171,27 +174,30 @@ class TraceToolController(BaseToolController):
 
         return False
 
-    def mousePressEvent(self, evt):
-        pos = evt.pos()
-        pt = QPoint_to_pair(pos)
-        end_point = Point2(self.view.viewState.tfV2W(pt))
-
+    def traceEnterPoint(self, evt):
         if self.last_pt is not None:
             traces = self.get_traces()
 
             if evt.modifiers() & QtCore.Qt.ShiftModifier:
                 for trace in traces:
                     self.project.artwork.merge_artwork(trace)
-                self.last_pt = end_point
+                self.last_pt = self.cur_point
             else:
                 self.project.artwork.merge_artwork(traces[0])
                 self.last_pt = traces[0].p1
                 self.cycle_routing_dir()
         else:
-            self.last_pt = end_point
+            self.last_pt = self.cur_point
+
+    def mousePressEvent(self, evt):
+        pos = evt.pos()
+        pt = QPoint_to_pair(pos)
+        self.cur_point = Point2(self.view.viewState.tfV2W(pt))
+
+        self.traceEnterPoint(evt)
 
 
-        self.traceEnterPoint()
+
 
     def mouseReleaseEvent(self, evt):
         pass
