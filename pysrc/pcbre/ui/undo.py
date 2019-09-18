@@ -16,9 +16,26 @@ class UndoStack(QtWidgets.QUndoStack):
             target.addAction(undoAction)
             target.addAction(redoAction)
         else:
-            pass
+            return (undoAction, redoAction)
 
+class UndoMerge(QtWidgets.QUndoCommand):
+    def __init__(self, project, artwork, desc):
+        super(UndoMerge, self).__init__(desc)
 
+        if isinstance(artwork, list):
+            self.artwork = artwork
+        else:
+            self.artwork = [artwork]
+
+        self.project = project
+
+    def redo(self):
+        for i in self.artwork:
+            self.project.artwork.merge(i)
+
+    def undo(self):
+        for i in reversed(self.artwork):
+            self.project.artwork.remove(i)
 
 class undo_helper_fncall(QtWidgets.QUndoCommand):
     def __init__(self, set_state, *args, **kwargs):

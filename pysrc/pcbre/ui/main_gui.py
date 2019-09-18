@@ -14,6 +14,7 @@ from pcbre.ui.actions.view import LayerJumpAction, FlipXAction, FlipYAction, Rot
 from pcbre.ui.boardviewwidget import BoardViewWidget
 from pcbre.ui.panes.info import InfoWidget
 from pcbre.ui.panes.layerlist import LayerListWidget
+from pcbre.ui.panes.undostack import UndoDock
 from pcbre.ui.tools.all import TOOLS
 from pcbre.ui.widgets.glprobe import probe
 from pcbre.ui.actions.save import SaveAction, SaveAsDialogAction, ExitAction
@@ -42,13 +43,18 @@ class MainWindowActions:
         self.view_set_mode_trace = SetModeTraceAction(window, window.viewArea)
         self.view_set_mode_cad = SetModeCADAction(window, window.viewArea)
 
+        self.undo = window.undo_stack.createUndoAction(window)
+        self.undo.setShortcut(QtGui.QKeySequence.Undo)
+        self.redo = window.undo_stack.createRedoAction(window)
+        self.redo.setShortcut(QtGui.QKeySequence.Redo)
+
 
         # PCB Actions
         self.pcb_stackup_setup_dialog = StackupSetupDialogAction(window)
         self.pcb_layer_view_setup_dialog = LayerViewSetupDialogAction(window)
         self.pcb_rebuild_connectivity = RebuildConnectivityAction(window)
 
-        # Invisible a)ctions - don't need to save these
+        # Invisible actions - don't need to save these
         for i in range(0, 9):
             window.addAction(LayerJumpAction(window, i))
 
@@ -70,6 +76,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.viewArea = BoardViewWidget(self.project)
         self.installEventFilter(self.viewArea)
 
+        self.undo_stack = QtWidgets.QUndoStack()
+
+        self.undo_stack.indexChanged.connect(self.viewArea.update)
+
         self.actions = MainWindowActions(self)
         self.debug_actions = DebugActions(self)
 
@@ -86,9 +96,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.current_controller = None
 
 
+    def submitCommand(self, cmd):
+        self.undo_stack.push(cmd)
+
     def toolBarChanged(self, bid):
         self.current_tool = self.tool_map[bid]
-        controller = self.current_tool.getToolController(self.viewArea)
+        controller = self.current_tool.getToolController(self.viewArea, self.submitCommand)
         self.current_controller = controller
         self.viewArea.setInteractionDelegate(controller)
         self.viewArea.setFocus()
@@ -121,6 +134,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def createLayerSelectionWidget(self):
         dock = LayerListWidget(self.project, self.viewArea.viewState)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+
+
+        dock = UndoDock(self.undo_stack)
+        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
         
         dock = InfoWidget(self.project)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
@@ -147,12 +164,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def createMenubar(self):
         from pcbre.ui.menu.file import FileMenu
+        from pcbre.ui.menu.edit import EditMenu
         from pcbre.ui.menu.view import ViewMenu
         from pcbre.ui.menu.pcb import PCBMenu
 
         from pcbre.ui.menu.debug import DebugMenu
 
         self.menuBar().addMenu(FileMenu(self))
+        self.menuBar().addMenu(EditMenu(self))
         self.menuBar().addMenu(ViewMenu(self))
         self.menuBar().addMenu(PCBMenu(self))
 

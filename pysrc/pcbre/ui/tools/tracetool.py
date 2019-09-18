@@ -10,6 +10,7 @@ from pcbre.matrix import Point2, translate, Vec2
 from pcbre.model.artwork import Via
 from pcbre.model.artwork_geom import Trace, Via
 from pcbre.ui.boardviewwidget import QPoint_to_pair
+from pcbre.ui.undo import UndoMerge
 
 from pcbre.ui.dialogs.settingsdialog import SettingsDialog
 from pcbre.ui.widgets.unitedit import UnitLineEdit, UNIT_GROUP_MM
@@ -61,7 +62,7 @@ class TraceToolOverlay:
 
 
 class TraceToolController(BaseToolController):
-    def __init__(self, view, project, toolparammodel):
+    def __init__(self, view, submit, project, toolparammodel):
         """
 
         :type view: pcbre.ui.boardviewwidget.BoardViewWidget
@@ -69,6 +70,7 @@ class TraceToolController(BaseToolController):
         super(TraceToolController, self).__init__()
 
         self.view = view
+        self.submit = submit
         self.project = project
 
         self.toolparammodel = toolparammodel
@@ -177,13 +179,15 @@ class TraceToolController(BaseToolController):
     def traceEnterPoint(self, evt):
         if self.last_pt is not None:
             traces = self.get_traces()
+            if not traces:
+                return
+
 
             if evt.modifiers() & QtCore.Qt.ShiftModifier:
-                for trace in traces:
-                    self.project.artwork.merge_artwork(trace)
+                self.submit(UndoMerge(self.project, list(traces), "Add traces"))
                 self.last_pt = self.cur_point
             else:
-                self.project.artwork.merge_artwork(traces[0])
+                self.submit(UndoMerge(self.project, traces[0], "Add trace"))
                 self.last_pt = traces[0].p1
                 self.cycle_routing_dir()
         else:
@@ -290,6 +294,6 @@ class TraceTool(BaseTool):
         self.ext = []
         self.model = TraceToolModel(project)
 
-    def getToolController(self, view):
-        return TraceToolController(view, self.project, self.model)
+    def getToolController(self, view, submit):
+        return TraceToolController(view, submit, self.project, self.model)
 

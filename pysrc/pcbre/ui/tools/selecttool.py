@@ -38,7 +38,7 @@ valid_select = [SelectByModes.POINT, SelectByModes.NET]
 
     
 class SelectToolController(BaseToolController):
-    def __init__(self, project, model, view):
+    def __init__(self, project, model, view, submit):
         """
 
         :param project:
@@ -116,8 +116,8 @@ class SelectTool(BaseTool):
         self.model.changed.connect(self.__update_icon)
 
 
-    def getToolController(self, view):
-        return SelectToolController(self.project, self.model, view)
+    def getToolController(self, view, submit):
+        return SelectToolController(self.project, self.model, view, submit)
 
     def __update_icon(self):
         ico = Icon(select_icons[self.model.vers])

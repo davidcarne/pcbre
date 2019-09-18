@@ -7,6 +7,7 @@ from pcbre.model.artwork_geom import Via
 from pcbre.model.net import Net
 from pcbre.ui.boardviewwidget import QPoint_to_pair
 
+from pcbre.ui.undo import UndoMerge
 from pcbre.ui.dialogs.settingsdialog import SettingsDialog
 from pcbre.ui.widgets.unitedit import UnitLineEdit, UNIT_GROUP_MM
 from pcbre.view.rendersettings import RENDER_OUTLINES
@@ -63,7 +64,7 @@ class ViaToolOverlay:
 
 
 class ViaToolController(BaseToolController):
-    def __init__(self, view, project, toolparammodel):
+    def __init__(self, view, submit, project, toolparammodel):
         """
 
         :type view: pcbre.ui.boardviewwidget.BoardViewWidget
@@ -72,6 +73,7 @@ class ViaToolController(BaseToolController):
 
         self.view = view
         self.project = project
+        self.submit = submit
 
         self.toolparammodel = toolparammodel
         self.toolparammodel.changed.connect(self.__modelchanged)
@@ -96,7 +98,7 @@ class ViaToolController(BaseToolController):
         # New object with dummy net
         if self.toolparammodel.current_layer_pair is not None:
             v = Via(pt_world, self.toolparammodel.current_layer_pair, self.toolparammodel.radius, None)
-            self.project.artwork.merge_artwork(v)
+            self.submit(UndoMerge(self.project, v, "Add Via"))
 
     def mouseReleaseEvent(self, evt):
         pass
@@ -194,6 +196,6 @@ class ViaTool(BaseTool):
     def setupToolButtonExtra(self):
         self.__setupMenu()
 
-    def getToolController(self, view):
-        return ViaToolController(view, self.project, self.model)
+    def getToolController(self, view, submit):
+        return ViaToolController(view, submit, self.project, self.model)
 

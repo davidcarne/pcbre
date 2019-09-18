@@ -4,6 +4,7 @@ from pcbre.matrix import Point2
 from pcbre.model.artwork_geom import Airwire
 from pcbre.ui.tools.basetool import BaseTool, BaseToolController
 from qtpy import QtGui, QtCore
+from pcbre.ui.undo import UndoMerge
 from pcbre.view.rendersettings import RENDER_HINT_ONCE
 from pcbre.view.target_const import COL_AIRWIRE
 
@@ -33,7 +34,7 @@ class AirwireToolController(BaseToolController):
     STATE_IDLE = 0
     STATE_WAIT_ADTL_POINT = 1
 
-    def __init__(self, project, view):
+    def __init__(self, project, view, submit):
         """
 
         :type view: pcbre.ui.boardviewwidget.BoardViewWidget
@@ -41,6 +42,7 @@ class AirwireToolController(BaseToolController):
         super(AirwireToolController, self).__init__()
         self.project = project
         self.view = view
+        self.submit = submit
 
         self.overlay = AirwireToolOverlay(self)
         self.state = self.STATE_IDLE
@@ -69,7 +71,7 @@ class AirwireToolController(BaseToolController):
 
         elif self.state == self.STATE_WAIT_ADTL_POINT:
             aw = Airwire(self.pt0, pt, self.pt0_layer, aw_l, None)
-            self.project.artwork.merge_artwork(aw)
+            self.submit(UndoMerge(self.project, aw, "Add Airwire"))
 
             # Here is where we emit the airwire
             if evt.modifiers() & QtCore.Qt.ShiftModifier:
@@ -92,6 +94,6 @@ class AirwireTool(BaseTool):
         super(AirwireTool, self).__init__(self)
         self.project = project
 
-    def getToolController(self, view):
-        return AirwireToolController(self.project, view)
+    def getToolController(self, view, submit):
+        return AirwireToolController(self.project, view, submit)
 

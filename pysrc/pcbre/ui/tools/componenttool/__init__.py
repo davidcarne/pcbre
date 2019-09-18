@@ -4,6 +4,7 @@ from pcbre.model.const import SIDE
 from pcbre.ui.tools.multipoint import MultipointEditRenderer, DONE_REASON
 from pcbre.ui.widgets.unitedit import UNIT_GROUP_MM
 from pcbre.util import Timer
+from pcbre.ui.undo import UndoMerge
 from pcbre.view.componentview import cmp_border_va, cmp_pad_periph_va
 from pcbre.view.rendersettings import RENDER_OUTLINES, RENDER_HINT_ONCE
 from pcbre.view.target_const import COL_SEL
@@ -154,7 +155,7 @@ class ComponentOverlay:
 
 
 class ComponentController(BaseToolController):
-    def __init__(self, mdl, project, view):
+    def __init__(self, mdl, project, view, submit):
         """
 
         :param mdl:
@@ -166,6 +167,7 @@ class ComponentController(BaseToolController):
         super(ComponentController, self).__init__()
         self.project = project
         self.view = view
+        self.submit = submit
         self.mdl = mdl
         self.mdl.changed.connect(self.changed)
 
@@ -214,7 +216,7 @@ class ComponentController(BaseToolController):
             if not cmp:
                 return
 
-            self.project.artwork.merge_component(cmp)
+            self.submit(UndoMerge(self.project, cmp, "add component"))
         
         self.restartFlow()
 
@@ -234,6 +236,6 @@ class ComponentTool(BaseTool):
         super(ComponentTool, self).__init__(project)
         self.mdl = ComponentModel()
 
-    def getToolController(self, view):
-        return ComponentController(self.mdl, self.project, view)
+    def getToolController(self, view, submit):
+        return ComponentController(self.mdl, self.project, view, submit)
 

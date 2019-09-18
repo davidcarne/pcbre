@@ -9,10 +9,11 @@ __author__ = 'davidc'
 
 
 class NameToolController(BaseToolController):
-    def __init__(self, view, project):
+    def __init__(self, view, submit, project):
         super(NameToolController, self).__init__()
 
         self.view = view
+        self.submit = submit
         self.project = project
 
         self.show = False
@@ -47,5 +48,5 @@ class NameTool(BaseTool):
         self.project = project
         self.ext = []
 
-    def getToolController(self, view):
-        return NameToolController(view, self.project)
+    def getToolController(self, view, submit):
+        return NameToolController(view, submit, self.project)
