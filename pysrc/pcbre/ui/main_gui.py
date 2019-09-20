@@ -14,6 +14,7 @@ from pcbre.ui.actions.view import LayerJumpAction, FlipXAction, FlipYAction, Rot
 from pcbre.ui.boardviewwidget import BoardViewWidget
 from pcbre.ui.panes.info import InfoWidget
 from pcbre.ui.panes.layerlist import LayerListWidget
+from pcbre.ui.panes.console import ConsoleWidget
 from pcbre.ui.panes.undostack import UndoDock
 from pcbre.ui.tools.all import TOOLS
 from pcbre.ui.widgets.glprobe import probe
@@ -68,6 +69,9 @@ class MainWindowActions:
         window.addAction(CycleModeAction(window, window.viewArea))
 
 class MainWindow(QtWidgets.QMainWindow):
+    layerChanged = QtCore.Signal((object,))
+    # Emitted when something changes the currently selected layer
+
     def __init__(self, p):
         super(MainWindow, self).__init__()
 
@@ -95,6 +99,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.current_tool = None
         self.current_controller = None
 
+    @QtCore.Slot(object)
+    def changeViewLayer(self, layer):
+        """Change the selected view layer"""
+        assert layer in self.project.stackup.layers
+
+        self.viewArea.viewState.current_layer = layer
+
+        self.layerChanged.emit(layer)
 
     def submitCommand(self, cmd):
         self.undo_stack.push(cmd)
@@ -131,21 +143,28 @@ class MainWindow(QtWidgets.QMainWindow):
                 toolbutton.setChecked(True)
                 self.toolBarChanged(toolbutton)
 
-    def createLayerSelectionWidget(self):
-        dock = LayerListWidget(self.project, self.viewArea.viewState)
-        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+    def createDockWidgets(self):
+        # TODO: make this modular, remember view state
 
+        dock = LayerListWidget(self, self.project, self.viewArea.viewState)
+        #dock.hide()
+        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+        self._view_menu.subWindowMenu.addAction(dock.toggleViewAction())
+
+        dock = ConsoleWidget(self.project)
+        dock.hide()
+        self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, dock)
+        self._view_menu.subWindowMenu.addAction(dock.toggleViewAction())
 
         dock = UndoDock(self.undo_stack)
+        #dock.hide()
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+        self._view_menu.subWindowMenu.addAction(dock.toggleViewAction())
         
         dock = InfoWidget(self.project)
+        dock.hide()
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
-        #self.subWindowMenu.addAction(dock.toggleViewAction())
-
-    def createDockWidgets(self):
-        self.createLayerSelectionWidget()
-
+        self._view_menu.subWindowMenu.addAction(dock.toggleViewAction())
 
     def createViewToolbar(self):
         tb = self.addToolBar("View")
@@ -172,7 +191,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.menuBar().addMenu(FileMenu(self))
         self.menuBar().addMenu(EditMenu(self))
-        self.menuBar().addMenu(ViewMenu(self))
+        self._view_menu = ViewMenu(self)
+        self.menuBar().addMenu(self._view_menu)
         self.menuBar().addMenu(PCBMenu(self))
 
         # TODO: Only show menu if started in debug mode

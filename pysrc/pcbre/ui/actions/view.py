@@ -14,11 +14,13 @@ class LayerJumpAction(QtWidgets.QAction):
         self.setShortcut(QtGui.QKeySequence("%d" % (layer_no+1)))
 
     def __action(self):
-        if self.__layer >= len(self.window.project.stackup.layers):
+        if self.__layer > len(self.window.project.stackup.layers):
             return
 
-        self.window.viewArea.viewState.current_layer = self.window.project.stackup.layers[self.__layer]
+        # TODO: make this get copper layer
+        layer = self.window.project.stackup.layers[self.__layer]
 
+        self.window.changeViewLayer(layer)
 
 class FlipXAction(QtWidgets.QAction):
     def __init__(self, window):
