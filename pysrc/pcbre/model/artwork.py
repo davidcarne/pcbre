@@ -21,11 +21,12 @@ from pcbre.model.util import ImmutableSetProxy
 from rtree import index
 import weakref
 
-#kref Rules of engagement:
-#
 #   Once an item is added to artwork, it should be considered geometrically and electrically immutable
+# 
+#   changing an object in a way that alters the geometry or connectivity requires removing it before applying the changes, then readding it
+#   this of course can be hidden in the UI. 
 #
-#
+#   The point of this step is to ensure that net connectivity is recalculated as necessary
 class ArtworkIndex:
     """
     Artwork index provides a wrapper on the Rtree spatial query library. Specifically, it resolves query results to
@@ -455,6 +456,14 @@ class Artwork:
             for i in group:
                 i.net = n0
 
+        assigned_nets = set(i.net for i in self.get_all_artwork())
+
+        existing_nets = set(self.__project.nets.nets)
+
+        to_remove_nets = existing_nets - assigned_nets
+
+        for net in to_remove_nets:
+            self.__project.nets.remove_net(net)
 
 
     def merge_artwork(self, geom):
@@ -705,12 +714,19 @@ class Artwork:
 
         return _aw
 
+    def __lookup_net_helper(self, sid):
+            try:
+                return self.__project.scontext.get(sid)
+            except KeyError:
+                print("WARNING: invalid SID %d for net lookup, replacing with empty net", sid)
+                return self.__project.nets.new()
+
     def deserialize(self, msg):
         for i in msg.vias:
             v = Via(deserialize_point2(i.point),
                     self.__project.scontext.get(i.viapairSid),
                     i.r,
-                    self.__project.scontext.get(i.netSid)
+                    self.__lookup_net_helper(i.netSid)
             )
 
             self.add_artwork(v)
@@ -721,10 +737,10 @@ class Artwork:
                 deserialize_point2(i.p1),
                 i.thickness,
                 self.__project.scontext.get(i.layerSid),
-                self.__project.scontext.get(i.netSid)
+                self.__lookup_net_helper(i.netSid)
             )
-
             self.add_artwork(t)
+
 
         for i in msg.polygons:
             exterior = [deserialize_point2(j) for j in i.exterior]
@@ -734,7 +750,7 @@ class Artwork:
                 self.__project.scontext.get(i.layerSid),
                 exterior,
                 interiors,
-                self.__project.scontext.get(i.netSid)
+                self.__lookup_net_helper(i.netSid)
             )
 
             self.add_artwork(p)

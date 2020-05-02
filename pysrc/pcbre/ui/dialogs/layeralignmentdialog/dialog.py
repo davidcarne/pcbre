@@ -191,6 +191,7 @@ class LayerAlignmentDialog(QtWidgets.QDialog):
         self.view_tabs = QtWidgets.QTabBar()
         self.view_tabs.currentChanged.connect(self.set_view_type)
 
+
         self.update_tabs()
 
         view_layout.addWidget(self.view_tabs)
@@ -224,7 +225,8 @@ class LayerAlignmentDialog(QtWidgets.QDialog):
         control_layout.addRow("Align By:", self.align_selection)
 
         # And the widget stack to drive that
-        self.stacked_layout = QtWidgets.QStackedLayout()
+        stack_widget = QtWidgets.QWidget()
+        self.stacked_layout = QtWidgets.QStackedLayout(stack_widget)
         self.stacked_layout.addWidget(rect_align_controls)
         self.stacked_layout.addWidget(keypoint_align_controls)
 
@@ -233,7 +235,7 @@ class LayerAlignmentDialog(QtWidgets.QDialog):
         # right pane layout
         control_buttons_layout = QtWidgets.QVBoxLayout()
         control_buttons_layout.addLayout(control_layout)
-        control_buttons_layout.addLayout(self.stacked_layout)
+        control_buttons_layout.addWidget(stack_widget)
 
         # Visbox
         vis_gb = QtWidgets.QGroupBox("Visible Layers")

@@ -1,5 +1,4 @@
 from collections import defaultdict
-from pcbre.accel.vert_array import VA_via
 from pcbre.model.artwork_geom import Via
 from pcbre.model.component import Component
 from pcbre.model.pad import Pad
@@ -94,10 +93,13 @@ class THRenderer:
         self.filled_instance_vbo.set_array(va.buffer()[:])
 
 
-        with self._filled_shader, self.__filled_vao, self.filled_instance_vbo, self._sq_vbo:
-            GL.glUniformMatrix3fv(self._filled_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
-            GL.glUniform1ui(self._filled_shader.uniforms.color, color)
-            GL.glDrawArraysInstancedBaseInstance(GL.GL_TRIANGLE_STRIP, 0, 4, va.count(), 0)
+        try:
+            with self._filled_shader, self.__filled_vao, self.filled_instance_vbo, self._sq_vbo:
+                GL.glUniformMatrix3fv(self._filled_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
+                GL.glUniform1ui(self._filled_shader.uniforms.color, color)
+                GL.glDrawArraysInstancedBaseInstance(GL.GL_TRIANGLE_STRIP, 0, 4, va.count(), 0)
+        except OpenGL.error.GLError as e:
+            print("Threw OGL error:")
 
 
     def render_outlines(self, mat, va):

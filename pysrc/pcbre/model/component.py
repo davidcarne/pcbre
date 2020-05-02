@@ -111,7 +111,11 @@ class Component:
             ident = i.identifier
             target.name_mapping[ident] = i.name
             assert i.net is not None
-            target.net_mapping[ident] = project.scontext.get(i.net)
+            try:
+                target.net_mapping[ident] = project.scontext.get(i.net)
+            except KeyError:
+                print("Warning: No net for SID %d during component load" % i.net)
+                target.net_mapping[ident] = project.nets.new()
 
 
     def point_inside(self, pt):
