@@ -62,6 +62,13 @@ class Stackup(QtCore.QObject):
     def via_pair_has_geom(self, via_pair):
         raise NotImplementedError("Via Pair geom check not finished")
 
+    def via_pair_for_layers(self, layers):
+        for vp in self.via_pairs:
+            first_layer, second_layer = vp.layers
+            if all(first_layer.order <= l.order <= second_layer.order for l in layers):
+                return vp
+        return None
+
     def __renumber_layers(self):
         for n, i in enumerate(self.__layers):
             i.number = n

@@ -4,7 +4,7 @@ from qtpy import QtCore, QtGui, QtWidgets
 
 import pcbre.model.project as P
 from pcbre.ui.actions.add import AddImageDialogAction
-from pcbre.ui.actions.debug import ToggleDrawBBoxAction, ToggleDrawDebugAction
+from pcbre.ui.actions.debug import ToggleDrawBBoxAction, ToggleDrawDebugAction, ToggleLogActions
 from pcbre.ui.actions.misc import NudgeUpAction, NudgeLeftAction, NudgeDownAction, NudgeRightAction, \
     ShowToolSettingsAction
 from pcbre.ui.actions.pcb import RebuildConnectivityAction, LayerViewSetupDialogAction, StackupSetupDialogAction
@@ -25,6 +25,7 @@ class DebugActions:
     def __init__(self, window):
         self.debug_draw = ToggleDrawDebugAction(window, window.viewArea)
         self.debug_draw_bbox = ToggleDrawBBoxAction(window, window.viewArea)
+        self.debug_log_action_history = ToggleLogActions(window, window.viewArea)
 
 class MainWindowActions:
     def __init__(self, window):

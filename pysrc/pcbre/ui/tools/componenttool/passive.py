@@ -14,6 +14,7 @@ from collections import namedtuple
 
 _well_known_t = namedtuple("well_known", ["name", "body_type", "pin_d", "body_size", "pad_size"])
 
+# Passive SMD "chip" components come in various common sizes.
 def _wkchip(name):
     n, _ = name.split('/')
     l = int(n[:2])/10 * units.MM
@@ -36,6 +37,10 @@ well_known_chip = [
     _wkchip("5025/2010"),
     _wkchip("6332/2512")
 ]
+
+# TODO: This model should be in one of two states:
+# - a well known component is assigned (in which case all values are derived from the well known component)
+# - no well known component is assigned (in which case the values are 
 class PassiveModel(GenModel):
     def __init__(self):
         super(PassiveModel, self).__init__()
@@ -44,7 +49,6 @@ class PassiveModel(GenModel):
         self.__body_corner = Point2(0.15 * units.IN, 0.05 * units.IN)
         self.__pin_corner = Point2(0.05 * units.IN, 0.05 * units.IN)
 
-    changed = QtCore.Signal()
 
     snap_well = mdlacc(True)
     
@@ -61,7 +65,6 @@ class PassiveModel(GenModel):
     @pin_d.setter
     def pin_d(self, v):
         self.__pin_d = v
-        self.changed.emit()
 
     @property
     def body_corner_vec(self):
@@ -72,7 +75,6 @@ class PassiveModel(GenModel):
     @body_corner_vec.setter
     def body_corner_vec(self, v):
         self.__body_corner = v
-        self.changed.emit()
 
     @property
     def pin_corner_vec(self):
@@ -83,7 +85,6 @@ class PassiveModel(GenModel):
     @pin_corner_vec.setter
     def pin_corner_vec(self, v):
         self.__pin_corner = v
-        self.changed.emit()
 
 
 
@@ -141,9 +142,9 @@ class PassiveEditWidget(AutoSettingsWidget):
         for v in well_known_chip:
             self.__add_wk(v)
 
-        self.cb_well_known.currentIndexChanged.connect(self.pkg_changed)
         self.cb_well_known.setCurrentIndex(self.__wk_to_idx[self.__model.well_known])
-        self.pkg_changed(self.cb_well_known.currentIndex())
+
+        self.cb_well_known.currentIndexChanged.connect(lambda _: self.update_ui())
 
         # Snap checkbox
         self.cb_snap = QtWidgets.QCheckBox()
@@ -151,7 +152,8 @@ class PassiveEditWidget(AutoSettingsWidget):
         self.cb_snap.clicked.connect(self.snap_ui_changed)
         self.layout.addRow("Snap to Well Known", self.cb_snap)
 
-
+        
+        
         self.gs = [
             self.addEdit("Pad Centers", UnitEditable(self.__model, "pin_d", UNIT_GROUP_MM)),
             self.addEdit("Body length", PointUnitEditable(self.__model, "body_corner_vec", "x", UNIT_GROUP_MM)),
@@ -161,13 +163,35 @@ class PassiveEditWidget(AutoSettingsWidget):
             self.addEdit("Pad width", PointUnitEditable(self.__model, "pin_corner_vec", "y", UNIT_GROUP_MM)),
             ]
 
+
+        self.pad_type_select = QtWidgets.QComboBox()
+        self.pad_type_select.addItem("SMT Chip Passive", Passive2BodyType.CHIP)
+        self.pad_type_select.addItem("SMT Capacitor (electrolytic)", Passive2BodyType.SMD_CAP)
+        self.pad_type_select.addItem("T/H Axial", Passive2BodyType.TH_AXIAL)
+        self.pad_type_select.addItem("T/H Radial", Passive2BodyType.TH_RADIAL)
+        self.pad_type_select.addItem("T/H Radial side", Passive2BodyType.TH_FLIPPED_CAP)
+
+        self.layout.addRow("Body Type", self.pad_type_select)
+
+        self.update_ui()
+
     def snap_ui_changed(self):
         en = not self.cb_snap.isChecked()
+
+    def update_ui(self):
+        idx = self.cb_well_known.currentIndex()
+
+        # Try one of the well-known components
+        self.well_known = self.__idx_to_wk[idx]
+
+        en = self.well_known is None
+
         for i in self.gs:
             i.widget.setEnabled(en)
+        self.pad_type_select.setEnabled(en)
 
-    def pkg_changed(self, idx):
-        self.well_known= self.__idx_to_wk[idx]
+        #if self.well_known is not None:
+        #    pkg_type
 
     def save(self):
         if self.well_known is None:

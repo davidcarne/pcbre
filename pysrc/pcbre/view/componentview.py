@@ -3,7 +3,7 @@ import math
 import weakref
 
 from pcbre import units
-from pcbre.accel.vert_array import VA_xy, VA_thickline, VA_via
+from pcbre.accel.vert_array import VA_xy, VA_thickline
 from pcbre.matrix import Rect, Point2, projectPoint, projectPoints, Vec2
 from pcbre.model.const import SIDE
 from pcbre.model.dipcomponent import DIPComponent

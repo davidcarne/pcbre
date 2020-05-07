@@ -1,8 +1,7 @@
-from qtpy import QtCore, QtGui
 from collections import defaultdict
 
 
-from pcbre.accel.vert_array import VA_thickline
+from pcbre.accel.vert_array import VA_thickline, VA_via
 from pcbre.view.target_const import COL_LAYER_MAIN
 from .basetool import BaseTool, BaseToolController
 from pcbre import units
@@ -12,9 +11,12 @@ from pcbre.model.artwork_geom import Trace, Via
 from pcbre.ui.boardviewwidget import QPoint_to_pair
 from pcbre.ui.undo import UndoMerge
 
-from pcbre.ui.dialogs.settingsdialog import SettingsDialog
+from pcbre.ui.action import ActionDescription, ActionShortcut, Modifier, EventID
+
 from pcbre.ui.widgets.unitedit import UnitLineEdit, UNIT_GROUP_MM
 from pcbre.view.rendersettings import RENDER_OUTLINES
+
+import enum
 
 ROUTING_STRAIGHT = 0
 ROUTING_45 = 1
@@ -22,47 +24,59 @@ ROUTING_90 = 2
 ROUTING_MOD = 3
 
 
+class TraceEventCode(enum.Enum):
+    DecreaseThickness = 0   # wheel-down
+    IncreaseThickness = 1   # wheel-up
+    AbortPlace = 2      # escape
+    PlaceSegment = 3         # enter, click
+    PlaceAll = 4      # shift-click, shift-enter
+    CycleRouteMode = 5  # shift-space
+    CycleRouteDir = 6   # space
+
 class TraceToolOverlay:
     def __init__(self, ctrl):
         """
         :type ctrl: TraceToolController
         """
         self.view = ctrl.view
-        self.tpm = ctrl.toolparammodel
         self.ctrl = ctrl
 
-
-    def initializeGL(self, gls):
-        """
-        :type gls: GLShared
-        :param gls:
-        :return:
-        """
-        self.gls = gls
+    def initializeGL(self, _):
+        pass
 
     def render(self, viewport, compositor):
-        traces =  self.ctrl.get_traces()
-        if not traces:
-            return
+        via, traces =  self.ctrl.get_artwork()
+
+        va_for_via = VA_via(1024)
 
         # Render by drawing the VA
         va_for_ly = defaultdict(lambda: VA_thickline(1024))
 
-        for t in traces:
-            va_for_ly[t.layer].add_trace(t)
+        if via:
+            va_for_via.add_donut(via.pt.x, via.pt.y, via.r)
 
-        for layer, va in va_for_ly.items():
-            with self.ctrl.view.compositor.get(layer):
-                self.ctrl.view.trace_renderer.render_va(
-                    va,
+            with compositor.get("OVERLAY"):
+                self.view.via_renderer.render_outlines(
                     self.ctrl.view.viewState.glMatrix,
-                    COL_LAYER_MAIN, True)
+                    va_for_via)
+
+        if traces:
+            for t in traces:
+                va_for_ly[t.layer].add_trace(t)
+
+            for layer, va in va_for_ly.items():
+                with self.ctrl.view.compositor.get(layer):
+                    self.ctrl.view.trace_renderer.render_va(
+                        va,
+                        self.ctrl.view.viewState.glMatrix,
+                        COL_LAYER_MAIN, True)
+
 
 
 
 
 class TraceToolController(BaseToolController):
-    def __init__(self, view, submit, project, toolparammodel):
+    def __init__(self, view, submit, project, toolsettings):
         """
 
         :type view: pcbre.ui.boardviewwidget.BoardViewWidget
@@ -73,47 +87,61 @@ class TraceToolController(BaseToolController):
         self.submit = submit
         self.project = project
 
-        self.toolparammodel = toolparammodel
-        self.toolparammodel.changed.connect(self.__modelchanged)
+        self.toolsettings = toolsettings
 
         self.cur_pt = Point2(0,0)
         self.last_pt = None
-
-        self.show = False
+        self.last_layer = None
 
         self.overlay = TraceToolOverlay(self)
 
-    def get_traces(self):
-        if self.view.current_layer_hack() is None:
-            return []
+        # TODO: HACK
+        self.actions = g_ACTIONS
 
-        sp = self.last_pt
+        self.routing_mode = ROUTING_STRAIGHT
+        self.routing_dir = False
+
+    def get_artwork(self):
+        if self.view.current_layer_hack() is None:
+            return None, []
 
         layer = self.view.current_layer_hack()
 
         # If no last-point is set, we return a trace stub 'circle' to visualize where the trace will go
-        if sp is None:
-            return [Trace(self.cur_pt, self.cur_pt, self.toolparammodel.thickness, layer, None)]
+        if self.last_pt is None:
+            return None, [Trace(self.cur_pt, self.cur_pt, self.toolsettings.thickness, layer, None)]
 
+        initial_via = None
+
+        # If previous layer and current layer are the same, no via needed
+        if self.last_layer != layer:
+            # Look for a viapair between the layer @ self.last_layer
+            vp = self.project.stackup.via_pair_for_layers([self.last_layer, layer])
+
+            if vp is not None:
+                initial_via = Via(self.last_pt, vp, self.toolsettings.via_radius)
 
         # Single straight trace
-        if self.toolparammodel.routing_mode == ROUTING_STRAIGHT:
-            return [Trace(sp, self.cur_pt, self.toolparammodel.thickness, layer, None)]
-        elif self.toolparammodel.routing_mode == ROUTING_90:
+        if self.routing_mode == ROUTING_STRAIGHT:
+            return initial_via, [Trace(self.last_pt, self.cur_pt, self.toolsettings.thickness, layer, None)]
+        
+        # 90 degree bend
+        elif self.routing_mode == ROUTING_90:
 
-            if self.toolparammodel.routing_dir:
-                pa = Point2(sp.x, self.cur_pt.y)
+            # position of bend point
+            if self.routing_dir:
+                pa = Point2(self.last_pt.x, self.cur_pt.y)
             else:
-                pa = Point2(self.cur_pt.x, sp.y)
+                pa = Point2(self.cur_pt.x, self.last_pt.y)
 
-            return [
-                Trace(sp, pa, self.toolparammodel.thickness, layer, None),
-                Trace(pa, self.cur_pt, self.toolparammodel.thickness, layer, None)
+            return initial_via, [
+                Trace(self.last_pt, pa, self.toolsettings.thickness, layer, None),
+                Trace(pa, self.cur_pt, self.toolsettings.thickness, layer, None)
             ]
 
-        elif self.toolparammodel.routing_mode == ROUTING_45:
+        elif self.routing_mode == ROUTING_45:
 
-            d_v = self.cur_pt - sp
+            d_v = self.cur_pt - self.last_pt
 
             d_nv = Vec2(d_v)
 
@@ -131,168 +159,146 @@ class TraceToolController(BaseToolController):
             d_vh = d_v - d_nv
 
 
-            if self.toolparammodel.routing_dir:
-                pa = sp + d_nv
+            if self.routing_dir:
+                pa = self.last_pt + d_nv
             else:
-                pa = sp + d_vh
+                pa = self.last_pt + d_vh
 
-            return [
-                Trace(sp, pa, self.toolparammodel.thickness, layer, None),
-                Trace(pa, self.cur_pt, self.toolparammodel.thickness, layer, None)
+            return initial_via, [
+                Trace(self.last_pt, pa, self.toolsettings.thickness, layer, None),
+                Trace(pa, self.cur_pt, self.toolsettings.thickness, layer, None)
             ]
 
 
-
-
     def cycle_routing_modes(self):
-        self.toolparammodel.routing_mode = (self.toolparammodel.routing_mode + 1) % ROUTING_MOD
+        self.routing_mode = (self.routing_mode + 1) % ROUTING_MOD
 
     def cycle_routing_dir(self):
-        self.toolparammodel.routing_dir = not self.toolparammodel.routing_dir
+        self.routing_dir = not self.routing_dir
 
     def showSettingsDialog(self):
         pass
 
+    def traceEnterPoint(self, evt, multi_seg=True):
+        self.cur_pt = evt.world_pos
 
-    def __modelchanged(self):
-        self.changed.emit()
+        layer = self.view.current_layer_hack()
+        if layer is None:
+            return
 
-    def keyPressEvent(self, evt):
-        if evt.key() == QtCore.Qt.Key_Escape:
-            evt.accept()
-            self.last_pt = None
-            return True
-        elif evt.key() == QtCore.Qt.Key_Enter or evt.key() == QtCore.Qt.Key_Return:
-            self.traceEnterPoint(evt)
-        elif evt.key() == QtCore.Qt.Key_Space and evt.modifiers() & QtCore.Qt.ShiftModifier:
-            self.cycle_routing_modes()
-            evt.accept()
-            return True
-
-        elif evt.key() == QtCore.Qt.Key_Space and evt.modifiers() == 0:
-            self.cycle_routing_dir()
-            evt.accept()
-            return True
-
-        return False
-
-    def traceEnterPoint(self, evt):
         if self.last_pt is not None:
-            traces = self.get_traces()
+            via, traces = self.get_artwork()
             if not traces:
                 return
 
+            v_list = []
+            if via is not None:
+                v_list = [via]
 
-            if evt.modifiers() & QtCore.Qt.ShiftModifier:
-                self.submit(UndoMerge(self.project, list(traces), "Add traces"))
-                self.last_pt = self.cur_point
+            if multi_seg:
+                self.submit(UndoMerge(self.project, v_list + list(traces), "Routing"))
+                self.last_pt = self.cur_pt
+                self.last_layer = layer
             else:
-                self.submit(UndoMerge(self.project, traces[0], "Add trace"))
+                self.submit(UndoMerge(self.project, v_list + [traces[0]], "Routing"))
                 self.last_pt = traces[0].p1
+                self.last_layer = layer
                 self.cycle_routing_dir()
         else:
-            self.last_pt = self.cur_point
+            self.last_pt = self.cur_pt
+            self.last_layer = layer
 
-    def mousePressEvent(self, evt):
-        pos = evt.pos()
-        pt = QPoint_to_pair(pos)
-        self.cur_point = Point2(self.view.viewState.tfV2W(pt))
-
-        self.traceEnterPoint(evt)
-
-
-
-
-    def mouseReleaseEvent(self, evt):
-        pass
 
     def mouseMoveEvent(self, evt):
-        self.show = True
-        self.cur_pt = Point2(self.view.viewState.tfV2W(Point2(evt.pos())))
-        self.changed.emit()
+        self.cur_pt = evt.world_pos
 
-    def mouseWheelEvent(self, event):
-        if event.modifiers() & QtCore.Qt.ShiftModifier:
-            # TODO: Remove hack on step
-            step = event.angleDelta().y()/120.0 * 0.050 * units.MM
-            self.toolparammodel.thickness += step
-            if self.toolparammodel.thickness <= 100:
-                self.toolparammodel.thickness = 100
+    def eventThickness(self, step):
+        step = step * 0.050 * units.MM
+        self.toolsettings.thickness += step
+        if self.toolsettings.thickness <= 100:
+            self.toolsettings.thickness = 100
 
-class TraceToolModel(QtCore.QObject):
-    def __init__(self, project):
-        super(TraceToolModel, self).__init__()
-        self.project = project
-
-        self.__thickness = 1000
-
-        self.__mode = ROUTING_STRAIGHT
-        self.__dir = False
-
-        self.__current_layer_id = 0
-
-    changed = QtCore.Signal()
-
-    @property
-    def routing_mode(self):
-        return self.__mode
-
-    @routing_mode.setter
-    def routing_mode(self, value):
-        old = self.__mode
-        self.__mode = value
-
-        if old != value:
-            self.changed.emit()
+    def event(self, event):
+        if event.code == TraceEventCode.DecreaseThickness:
+            self.event_thickness(-1 * event.amount)
+        elif event.code == TraceEventCode.IncreaseThickness:
+            self.event_thickness(event.amount)
+        elif event.code == TraceEventCode.AbortPlace:
+            self.last_pt = None
+            self.last_layer = None
+        elif event.code == TraceEventCode.PlaceSegment:
+            self.traceEnterPoint(event, False)
+        elif event.code == TraceEventCode.PlaceAll:
+            self.traceEnterPoint(event, True)
+        elif event.code == TraceEventCode.CycleRouteMode:
+            self.cycle_routing_modes()
+        elif event.code == TraceEventCode.CycleRouteDir:
+            self.cycle_routing_dir()
+        else:
+            raise ValueError("Trace tool received unknown event: %s" % event)
 
 
-    @property
-    def routing_dir(self):
-        return self.__dir
+g_ACTIONS = [
+    ActionDescription(
+        ActionShortcut(EventID.Mouse_WheelDown, Modifier.Shift),
+        TraceEventCode.DecreaseThickness,
+        "Decrease Trace Thickness"),
+    ActionDescription(
+        ActionShortcut(EventID.Mouse_WheelUp, Modifier.Shift),
+        TraceEventCode.IncreaseThickness,
+        "Increase Trace Thickness"),
+    ActionDescription(
+        ActionShortcut(EventID.Key_Escape),
+        TraceEventCode.AbortPlace,
+        "Abort Placement"),
+    ActionDescription(
+        [
+            ActionShortcut(EventID.Key_Enter), 
+            ActionShortcut(EventID.Key_Return), 
+            ActionShortcut(EventID.Mouse_B1)
+            ],
+        TraceEventCode.PlaceSegment,
+        "Place track segment"),
+    ActionDescription(
+        [
+            ActionShortcut(EventID.Key_Enter, Modifier.Shift),
+            ActionShortcut(EventID.Key_Return, Modifier.Shift), 
+            ActionShortcut(EventID.Mouse_B1, Modifier.Shift)
+            ],
+        TraceEventCode.PlaceAll,
+        "Place all segments"),
 
-    @routing_dir.setter
-    def routing_dir(self, value):
-        old = self.__dir
-        self.__dir = value
+    ActionDescription(
+        ActionShortcut(EventID.Key_Space, Modifier.Shift),
+        TraceEventCode.CycleRouteMode,
+        "Cycle routing mode"),
 
-        if old != value:
-            self.changed.emit()
+    ActionDescription(
+        ActionShortcut(EventID.Key_Space),
+        TraceEventCode.CycleRouteDir,
+        "Cycle routing direction"),
+]
 
-    @property
-    def current_layer_id(self):
-        return self.__current_layer_id
+class TraceToolSettings(object):
+    __slots__ = ["thickness", "via_radius"]
 
-    @current_layer_id.setter
-    def current_layer_id(self, value):
-        old = self.__current_layer_id
-        self.__current_layer_id = value
+    def __init__(self):
+        self.thickness = 1000
+        self.via_radius = 500
 
-        if old != value:
-            self.changed.emit()
-
-    @property
-    def thickness(self):
-        return self.__thickness
-
-    @thickness.setter
-    def thickness(self, value):
-        old = self.__thickness
-        self.__thickness = value
-
-        if old != value:
-            self.changed.emit()
 
 class TraceTool(BaseTool):
     ICON_NAME = "trace"
     NAME = "Trace"
     SHORTCUT = 't'
     TOOLTIP = 'Trace (t)'
+    ACTIONS = g_ACTIONS
 
     def __init__(self, project):
         super(TraceTool, self).__init__(project)
         self.project = project
         self.ext = []
-        self.model = TraceToolModel(project)
+        self.model = TraceToolSettings()
 
     def getToolController(self, view, submit):
         return TraceToolController(view, submit, self.project, self.model)

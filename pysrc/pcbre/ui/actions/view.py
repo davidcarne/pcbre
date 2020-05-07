@@ -14,7 +14,7 @@ class LayerJumpAction(QtWidgets.QAction):
         self.setShortcut(QtGui.QKeySequence("%d" % (layer_no+1)))
 
     def __action(self):
-        if self.__layer > len(self.window.project.stackup.layers):
+        if self.__layer >= len(self.window.project.stackup.layers):
             return
 
         # TODO: make this get copper layer

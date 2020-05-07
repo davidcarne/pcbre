@@ -1,7 +1,7 @@
 from collections import defaultdict
 import math
 import time
-
+from pcbre.ui.action import MoveEvent, ActionEvent, EventID, Modifier
 from qtpy import QtOpenGL
 import qtpy.QtCore as QtCore
 import qtpy.QtGui as QtGui
@@ -9,7 +9,7 @@ import OpenGL.GL as GL
 import numpy
 from OpenGL.arrays.vbo import VBO
 from pcbre import units
-from pcbre.accel.vert_array import VA_thickline, VA_xy, VA_via, VA_tex
+from pcbre.accel.vert_array import VA_thickline, VA_xy, VA_tex
 from pcbre.matrix import scale, translate, Point2, projectPoint
 from pcbre.model.const import SIDE
 from pcbre.model.dipcomponent import DIPComponent
@@ -51,6 +51,7 @@ MOVE_MOUSE_BUTTON = QtCore.Qt.RightButton
 
 
 
+EVT_START_DRAG = 0
 
 def fixed_center_dot(viewState, m, view_center=None):
 
@@ -152,6 +153,35 @@ class ViewState(ViewPort):
         self.changed.emit()
 
 
+class MoveDragHandler:
+    def __init__(self, vs, start):
+        self.vs = vs
+        self.last = start
+
+    def move(self, cur):
+        lx, ly = self.vs.tfV2P(self.last)
+        nx, ny = self.vs.tfV2P(cur)
+
+        delta = nx-lx, ny-ly
+
+        self.vs.transform = M.translate(*delta).dot(self.vs.transform)
+
+        self.last = cur
+
+    def done(self):
+        pass
+
+
+class WheelEmulation:
+    def __init__(self):
+        pass
+
+    def move(self, evt):
+        self.cb_move(evt)
+
+    def done(self):
+        pass
+
 class BaseViewWidget(QtOpenGL.QGLWidget):
     def __init__(self, parent=None):
         if hasattr(QtOpenGL.QGLFormat, 'setVersion'):
@@ -170,12 +200,14 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
 
         self.viewState.changed.connect(self.update)
 
-        # Nav Handling
-        self.move_dragging = False
-        self.move_dragged = False
-        self.mwemu = False
-        self.lastPoint = None
 
+        self.lastPoint = QtCore.QPoint(0,0)
+        # Nav Handling
+        self.active_drag = None
+
+        self.mouse_wheel_emu = None
+
+        self.action_log_cb = None
         self.interactionDelegate = None
         self.setMouseTracking(True)
 
@@ -186,21 +218,65 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
         # OpenGL shared resources object. Initialized during initializeGL
         self.gls = GLShared()
 
+        #
+        self.local_actions_map = {(EventID.Mouse_B2_DragStart, Modifier(0)): EVT_START_DRAG}
+
+        self.id_actions_map = {}
 
 
-    def eventFilter(self, target, event):
+    def internal_event(self, action_event):
+        if action_event.code == EVT_START_DRAG:
+            self.active_drag = MoveDragHandler(self.viewState, action_event.cursor_pos)
+
+    def _log_action(self, *args):
+        if self.action_log_cb is not None:
+            self.action_log_cb(*args)
+
+    def dispatchActionEvent(self, point, event_id, modifiers, amount=1):
+        key = (event_id, modifiers)
+
+
+        if key in self.local_actions_map:
+            code = self.local_actions_map[key]
+            cb = self.internal_event
+            self._log_action(key, "local")
+
+        elif key in self.id_actions_map:
+            if self.interactionDelegate is None:
+                self._log_action(key, "noid")
+                return False
+
+            self._log_action(key, "delegate", self.id_actions_map[key].description)
+            code = self.id_actions_map[key].event_code
+            cb = self.interactionDelegate.event
+        else:
+            self._log_action(key, "unhandled")
+            return False
+
+        pt = Point2(QPoint_to_pair(point))
+
+        w_pt = self.viewState.tfV2W(pt)
+
+        event = ActionEvent(code, pt, w_pt, amount)
+
+
+        cb(event)
+        return True
+
+
+    def eventFilter(self, target, qevent):
         if self.interactionDelegate is None:
             return False
 
-        if event.type() == QtCore.QEvent.KeyRelease:
-            s = self.interactionDelegate.keyReleaseEvent(event)
-            self.update()
-            return s
+        if qevent.type() == QtCore.QEvent.KeyPress:
+            event_id = EventID.from_key_event(qevent)
+            modifiers = Modifier.from_qevent(qevent)
+            
+            ate_event = self.dispatchActionEvent(self.lastPoint, event_id, modifiers)
+            if ate_event:
+                self.update()
 
-        if event.type() == QtCore.QEvent.KeyPress:
-            s = self.interactionDelegate.keyPressEvent(event)
-            self.update()
-            return s
+            return ate_event
 
         return False
 
@@ -227,11 +303,16 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
             return
 
         if self.interactionDelegate:
-            self.interactionDelegate.changed.disconnect(self.update)
             self.interactionDelegate.finalize()
 
+        # Build a map of internal event IDs to actions on the delegate
+        self.id_actions_map = {}
+        for action in ed.actions:
+            # TODO: customized shortcuts
+            for shortcut in action.default_shortcuts:
+                self.id_actions_map[(shortcut.evtid, shortcut.modifiers)] = action
+
         self.interactionDelegate = ed
-        ed.changed.connect(self.update)
         ed.initialize()
 
         # If we have an overlay, GLinit it only if we've initialized shared state
@@ -245,71 +326,80 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
 
     def mousePressEvent(self, event):
         self.lastPoint = event.pos()
-        self.move_dragged = False
 
+        #if event.button() == MOVE_MOUSE_BUTTON:
+        #    self.active_drag = MoveDragHandler(self.viewState,
+        #        Point2(QPoint_to_pair(self.lastPoint)))
 
-        if event.button() == MOVE_MOUSE_BUTTON:
-            self.move_dragging = True
-            return
-        elif event.button() == QtCore.Qt.MiddleButton:
-            self.mwemu = True
-            return
-        elif not self.move_dragging and not self.mwemu:
-            if self.interactionDelegate is not None:
-                self.interactionDelegate.mousePressEvent(event)
+        #elif event.button() == QtCore.Qt.MiddleButton:
+        #    self.mouse_wheel_emu = QPoint_to_pair(event.pos())
+
+        #elif not self.active_drag and self.mouse_wheel_emu is None:
+        #    if self.interactionDelegate is not None:
+
+        event_id = EventID.from_mouse_event(event)
+        modifiers = Modifier.from_qevent(event)
+
+        self.dispatchActionEvent(event.pos(), event_id, modifiers)
 
         self.update()
 
-    def mouseMoveEvent(self, event):
-        if self.lastPoint is None:
-            self.lastPoint = event.pos()
-            return
+    def mouseMoveEvent(self, qevent):
 
-        delta_px = event.pos() - self.lastPoint
-        lastpoint_real = self.viewState.tfV2P(Point2(self.lastPoint))
-        newpoint_real = self.viewState.tfV2P(Point2(event.pos()))
-        lx,ly = lastpoint_real
-        nx,ny = newpoint_real
-        delta = nx-lx, ny-ly
+        #delta_px = qevent.pos() - self.lastPoint
 
-        self.lastPoint = event.pos()
+        #lx, ly = self.viewState.tfV2P(Point2(self.lastPoint))
+        #nx, ny = self.viewState.tfV2P(Point2(qevent.pos()))
 
-        needs_update = False
-        if (event.buttons() & MOVE_MOUSE_BUTTON) and self.move_dragging:
-            self.move_dragged = True
+        #delta = nx-lx, ny-ly
 
-            self.viewState.transform = M.translate(*delta).dot(self.viewState.transform)
-            needs_update = True
+        #self.lastPoint = qevent.pos()
 
-        elif (event.buttons() & QtCore.Qt.MiddleButton):
-            delta = -10 * delta_px.y()
 
-            self.wheelEvent(QtGui.QWheelEvent(event.pos(),delta, event.buttons(), event.modifiers()))
-            needs_update = True
-        elif not self.move_dragging and not self.mwemu:
+
+        if self.active_drag:
+            self.active_drag.move(Point2(QPoint_to_pair(qevent.pos())))
+
+        #elif qevent.buttons() & QtCore.Qt.MiddleButton and self.mouse_wheel_emu is not None:
+        #    self.zoom(-delta_px.y()/6, self.mouse_wheel_emu)
+
+        elif self.active_drag is None and not self.mouse_wheel_emu:
             if self.interactionDelegate is not None:
-                self.interactionDelegate.mouseMoveEvent(event)
-                needs_update = True
 
-        if needs_update:
-            self.update()
+                pos = Point2(QPoint_to_pair(qevent.pos()))
+
+                event = MoveEvent(
+                    pos,
+                    self.viewState.tfV2W(pos))
+
+                self.interactionDelegate.mouseMoveEvent(event)
+        
+        self.update()
 
     def mouseReleaseEvent(self, event):
-        if event.button() == MOVE_MOUSE_BUTTON and self.move_dragging:
-            self.move_dragging = False
-            return
+        #if event.button() == MOVE_MOUSE_BUTTON and self.active_drag:
+        #    self.active_drag.done()
+        #    self.active_drag = None
 
         # Middle mouse button events are mapped to mouse wheel
-        elif event.button() == QtCore.Qt.MiddleButton:
-            self.mwemu = False
-            return
+        #elif event.button() == QtCore.Qt.MiddleButton:
+        #    self.mouse_wheel_emu = None
+        #    return
 
-        if not self.move_dragged and not self.move_dragging and not self.mwemu:
-            if self.interactionDelegate is not None:
-                self.interactionDelegate.mouseReleaseEvent(event)
+        #elif self.mouse_wheel_emu is None and self.active_drag is not None:
+        #    if self.interactionDelegate is not None:
+        #        pass
+        event_id = EventID.from_mouse_event(event)
+        modifiers = Modifier.from_qevent(event)
+
+        self.dispatchActionEvent(event.pos(), event_id, modifiers)
 
         self.update()
 
+
+    def zoom(self, step, around_point):
+        sf = 1.1 ** step
+        fixed_center_dot(self.viewState, M.scale(sf), around_point)
 
     def wheelEvent(self, event):
         """
@@ -319,12 +409,15 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
         """
         if not event.modifiers():
             step = event.angleDelta().y()/120.0
-
-            sf = 1.1 ** step
-            fixed_center_dot(self.viewState, M.scale(sf), QPoint_to_pair(event.pos()))
+            cpt = QPoint_to_pair(event.pos())
+            self.zoom(step, cpt)
         else:
             if self.interactionDelegate:
-                self.interactionDelegate.mouseWheelEvent(event)
+                #self.interactionDelegate.mouseWheelEvent(event)
+                # FIXME
+                pass
+
+        self.update()
 
     def initializeGL(self):
         assert not self.__gl_initialized
@@ -345,6 +438,7 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
 
         if self.interactionDelegate is not None and self.interactionDelegate.overlay is not None:
             self.interactionDelegate.overlay.initializeGL(self.gls)
+            pass
 
     def reinit(self):
         pass
@@ -712,9 +806,6 @@ class BoardViewWidget(BaseViewWidget):
             pb.composite("OVERLAY", (255,255,255))
 
 
-
-
-
     def render(self):
         with Timer() as t_render:
             # Update the layer-visible check
@@ -739,16 +830,6 @@ class BoardViewWidget(BaseViewWidget):
                 ]
             )
 
-            # Fake some data on the layer
-
-
-
-            # Two view modes - CAM and trace
-            # CAM -  all layers, SIDE-up
-            # Trace - current layer + artwork (optional, other layers underneath)
-
-            # Setup HAX
-
             self.__render_top_half()
 
             if self.render_mode == MODE_CAD:
@@ -759,7 +840,5 @@ class BoardViewWidget(BaseViewWidget):
                 # Render a single layer for maximum contrast
                 self.render_mode_trace()
 
-
             self.debug_renderer.render()
 
-        print("Total render time: %f" % t_render.interval)

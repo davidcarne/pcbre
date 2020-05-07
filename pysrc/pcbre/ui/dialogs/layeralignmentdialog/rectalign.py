@@ -881,6 +881,7 @@ class ThetaLineEdit(PLineEdit):
     def sizeHint(self):
         size = super(ThetaLineEdit, self).sizeHint()
         return QtCore.QSize(2.5 * size.height(), size.height())
+
 class RectAlignSettingsWidget(QtWidgets.QWidget):
     def __init__(self, parent, model):
         super(RectAlignSettingsWidget, self).__init__()

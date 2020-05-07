@@ -6,6 +6,7 @@ class DebugMenu(QtWidgets.QMenu):
 
         self.addAction(mw.debug_actions.debug_draw)
         self.addAction(mw.debug_actions.debug_draw_bbox)
+        self.addAction(mw.debug_actions.debug_log_action_history)
 
         def update_sub():
             mw.debug_actions.debug_draw.update_from_prop()
