@@ -135,3 +135,29 @@ class CycleModeAction(QtWidgets.QAction):
 
         self.va.render_mode = newmode
 
+
+class ShowConsoleAction(QtWidgets.QAction):
+    def __init__(self, project, mw):
+        self.setCheckable(True)
+
+        self.dock = None
+        self.project = project
+        self.mw = mw
+
+        self.update_from_prop()
+
+
+    def handle_close(self):
+        self.dock = None
+
+    def toggle(self):
+        if self.docked is None:
+            self.dock = ConsoleWidget(self.project)
+            self.mw.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.dock)
+
+        self.update_from_prop()
+
+    def update_from_prop(self):
+        self.setChecked(self.dock is not None)
+
+
