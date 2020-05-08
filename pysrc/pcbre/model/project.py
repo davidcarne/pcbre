@@ -16,12 +16,14 @@ from pcbre.model.util import ImmutableListProxy
 MAGIC = b"PCBRE\x00"
 VERSION_MAGIC = b"\x01\x00"
 
+
 class ProjectConfig(dict):
     def serialize(self):
         pass
 
     def deserialize(self):
         pass
+
 
 class ProjectIsBadException(Exception):
     def __init__(self, reason):
@@ -123,7 +125,6 @@ class Stackup(QtCore.QObject):
 
         return None
 
-
     def serialize(self):
         _stackup = ser.Stackup.new_message()
         _stackup.init("layers", len(self.__layers))
@@ -190,7 +191,8 @@ class Imagery:
         """
 
         assert kp._project is self
-        assert len(kp.layer_positions) == 0 # Verify that no layers use the keypoint
+        # Verify that no layers use the keypoint
+        assert len(kp.layer_positions) == 0
 
         kp._project = None
 
@@ -198,7 +200,6 @@ class Imagery:
 
     def get_keypoint_index(self, kp):
         return self.keypoints.index(kp)
-
 
     def serialize(self):
         imagery = ser.Imagery.new_message()
@@ -222,6 +223,7 @@ class Imagery:
 
         for i in msg.imagelayers:
             self.__imagelayers.append(ImageLayer.deserialize(self.__project, i))
+
 
 class Nets(QtCore.QObject):
     changed = QtCore.Signal(ModelChange)
@@ -280,6 +282,7 @@ class Nets(QtCore.QObject):
             n = Net(name=i.name, net_class=i.nclass)
             self.__project.scontext.set_sid(i.sid, n)
             self.add_net(n)
+
 
 class Project:
 
@@ -376,7 +379,7 @@ class Project:
         except Exception as e:
             os.unlink(path)
             os.rename(bakname, path)
-            raise
+            raise e
 
         if update_path:
             self.filepath = path
@@ -384,9 +387,9 @@ class Project:
         f.flush()
         f.close()
 
-
     def close(self):
         pass
+
 
 def openProject():
     pass

@@ -1,8 +1,8 @@
 from qtpy import QtWidgets
 
-class ToggleLogActions(QtWidgets.QAction):
+class ToggleLogToolActions(QtWidgets.QAction):
     def __init__(self, mw, va):
-        from pcbre.ui.debug.action_history import ActionHistoryLogger
+        from pcbre.ui.debug.tool_action_history import ToolActionHistoryLogger
         QtWidgets.QAction.__init__(self, "Log actions and shortcuts", mw)
         self.va = va
 
@@ -18,10 +18,10 @@ class ToggleLogActions(QtWidgets.QAction):
         self.setChecked(self.va.action_log_cb is not None)
 
     def __set_prop(self):
-        from pcbre.ui.debug.action_history import DebugActionHistoryWidget
+        from pcbre.ui.debug.tool_action_history import DebugToolActionHistoryWidget
         if self.isChecked():
             self.va.action_log_cb = self.history_logger.log
-            self.widget = DebugActionHistoryWidget(self.history_logger)
+            self.widget = DebugToolActionHistoryWidget(self.history_logger)
             self.widget.show()
         else:
             if self.widget is not None:

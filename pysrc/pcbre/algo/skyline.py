@@ -66,12 +66,14 @@ class _StartHeight(object):
             nodes = itertools.takewhile(lambda x: x != self, _node_iter(self.next))
             return ", ".join("%s height: %d fw:%d" % (s.node, s.height, s.wasted_width) for s in nodes)
         else:
-            return  "<%s height: %d fw:%d>" % (self.node, self.height, self.wasted_width)
+            return "<%s height: %d fw:%d>" % (self.node, self.height, self.wasted_width)
+
 
 def _node_iter(node):
     while node is not None:
         yield node
         node = node.next
+
 
 class SkyLine(object):
     """The SkyLine class represents a mutable 'SkyLine' in area (width, height). Initially, the skyline is zero-height.
@@ -112,10 +114,8 @@ class SkyLine(object):
         assert splitpoint <= self.width
         assert height > node.height
 
-
         last_height = node.height
         node.height = height
-
 
         # If the splitpoint is at the RHS of the packing bin
         # just shortcut out
@@ -211,41 +211,27 @@ class SkyLine(object):
         if cand is None:
             return None
 
-
         self.split(cand.node, cand.node.left + width, cand.height + height)
 
         return cand.node.left, cand.height
 
     def pack_multiple(self, tuples):
-        l = list(enumerate(tuples))
+        packl = list(enumerate(tuples))
 
         results = [None] * len(tuples)
 
-        while l:
+        while packl:
             scores = []
-            for n_l, (n_initial, (width, height)) in enumerate(l):
-                scores.append((n_l, height, self.find(width, height)) )
+            for n_l, (n_initial, (width, height)) in enumerate(packl):
+                scores.append((n_l, height, self.find(width, height)))
 
             win_index, glyph_height, win_cand = min(scores, key=lambda x: (x[2].height + x[1], x[2].wasted_width))
-            width, height = l[win_index][1]
+            width, height = packl[win_index][1]
 
             self.split(win_cand.node, win_cand.node.left + width, win_cand.height + height)
 
-            results[l[win_index][0]] = win_cand.node.left, win_cand.height
+            results[packl[win_index][0]] = win_cand.node.left, win_cand.height
 
-            del l[win_index]
+            del packl[win_index]
 
         return results
-
-
-
-
-
-
-
-
-
-
-
-
-

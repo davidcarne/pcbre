@@ -14,8 +14,10 @@ else:
 
 __author__ = 'davidc'
 
+
 class Geom:
     pass
+
 
 class Polygon(Geom):
     ISC = IntersectionClass.POLYGON
@@ -32,7 +34,6 @@ class Polygon(Geom):
         self.net = net
         self.layer = layer
         self._project = None
-
 
         self.__triangulation = None
 
@@ -78,7 +79,6 @@ class Trace(Geom):
         return "<Trace %s %s r=%f, layer=%s, net=%s>" % (self.p0, self.p1, self.thickness, self.layer.name, netname)
 
 
-
 class Airwire(Geom):
     TYPE_FLAGS = TFF.HAS_NET
     ISC = IntersectionClass.VIRTUAL_LINE
@@ -94,11 +94,12 @@ class Airwire(Geom):
 
         self._project = None
 
+
 class Via(Geom):
     ISC = IntersectionClass.VIA
     TYPE_FLAGS = TFF.HAS_GEOM | TFF.HAS_NET
 
-    def __init__(self, pt, viapair, r, net = None):
+    def __init__(self, pt, viapair, r, net=None):
         self.pt = pt
         self.r = r
         self.viapair = viapair
@@ -114,6 +115,7 @@ class Via(Geom):
         return self.__poly_repr
 
     def __repr__(self):
-        return "<Via %s r:%f ly=(%s:%s) net=%s>" % (self.pt, self.r,
-                                                   self.viapair.layers[0].name, self.viapair.layers[1].name,
-                                                   self.net.name if self.net is not None else "none")
+        return "<Via %s r:%f ly=(%s:%s) net=%s>" % (
+            self.pt, self.r,
+            self.viapair.layers[0].name, self.viapair.layers[1].name,
+            self.net.name if self.net is not None else "none")

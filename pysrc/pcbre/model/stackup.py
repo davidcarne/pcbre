@@ -1,6 +1,6 @@
 from pcbre.model.const import SIDE
-import pcbre.model.imagelayer
 import pcbre.model.serialization as ser
+
 
 class Layer:
 
@@ -17,8 +17,9 @@ class Layer:
 
     def __repr__(self):
         return "<Layer name:'%s' order:%s color:%s>" % (self.name,
-                                                           self.order,
-                                                           self.color)
+                                                        self.order,
+                                                        self.color)
+
     def serialize(self):
         m = ser.Layer.new_message()
         m.sid = self._project.scontext.sid_for(self)
@@ -43,7 +44,6 @@ class Layer:
 
         return obj
 
-
     @property
     def order(self):
         return self._project.stackup._order_for_layer(self)
@@ -51,9 +51,6 @@ class Layer:
     @property
     def side(self):
         return SIDE.Bottom if self.order > 0 else SIDE.Top
-
-
-
 
 
 class ViaPair:
@@ -97,7 +94,6 @@ class ViaPair:
 
         return _vp
 
-
     @staticmethod
     def deserialize(project, msg):
         l_first = project.scontext.get(msg.firstLayerSid)
@@ -108,4 +104,3 @@ class ViaPair:
         project.scontext.set_sid(msg.sid, vp)
 
         return vp
-

@@ -2,10 +2,12 @@ __author__ = 'davidc'
 
 from enum import Enum
 
+
 class ChangeType(Enum):
     ADD = 1
     CHANGE = 2
     REMOVE = 3
+
 
 class ModelChange:
     def __init__(self, container, what, reason):

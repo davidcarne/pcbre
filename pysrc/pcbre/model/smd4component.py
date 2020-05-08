@@ -1,5 +1,4 @@
 import math
-
 from pcbre.matrix import rotate, Vec2, Point2, Rect, projectPoint
 from pcbre.model.component import Component
 from pcbre.model.const import OnSide, IntersectionClass
@@ -8,9 +7,9 @@ from pcbre.model.pad import Pad
 
 __author__ = 'davidc'
 
+
 class SMD4Component(Component):
     ISC = IntersectionClass.NONE
-
 
     def __init__(self,
                  center, theta, side, side_layer_oracle,
@@ -33,11 +32,9 @@ class SMD4Component(Component):
         self.pin_contact_width = pin_contact_width
         self.pin_spacing = pin_spacing
 
-
         self.__pins_cache = []
 
         self._project = None
-
 
     @property
     def on_sides(self):
@@ -50,9 +47,6 @@ class SMD4Component(Component):
     def __update(self):
         if self.__pins_cache:
             return
-
-        w = self.dim_1_body
-        h = self.dim_2_body
 
         pads = []
 
@@ -97,20 +91,16 @@ class SMD4Component(Component):
         else:
             y_axis = self.dim_1_body
 
-        return Rect.fromCenterSize(Point2(0,0), x_axis, y_axis)
+        return Rect.fromCenterSize(Point2(0, 0), x_axis, y_axis)
 
     def point_inside(self, pt):
         v = pt - self.center
         v_in_cmp = projectPoint(rotate(-self.theta), v)
         return self.theta_bbox.point_test(v_in_cmp)
 
-
-
-
     def get_pads(self):
         self.__update()
         return self.__pins_cache
-
 
     def serializeTo(self, cmp_msg):
         self._serializeTo(cmp_msg.common)
@@ -131,23 +121,14 @@ class SMD4Component(Component):
         t.side3Pins = self.side_pins[2]
         t.side4Pins = self.side_pins[3]
 
-
     @staticmethod
     def deserialize(project, msg):
         t = msg.smd4
-        cmp = SMD4Component(None, None, None, project,
+        cmp = SMD4Component(
+                None, None, None, project,
                 t.side1Pins, t.side2Pins, t.side3Pins, t.side4Pins,
                 t.dim1Body, t.dim1PinEdge, t.dim2Body, t.dim2PinEdge,
                 t.pinContactLength, t.pinContactWidth, t.pinSpacing)
 
         Component.deserializeTo(project, msg.common, cmp)
         return cmp
-
-
-
-
-
-
-
-
-

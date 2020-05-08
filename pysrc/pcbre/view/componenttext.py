@@ -68,10 +68,10 @@ class ComponentTextBatcher:
 
             for pad in cmp.get_pads():
                 if pad.is_through():
-                    r = Rect.fromCenterSize(Point2(0,0), pad.l * 0.6, pad.w * 0.6)
+                    r = Rect.fromCenterSize(Point2(0,0), pad.length * 0.6, pad.width * 0.6)
 
                 else:
-                    r = Rect.fromCenterSize(Point2(0,0), pad.l*0.8, pad.w*0.8)
+                    r = Rect.fromCenterSize(Point2(0,0), pad.length*0.8, pad.width*0.8)
 
                 mat = cmp.matrix.dot(pad.translate_mat)
 

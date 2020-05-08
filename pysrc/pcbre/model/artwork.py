@@ -21,10 +21,11 @@ from pcbre.model.util import ImmutableSetProxy
 from rtree import index
 import weakref
 
+
 #   Once an item is added to artwork, it should be considered geometrically and electrically immutable
-# 
+#
 #   changing an object in a way that alters the geometry or connectivity requires removing it before applying the changes, then readding it
-#   this of course can be hidden in the UI. 
+#   this of course can be hidden in the UI.
 #
 #   The point of this step is to ensure that net connectivity is recalculated as necessary
 class ArtworkIndex:
@@ -76,6 +77,7 @@ class ArtworkIndex:
         del self.__idx_to_obj[idx]
 
         self.__index.delete(idx, self.__rect_index_order(geom.bbox))
+
 
 class Artwork:
     def __init__(self, project):
@@ -133,14 +135,12 @@ class Artwork:
         else:
             raise NotImplementedError()
 
-
         self.__index.insert(aw)
 
         aw._project = self.__project
 
     def add_component(self, cmp):
         """
-
         :param cmp:
         :return:
         """
@@ -152,7 +152,6 @@ class Artwork:
             self.__index.insert(pad)
 
         self.components_generation += 1
-
 
     def merge_component(self, cmp):
         """
@@ -173,7 +172,6 @@ class Artwork:
         self.__components.remove(cmp)
 
         self.components_generation += 1
-
 
     def remove_artwork(self, aw):
         assert aw._project is self.__project
@@ -213,7 +211,6 @@ class Artwork:
                     self.__airwires.remove(airwire)
                     self.airwires_generation += 1
 
-
         # If no remaining geometry is on the net, we need to drop it
         n = self.get_geom_for_net(aw_net)
 
@@ -233,7 +230,6 @@ class Artwork:
             self.merge_component(aw)
         else:
             self.merge_artwork(aw)
-
 
     @property
     def __all_pads(self):
@@ -374,9 +370,7 @@ class Artwork:
 
         geom.net = None
 
-
-
-    def compute_connected(self, all_geom, progress_cb = lambda x,y:0 ):
+    def compute_connected(self, all_geom, progress_cb=lambda x, y: 0):
         """
         Compute connected sets from all_geom
         :param all_geom:
@@ -418,16 +412,15 @@ class Artwork:
                         geom_to_label[i] = label
 
             # Still no label
-            if label == None:
+            if label is None:
                 geom_to_label[k] = labno
                 label_to_geom[labno].add(k)
                 labno += 1
 
         return list(label_to_geom.values())
 
-
-    def rebuild_connectivity(self, progress_cb = lambda x,y:0):
-        connectivity = self.compute_connected(self.get_all_artwork(), progress_cb = progress_cb)
+    def rebuild_connectivity(self, progress_cb=lambda x, y: 0):
+        connectivity = self.compute_connected(self.get_all_artwork(), progress_cb=progress_cb)
 
         # First, for each existing net, we identify which groups are owned by the net
         # and remove the groups having the smaller amounts of geometry (by count)
@@ -465,7 +458,6 @@ class Artwork:
         for net in to_remove_nets:
             self.__project.nets.remove_net(net)
 
-
     def merge_artwork(self, geom):
         """
         Merge a geometry object into the design. Takes care of either assigning object a net, or merging nets if necessary
@@ -482,7 +474,6 @@ class Artwork:
     def query_intersect(self, geom):
         qr = self.query(geom, bbox_prune=True)
         return list(itertools.takewhile(lambda a: a[0] <= 0, qr))
-
 
     def intersect_sets(self, a, b):
         """
@@ -514,11 +505,8 @@ class Artwork:
                 res.append(i)
         return res
 
-
-
-
     # return distance-sorted list of intersects
-    def query(self, geom, bbox_prune = False):
+    def query(self, geom, bbox_prune=False):
         """
 
         :param geom:  object to query
@@ -580,7 +568,6 @@ class Artwork:
                         other
                     ))
 
-
         elif isinstance(geom, Trace):
             for other in self.__traces:
                 if other.layer is not geom.layer:
@@ -589,10 +576,9 @@ class Artwork:
                 if bbox_prune and not bbox.intersects(other.bbox):
                     continue
                 results.append((
-                        dist_trace_trace(geom, other),
+                    dist_trace_trace(geom, other),
                     other
                 ))
-
 
             # Build lookup to check viapair
             vps_ok = {}
@@ -715,11 +701,11 @@ class Artwork:
         return _aw
 
     def __lookup_net_helper(self, sid):
-            try:
-                return self.__project.scontext.get(sid)
-            except KeyError:
-                print("WARNING: invalid SID %d for net lookup, replacing with empty net", sid)
-                return self.__project.nets.new()
+        try:
+            return self.__project.scontext.get(sid)
+        except KeyError:
+            print("WARNING: invalid SID %d for net lookup, replacing with empty net", sid)
+            return self.__project.nets.new()
 
     def deserialize(self, msg):
         for i in msg.vias:
@@ -727,7 +713,7 @@ class Artwork:
                     self.__project.scontext.get(i.viapairSid),
                     i.r,
                     self.__lookup_net_helper(i.netSid)
-            )
+                    )
 
             self.add_artwork(v)
 
@@ -740,7 +726,6 @@ class Artwork:
                 self.__lookup_net_helper(i.netSid)
             )
             self.add_artwork(t)
-
 
         for i in msg.polygons:
             exterior = [deserialize_point2(j) for j in i.exterior]

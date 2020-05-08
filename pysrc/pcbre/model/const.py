@@ -7,6 +7,7 @@ class SIDE(Enum):
     Top = 0
     Bottom = 1
 
+
 class OnSide(Enum):
     One = 0
     Both = 1
@@ -18,7 +19,8 @@ class IntersectionClass(enum.Enum):
     VIA = 2
     PAD = 3
     POLYGON = 4
-    VIRTUAL_LINE = 5 # Object that only intersects at the two instantaneous points at each end
+    # Object that only intersects at the two instantaneous points at each end
+    VIRTUAL_LINE = 5
 
 
 class _TFF(int):
@@ -27,9 +29,9 @@ class _TFF(int):
 
     def __repr__(self):
         a = []
-        ks = [ (k, v) for k,v in
-            [(k, getattr(TFF, k)) for k in dir(TFF)]
-            if isinstance(v, _TFF)]
+        ks = [(k, v) for k, v in
+              [(k, getattr(TFF, k)) for k in dir(TFF)]
+              if isinstance(v, _TFF)]
 
         for k, v in sorted(ks, key=operator.itemgetter(1)):
             if self & v:
@@ -50,4 +52,3 @@ class TFF:
     HAS_NET = _TFF(1)
     HAS_GEOM = _TFF(2)
     HAS_INST_INFO = _TFF(4)
-

@@ -1,19 +1,18 @@
 from pcbre import units
 from pcbre.matrix import Point2, Rect
-from pcbre.model.component import Component
 from pcbre.model.const import OnSide, IntersectionClass
 from pcbre.model.pad import Pad
 from pcbre.model.component import Component
 
 __author__ = 'davidc'
 
+
 class SIPComponent(Component):
     ISC = IntersectionClass.NONE
 
     def __init__(self, center, theta, side, side_layer_oracle, pin_count, pin_space, pad_size):
-        Component.__init__(self, center, theta, side, side_layer_oracle = side_layer_oracle)
+        Component.__init__(self, center, theta, side, side_layer_oracle=side_layer_oracle)
         self.__my_init(pin_count, pin_space, pad_size)
-
 
     def __my_init(self, pin_count, pin_space, pad_size):
 
@@ -44,7 +43,7 @@ class SIPComponent(Component):
             x = 0
             y = pin_edge_center_delta - dx
 
-            center = Point2(x,y)
+            center = Point2(x, y)
             newpad = Pad(self, "%s" % (i + 1), center, 0, self.__pad_size, self.__pad_size, th_diam=500)
             self.__pins_cache.append(newpad)
 
@@ -72,7 +71,7 @@ class SIPComponent(Component):
 
     @property
     def theta_bbox(self):
-        return Rect.fromCenterSize(Point2(0,0), self.body_width(), self.body_length())
+        return Rect.fromCenterSize(Point2(0, 0), self.body_width(), self.body_length())
 
     def serializeTo(self, sip_msg):
         self._serializeTo(sip_msg.common)
@@ -91,7 +90,6 @@ class SIPComponent(Component):
         Component.deserializeTo(project, sip_msg.common, cmp)
         cmp.__my_init(m.pinCount, m.pinSpace, m.padSize)
         return cmp
-
 
 
 class DIPComponent(Component):
@@ -138,7 +136,7 @@ class DIPComponent(Component):
                 x = self.__pin_width/2
                 y = -pin_edge_center_delta + dx
 
-            center = Point2(x,y)
+            center = Point2(x, y)
             newpad = Pad(self, "%s" % (i + 1), center, 0, self.__pad_size, self.__pad_size, th_diam=500)
             self.__pins_cache.append(newpad)
 
@@ -186,7 +184,7 @@ class DIPComponent(Component):
 
     @property
     def theta_bbox(self):
-        return Rect.fromCenterSize(Point2(0,0), self.body_width(), self.body_length())
+        return Rect.fromCenterSize(Point2(0, 0), self.body_width(), self.body_length())
 
     def serializeTo(self, dip_msg):
         self._serializeTo(dip_msg.common)
@@ -206,4 +204,3 @@ class DIPComponent(Component):
         Component.deserializeTo(project, dip_msg.common, cmp)
         cmp.__my_init(m.pinCount, m.pinSpace, m.pinWidth, m.padSize, project)
         return cmp
-

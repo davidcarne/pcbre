@@ -1,12 +1,9 @@
 from pcbre.model.artwork_geom import Trace
 from pcbre.model.const import IntersectionClass, TFF
+from pcbre.matrix import rotate, translate, Point2, Rect, projectPoint
+import numpy.linalg
 
 __author__ = 'davidc'
-
-from pcbre.matrix import rotate, translate, Point2, Vec2, Rect, projectPoint
-from shapely.geometry import Point as ShapelyPoint
-
-import numpy.linalg
 
 
 def lazyprop(fn):
@@ -32,7 +29,7 @@ class Pad(object):
     ISC = IntersectionClass.PAD
     TYPE_FLAGS = TFF.HAS_GEOM | TFF.HAS_NET
 
-    def __init__(self, parent, pad_no, rel_center, theta, w, l, th_diam=0, side=None):
+    def __init__(self, parent, pad_no, rel_center, theta, width, length, th_diam=0, side=None):
         """
         :param parent: Parent
         :param rel_center:
@@ -51,8 +48,8 @@ class Pad(object):
         self.__translate_mat = translate(self.__rel_center.x, self.__rel_center.y)
         self.__theta = theta
 
-        self.w = w
-        self.l = l
+        self.width = width
+        self.length = length
 
         self.side = side
 
@@ -71,7 +68,6 @@ class Pad(object):
         self.center = projectPoint(pmat, self.__rel_center)
 
         self.layer = self.parent._side_layer_oracle.stackup.layer_for_side(self.side)
-
 
     @lazyprop
     def __p2p_mat(self):
@@ -96,7 +92,6 @@ class Pad(object):
     @lazyprop
     def trace_rel_repr(self):
         return self.__get_rel_trace_repr()
-
 
     @lazyprop
     def bbox(self):
@@ -137,17 +132,17 @@ class Pad(object):
 
     def __get_unrot_trace_points(self):
         if self.l > self.w:
-            l = self.l - self.w
-            w = self.w
-            p0 = Point2(l/2, 0)
-            p1 = Point2(-l/2, 0)
+            length = self.l - self.w
+            width = self.w
+            p0 = Point2(length/2, 0)
+            p1 = Point2(-length/2, 0)
         else:
-            l = self.w - self.l
-            w = self.l
-            p0 = Point2(0, l/2)
-            p1 = Point2(0, -l/2)
+            length = self.w - self.l
+            width = self.l
+            p0 = Point2(0, length/2)
+            p1 = Point2(0, -length/2)
 
-        return w, p0, p1
+        return width, p0, p1
 
     def __get_rel_trace_repr(self):
         w, p0, p1 = self.__get_unrot_trace_points()
@@ -172,6 +167,3 @@ class Pad(object):
 
     def is_through(self):
         return self.th_diam > 0
-
-
-

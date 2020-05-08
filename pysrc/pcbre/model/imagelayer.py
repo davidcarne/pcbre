@@ -1,11 +1,11 @@
 import cv2
-from pcbre.matrix import projectPoint, Point2
-import numpy
 import os.path
 import pcbre.model.serialization as ser
 from pcbre.model.serialization import deserialize_matrix, serialize_matrix, serialize_point2, deserialize_point2, \
     serialize_point2f, deserialize_point2f
 from pcbre.model.util import ImmutableListProxy
+from pcbre.matrix import projectPoint
+import numpy
 
 
 class KeyPoint:
@@ -54,8 +54,6 @@ class KeyPoint:
         return layer_positions
 
 
-
-
 class KeyPointPosition:
     def __init__(self, key_point, position):
         """
@@ -69,6 +67,7 @@ class KeyPointPosition:
         """
         self.key_point = key_point
         self.image_pos = position
+
 
 class KeyPointAlignment:
     def __init__(self):
@@ -114,6 +113,7 @@ class KeyPointAlignment:
             obj.set_keypoint_position(project.scontext.get(i.kpSid), deserialize_point2f(i.position))
         return obj
 
+
 class RectAlignment:
     def __init__(self, handles, dim_handles, dims, dims_locked, origin_center, origin_corner, flip_x, flip_y):
         self._project = None
@@ -137,7 +137,12 @@ class RectAlignment:
             msg.dims[n] = i
 
         msg.lockedToDim = self.dims_locked
-        msg.originCorner = {0:"lowerLeft", 1:"lowerRight", 2:"upperLeft", 3:"upperRight"}[self.origin_corner]
+        msg.originCorner = {
+            0: "lowerLeft",
+            1: "lowerRight",
+            2: "upperLeft",
+            3: "upperRight"}[self.origin_corner]
+
         msg.originCenter = serialize_point2f(self.origin_center)
 
         for n, i in enumerate(self.handles):
@@ -158,7 +163,6 @@ class RectAlignment:
         else:
             to.point = serialize_point2f(m)
 
-
     @staticmethod
     def __deserialize_handle(msg):
         if msg.which() == "none":
@@ -166,24 +170,29 @@ class RectAlignment:
         else:
             return deserialize_point2f(msg.point)
 
-
     @staticmethod
     def deserialize(msg):
-        handles = [ RectAlignment.__deserialize_handle(i) for i in msg.handles]
-        dimHandles = [ RectAlignment.__deserialize_handle(i) for i in msg.dimHandles]
+        handles = [RectAlignment.__deserialize_handle(i) for i in msg.handles]
+        dimHandles = [RectAlignment.__deserialize_handle(i) for i in msg.dimHandles]
         dims = [i for i in msg.dims]
 
         assert len(handles) == 12
         assert len(dimHandles) == 4
         assert len(dims) == 2
-        originCorner = {"lowerLeft": 0, "lowerRight": 1, "upperLeft" : 2, "upperRight": 3}[str(msg.originCorner)]
+        originCorner = {
+            "lowerLeft": 0,
+            "lowerRight": 1,
+            "upperLeft": 2,
+            "upperRight": 3}[str(msg.originCorner)]
+
         originCenter = deserialize_point2f(msg.originCenter)
 
         return RectAlignment(handles, dimHandles, dims, msg.lockedToDim,
                              originCenter, originCorner, msg.flipX, msg.flipY)
 
+
 class ImageLayer:
-    def __init__(self, name, data, transform_matrix = numpy.identity(3)):
+    def __init__(self, name, data, transform_matrix=numpy.identity(3)):
         self.__cached_decode = None
         self._project = None
         self.name = name
@@ -230,7 +239,6 @@ class ImageLayer:
 
         return self.__cached_decode
 
-
     def __calculate_transform_matrix(self):
         if hasattr(self, "__cached_p2norm"):
             return
@@ -244,7 +252,6 @@ class ImageLayer:
                                [0,  0, 1]], dtype=numpy.float32)
         self.__cached_p2norm = tmat
         self.__cached_norm2p = numpy.linalg.inv(tmat)
-
 
     """ Transform matricies from pixel-space to normalized image space (-1..1) """
     @property
@@ -267,8 +274,6 @@ class ImageLayer:
     def fromFile(project, filename):
         assert os.path.exists(filename)
 
-        im = cv2.imdecode(numpy.fromfile(filename, dtype=numpy.uint8), 1)
-        tmat = numpy.identity(3)
         basename = os.path.basename(filename)
         return ImageLayer(name=basename, data=open(filename, "rb").read())
 
@@ -316,7 +321,6 @@ class ImageLayer:
         else:
             raise NotImplementedError()
 
-
         return obj
 
     def __repr__(self):
@@ -324,5 +328,3 @@ class ImageLayer:
 
     def set_decoded_data(self, ar):
         self.__cached_decode = ar
-
-
