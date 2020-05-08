@@ -1,5 +1,4 @@
 import numpy
-import collections
 from pcbre.matrix import projectPoint
 
 # We use 4 types of coordinates:
@@ -18,6 +17,7 @@ from pcbre.matrix import projectPoint
 #
 # W - World coords. World coordinates are in mm
 #
+
 
 class ViewPort(object):
     def __init__(self, x, y):
@@ -100,12 +100,11 @@ class ViewPort(object):
         self.__width = newwidth
         self.__height = newheight
 
-
         # World to natural device coordinates matrix
         self.__w2ndc = numpy.array([
-                                       [     1,      0,     0],
-                                       [     0,      1,     0],
-                                       [     0,      0,     1]
+                                       [1, 0, 0],
+                                       [0, 1, 0],
+                                       [0, 0, 1]
                                    ], dtype=numpy.float32)
 
         # Natural device coordinates to viewport matrix
@@ -114,12 +113,9 @@ class ViewPort(object):
 
         rs = max(self.__width, self.__height)/2
         self.__ndc2v = numpy.array([
-            [ rs,   0, xh],
-            [  0, -rs, yh],
-            [  0,   0,  1],
+            [rs, 0, xh],
+            [0, -rs, yh],
+            [0, 0, 1],
             ])
 
         self.__update()
-
-
-

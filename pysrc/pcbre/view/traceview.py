@@ -1,21 +1,13 @@
-from collections import defaultdict
 from pcbre.accel.vert_array import VA_thickline
-from pcbre.view.rendersettings import RENDER_STANDARD, RENDER_OUTLINES, RENDER_SELECTED
-from pcbre.view.util import get_consolidated_draws_1
 
 __author__ = 'davidc'
 import math
 from OpenGL import GL
 from OpenGL.arrays.vbo import VBO
 import numpy
-from pcbre import units
-from pcbre.matrix import Rect, translate, rotate, Point2, scale, Vec2
+from pcbre.matrix import rotate, Vec2
 from pcbre.ui.gl import VAO, vbobind, glimports as GLI
 import ctypes
-
-
-import weakref
-
 from pcbre.view.target_const import COL_LAYER_MAIN, COL_SEL
 
 NUM_ENDCAP_SEGMENTS = 32
@@ -25,9 +17,9 @@ FIRST_LINE_LOOP = NUM_ENDCAP_SEGMENTS * 2 + 2
 LINE_LOOP_SIZE = NUM_ENDCAP_SEGMENTS * 2
 
 
-
 # TODO: Detect automatically
 has_base_instance = True
+
 
 class TraceRender:
     def __init__(self, parent_view):
@@ -36,7 +28,7 @@ class TraceRender:
 
     def initializeGL(self, gls):
         # Build trace vertex VBO and associated vertex data
-        dtype = [("vertex", numpy.float32, 2), ("ptid", numpy.uint32 )]
+        dtype = [("vertex", numpy.float32, 2), ("ptid", numpy.uint32)]
         self.working_array = numpy.zeros(NUM_ENDCAP_SEGMENTS * 2 + 2, dtype=dtype)
         self.trace_vbo = VBO(self.working_array, GL.GL_DYNAMIC_DRAW)
 
@@ -44,24 +36,22 @@ class TraceRender:
         # ptid is a variable with value 0 or 1 that indicates which endpoint the geometry is associated with
         self.__build_trace()
 
-
         self.__attribute_shader_vao = VAO()
-        self.__attribute_shader = gls.shader_cache.get("line_vertex_shader","basic_fill_frag", defines={"INPUT_TYPE":"in"})
-
-
+        self.__attribute_shader = gls.shader_cache.get(
+            "line_vertex_shader", "basic_fill_frag", defines={"INPUT_TYPE": "in"})
 
         # Now we build an index buffer that allows us to render filled geometry from the same
         # VBO.
         arr = []
         for i in range(NUM_ENDCAP_SEGMENTS - 1):
             arr.append(0)
-            arr.append(i+2)
-            arr.append(i+3)
+            arr.append(i + 2)
+            arr.append(i + 3)
 
         for i in range(NUM_ENDCAP_SEGMENTS - 1):
             arr.append(1)
-            arr.append(i+NUM_ENDCAP_SEGMENTS+2)
-            arr.append(i+NUM_ENDCAP_SEGMENTS+3)
+            arr.append(i + NUM_ENDCAP_SEGMENTS + 2)
+            arr.append(i + NUM_ENDCAP_SEGMENTS + 3)
 
         arr.append(2)
         arr.append(2 + NUM_ENDCAP_SEGMENTS - 1)
@@ -73,19 +63,16 @@ class TraceRender:
         arr = numpy.array(arr, dtype=numpy.uint32)
         self.index_vbo = VBO(arr, target=GL.GL_ELEMENT_ARRAY_BUFFER)
 
-
-
         self.instance_dtype = numpy.dtype([
             ("pos_a", numpy.float32, 2),
             ("pos_b", numpy.float32, 2),
             ("thickness", numpy.float32, 1),
-            #("color", numpy.float32, 4)
+            # ("color", numpy.float32, 4)
         ])
 
         # Use a fake array to get a zero-length VBO for initial binding
         instance_array = numpy.ndarray(0, dtype=self.instance_dtype)
         self.instance_vbo = VBO(instance_array)
-
 
         with self.__attribute_shader_vao, self.trace_vbo:
             vbobind(self.__attribute_shader, self.trace_vbo.dtype, "vertex").assign()
@@ -93,9 +80,9 @@ class TraceRender:
 
         with self.__attribute_shader_vao, self.instance_vbo:
             self.__bind_pos_a = vbobind(self.__attribute_shader, self.instance_dtype, "pos_a", div=1)
-            self.__bind_pos_b =  vbobind(self.__attribute_shader, self.instance_dtype, "pos_b", div=1)
+            self.__bind_pos_b = vbobind(self.__attribute_shader, self.instance_dtype, "pos_b", div=1)
             self.__bind_thickness = vbobind(self.__attribute_shader, self.instance_dtype, "thickness", div=1)
-            #vbobind(self.__attribute_shader, self.instance_dtype, "color", div=1).assign()
+            # vbobind(self.__attribute_shader, self.instance_dtype, "color", div=1).assign()
             self.__base_rebind(0)
 
             self.index_vbo.bind()
@@ -108,15 +95,14 @@ class TraceRender:
     def restart(self):
         pass
 
-
     def __build_trace(self):
         # Update trace VBO
-        self.working_array["vertex"][0] = (0,0)
+        self.working_array["vertex"][0] = (0, 0)
         self.working_array["ptid"][0] = 0
-        self.working_array["vertex"][1] = (0,0)
+        self.working_array["vertex"][1] = (0, 0)
         self.working_array["ptid"][1] = 1
 
-        end = Vec2(1,0)
+        end = Vec2(1, 0)
         for i in range(0, NUM_ENDCAP_SEGMENTS):
             theta = math.pi * i/(NUM_ENDCAP_SEGMENTS - 1) + math.pi/2
             m = rotate(theta).dot(end.homol())
@@ -131,7 +117,6 @@ class TraceRender:
 
     def render(self, mat):
 
-
         # Build and copy VBO. Track draw start/size per layer
         pos = {}
 
@@ -144,11 +129,9 @@ class TraceRender:
             pos[layer, True] = (accuum.tell(), ts.sel.count())
             accuum.extend(ts.sel)
 
-
         # Force full resend of VBO
         self.instance_vbo.set_array(accuum.buffer()[:])
         self.instance_vbo.bind()
-
 
         with self.__attribute_shader, self.__attribute_shader_vao:
             GL.glUniformMatrix3fv(self.__attribute_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
@@ -167,10 +150,8 @@ class TraceRender:
 
                         self.__render_va_inner(col, False, first, count)
 
-
     def __render_va_inner(self, col, is_outline, first, count):
         GL.glUniform4ui(self.__attribute_shader.uniforms.layer_info, 255, col, 0, 0)
-
 
         if has_base_instance:
             # Many instances backport glDrawElementsInstancedBaseInstance
@@ -207,4 +188,3 @@ class TraceRender:
             GL.glUniformMatrix3fv(self.__attribute_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
 
             self.__render_va_inner(col, is_outline, first, count)
-

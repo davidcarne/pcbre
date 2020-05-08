@@ -22,6 +22,7 @@ class RenderPCBLayer:
         self.va_traces.extend(other.va_traces)
         self.va_text.extend(other.va_text)
 
+
 class RenderSide:
     # On the sides, we only have component outlines and component text
     def __init__(self):
@@ -50,6 +51,7 @@ class RenderVia:
     def extend(self, other):
         self.va_vias.extend(other.va_vias)
         self.va_text.extend(other.va_text)
+
 
 class StackupRenderCommands:
     def __init__(self):
@@ -85,6 +87,7 @@ class StackupRenderCommands:
 
         self.multi.extend(other.multi)
 
+
 class CADCache:
     def __init__(self, project):
         """
@@ -102,7 +105,6 @@ class CADCache:
         self.__vias_generation = None
         self.__cmp_generation = None
 
-
     def update_if_necessary(self):
 
         # Update traces as necessary
@@ -113,14 +115,12 @@ class CADCache:
             for t in self.__project.artwork.traces:
                 self.__traces_cache.layers[t.layer].va_traces.add_trace(t)
 
-
         if self.__vias_generation != self.__project.artwork.vias_generation:
             self.__vias_generation = self.__project.artwork.vias_generation
 
             self.__vias_cache.clear()
             for v in self.__project.artwork.vias:
                 self.__vias_cache.vias[v.viapair].va_vias.add_via(v)
-
 
         if self.__cmp_generation != self.__project.artwork.components_generation:
             self.__cmp_generation = self.__project.artwork.components_generation
@@ -148,6 +148,7 @@ class CADCache:
         target.extend(self.__vias_cache)
         target.extend(self.__cmp_cache)
 
+
 class SelectionHighlightCache:
     def __init__(self, project):
         self.__project = project
@@ -161,12 +162,11 @@ class SelectionHighlightCache:
         self.thinline_va = VA_xy(1024)
         self.via_va = VA_via(1024)
 
-
     def update_if_necessary(self, selection_list):
         if (self.__last_selection == selection_list and
-            self.__project.artwork.components_generation == self.__component_generation and
-            self.__project.artwork.traces_generation == self.__traces_generation and
-            self.__project.artwork.vias_generation == self.__via_generation):
+                self.__project.artwork.components_generation == self.__component_generation and
+                self.__project.artwork.traces_generation == self.__traces_generation and
+                self.__project.artwork.vias_generation == self.__via_generation):
             return
 
         self.__via_generation = self.__project.artwork.vias_generation
@@ -196,9 +196,3 @@ class SelectionHighlightCache:
                         self.via_va.add_th_pad(j)
                     else:
                         self.thickline_va.add_trace(j.trace_repr)
-
-
-
-
-
-

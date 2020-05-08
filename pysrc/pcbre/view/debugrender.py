@@ -3,8 +3,9 @@ from pcbre.util import Timer
 import OpenGL.GL as GL
 from OpenGL.arrays.vbo import VBO
 from pcbre.accel.vert_array import VA_xy
-from pcbre.ui.gl import vbobind, VAO, Texture, glimports as GLI
+from pcbre.ui.gl import VAO, glimports as GLI
 import ctypes
+
 
 class DebugRender:
     def __init__(self, boardview):
@@ -12,12 +13,10 @@ class DebugRender:
         self.debug_draw_bbox = True
         self.parent = boardview
 
-
     def initializeGL(self, gls):
         self.shader = gls.shader_cache.get("vert2", "frag1")
 
         self.vao = VAO()
-
 
         self.vbo = VBO(bytes(), usage=GL.GL_STREAM_DRAW)
 
@@ -32,7 +31,6 @@ class DebugRender:
             GL.glVertexAttribPointer(loc, 2, GL.GL_FLOAT, False, 8, ctypes.c_void_p(0))
             GL.glVertexAttribDivisor(loc, 0)
 
-
     def render(self):
 
         if not self.debug_draw:
@@ -42,7 +40,8 @@ class DebugRender:
         buf = VA_xy(1024)
         buf_sel = VA_xy(1024)
 
-        with Timer() as t_debug_bbox:
+        t_debug_bbox = Timer()
+        with t_debug_bbox:
             if self.debug_draw_bbox:
 
                 # Build a list of all bboxes we're going to draw
@@ -68,13 +67,12 @@ class DebugRender:
 
                         dest.add_aligned_box(cx, cy, w, h)
 
-
-        with Timer() as t_debug_draw:
+        t_debug_draw = Timer()
+        with t_debug_draw:
             # TODO: HACK
             # PyOpenGL doesn't know how to deal with a cffi buffer
             buf_r = buf.buffer()[:] + buf_sel.buffer()[:]
             self.vbo.set_array(buf_r, None)
-
 
             # Now render the two buffers
             with self.shader, self.vao, self.vbo:

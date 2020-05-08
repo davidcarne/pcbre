@@ -1,6 +1,7 @@
 from collections import defaultdict
 from OpenGL import GL
 from OpenGL.arrays.vbo import VBO
+from pcbre.ui.gl import VAO, vbobind, glimports as GLI
 import ctypes
 import numpy
 from pcbre.matrix import Point2
@@ -8,6 +9,7 @@ from pcbre.view.rendersettings import RENDER_STANDARD, RENDER_OUTLINES, RENDER_S
 from pcbre.view.util import get_consolidated_draws
 
 __author__ = 'davidc'
+
 
 class PolygonVBOPair:
     __RESTART_INDEX = 2 ** 32 - 1
@@ -35,13 +37,11 @@ class PolygonVBOPair:
         self.__index_vbo_current = False
 
         self.restart()
-        
 
     def restart(self):
         self.__deferred_tri_render_ranges = defaultdict(list)
         self.__deferred_line_render_ranges = defaultdict(list)
 
-        
     def initializeGL(self):
         self.__vao = VAO()
 
@@ -56,7 +56,7 @@ class PolygonVBOPair:
         self.__index_vbo_current = False
 
         self.__shader = self.__gls.shader_cache.get("vert2", "frag1")
-        
+
         with self.__vao, self.__vert_vbo:
             vbobind(self.__shader, self.__vert_vbo_dtype, "vertex").assign()
             self.__index_vbo.bind()
@@ -100,7 +100,6 @@ class PolygonVBOPair:
 
         return self.__position_lookup[norm_pos]
 
-
     def __add(self, polygon):
         tris = polygon.get_tris_repr()
         tri_index_first = len(self.__tri_index_list)
@@ -126,7 +125,6 @@ class PolygonVBOPair:
 
         return tr, lr
 
-
     def deferred(self, polygon, render_settings=RENDER_STANDARD):
         if polygon in self.__tri_draw_ranges:
             trange, lrange = self.__tri_draw_ranges[polygon], self.__outline_draw_ranges[polygon]
@@ -138,20 +136,18 @@ class PolygonVBOPair:
         else:
             self.__deferred_tri_render_ranges[render_settings].append(trange)
 
-
     def render(self, matrix, layer):
         self.__update_vert_vbo()
         self.__update_index_vbo()
 
         overall_color = self.__view.color_for_layer(layer)
-        sel_color  = self.__view.sel_colormod(True, overall_color)
+        sel_color = self.__view.sel_colormod(True, overall_color)
 
         def _c_for_rs(rs):
             if rs & RENDER_SELECTED:
                 return tuple(sel_color) + (1,)
             else:
                 return tuple(overall_color) + (1,)
-
 
         with self.__shader, self.__vao:
             GL.glUniformMatrix3fv(self.__shader.uniforms.mat, 1, True, matrix.ctypes.data_as(GLI.c_float_p))
@@ -161,7 +157,7 @@ class PolygonVBOPair:
                 GL.glUniform4f(self.__shader.uniforms.color, *_c_for_rs(rs))
 
                 for first, last in tri_draw_list:
-                        GL.glDrawElements(GL.GL_TRIANGLES, last - first, GL.GL_UNSIGNED_INT, ctypes.c_void_p(first * 4))
+                    GL.glDrawElements(GL.GL_TRIANGLES, last - first, GL.GL_UNSIGNED_INT, ctypes.c_void_p(first * 4))
 
             GL.glEnable(GL.GL_PRIMITIVE_RESTART)
             GL.glPrimitiveRestartIndex(self.__RESTART_INDEX)
@@ -169,7 +165,12 @@ class PolygonVBOPair:
                 GL.glUniform4f(self.__shader.uniforms.color, *_c_for_rs(rs))
                 line_draw_list = get_consolidated_draws(ranges)
                 for first, last in line_draw_list:
-                        GL.glDrawElements(GL.GL_LINE_STRIP, last - first, GL.GL_UNSIGNED_INT, ctypes.c_void_p((first + self.__outline_index_offset) * 4))
+                    GL.glDrawElements(
+                        GL.GL_LINE_STRIP,
+                        last - first,
+                        GL.GL_UNSIGNED_INT,
+                        ctypes.c_void_p((first + self.__outline_index_offset) * 4))
+
             GL.glDisable(GL.GL_PRIMITIVE_RESTART)
 
 
@@ -192,8 +193,7 @@ class CachedPolygonRenderer:
             self.__layer_arrays[polygon.layer].initializeGL()
 
         self.__layer_arrays[polygon.layer].deferred(polygon, rendersettings)
+
     def render(self, matrix, layer):
         if layer in self.__layer_arrays:
             self.__layer_arrays[layer].render(matrix, layer)
-
-

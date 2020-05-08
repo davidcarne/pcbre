@@ -2,11 +2,11 @@ from OpenGL.arrays.vbo import VBO
 import contextlib
 from pcbre.ui.gl import Texture, VAO, vbobind
 import numpy
-import ctypes
 
 __author__ = 'davidc'
 
 import OpenGL.GL as GL
+
 
 class CompositeManager:
     def __init__(self):
@@ -53,7 +53,6 @@ class CompositeManager:
         :return:
         """
 
-
         self.__keys = {}
 
         self.__active_count = 0
@@ -68,8 +67,7 @@ class CompositeManager:
         :return:
         """
         with self.__layer_fbs[n]:
-            GL.glClearBufferfv(GL.GL_COLOR, 0, (0,255,0,0))
-
+            GL.glClearBufferfv(GL.GL_COLOR, 0, (0, 255, 0, 0))
 
     def __get_vbo_data(self):
         if self.__width == 0 or self.__height == 0:
@@ -77,13 +75,11 @@ class CompositeManager:
 
         # Fullscreen textured quad
         filled_points = [
-            ( (-1.0, -1.0), (0.0, 0.0) ),
-            ( ( 1.0, -1.0), (1.0, 0.0) ),
-            ( (-1.0,  1.0), (0.0, 1.0) ),
-            ( ( 1.0,  1.0), (1.0, 1.0) ),
-
+            ((-1.0, -1.0), (0.0, 0.0)),
+            ((1.0, -1.0), (1.0, 0.0)),
+            ((-1.0, 1.0), (0.0, 1.0)),
+            ((1.0, 1.0), (1.0, 1.0)),
         ]
-
 
         ar = numpy.array(filled_points, dtype=[("vertex", numpy.float32, 2), ("texpos", numpy.float32, 2)])
 
@@ -91,8 +87,8 @@ class CompositeManager:
         xscale = self.__width / sscale
         yscale = self.__height / sscale
 
-        ar["vertex"][:,0] *= xscale
-        ar["vertex"][:,1] *= yscale
+        ar["vertex"][:, 0] *= xscale
+        ar["vertex"][:, 1] *= yscale
 
         return ar
 
@@ -108,13 +104,10 @@ class CompositeManager:
             GL.glTexParameteri(GL.GL_TEXTURE_1D, GL.GL_TEXTURE_WRAP_S, GL.GL_CLAMP_TO_EDGE)
             GL.glTexParameteri(GL.GL_TEXTURE_1D, GL.GL_TEXTURE_WRAP_T, GL.GL_CLAMP_TO_EDGE)
 
-
         # Compositing shader and geometry
-        self.__composite_shader = gls.shader_cache.get("layer_composite_vert", "layer_composite_frag",
-                                                         fragment_bindings = {
-                                                             "final_color": 0
-                                                         })
-
+        self.__composite_shader = gls.shader_cache.get(
+            "layer_composite_vert", "layer_composite_frag",
+            fragment_bindings={"final_color": 0})
 
         ar = self.__get_vbo_data()
         self.__composite_vao = VAO()
@@ -137,22 +130,16 @@ class CompositeManager:
             GL.glTexImage1D(GL.GL_TEXTURE_1D, 0, GL.GL_RGBA, 256, 0, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE,
                             array)
 
-
     def clear_bg_fb(self, n):
         GL.glClearColor(0, 0.0, 0.0, 1.0)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
 
-
     @contextlib.contextmanager
     def composite_prebind(self):
-        parent = self
-
         GL.glActiveTexture(GL.GL_TEXTURE1)
         GL.glBindTexture(GL.GL_TEXTURE_1D, self.__texture_colors)
 
-        #GL.glBlendFunc(GL.GL_ONE, GL.GL_ONE)
         GL.glBlendFunc(GL.GL_ONE, GL.GL_ONE_MINUS_SRC_ALPHA)
-
 
         layer_list = self.__keys
         composite_shader = self.__composite_shader
@@ -161,15 +148,20 @@ class CompositeManager:
             def composite(self, n, layer_primary_color):
                 alpha = 0.5 * 255
                 try:
-                    l = layer_list[n]
+                    layer = layer_list[n]
                 except KeyError:
                     return
 
                 GL.glActiveTexture(GL.GL_TEXTURE0)
-                GL.glBindTexture(GL.GL_TEXTURE_2D, l.info_texture)
+                GL.glBindTexture(GL.GL_TEXTURE_2D, layer.info_texture)
 
-                GL.glUniform4f(composite_shader.uniforms.layer_color,
-                        layer_primary_color[0], layer_primary_color[1], layer_primary_color[2], alpha)
+                GL.glUniform4f(
+                    composite_shader.uniforms.layer_color,
+                    layer_primary_color[0],
+                    layer_primary_color[1],
+                    layer_primary_color[2],
+                    alpha)
+
                 GL.glDrawArrays(GL.GL_TRIANGLE_STRIP, 0, 4)
 
         # Composite the layer to the screen
@@ -180,7 +172,6 @@ class CompositeManager:
             yield _PREBIND()
 
 
-
 class RenderLayer:
     def __init__(self, width, height):
         self.__is_setup = False
@@ -189,8 +180,7 @@ class RenderLayer:
 
     def resize(self, width, height):
         self.__setup(width, height)
-        
-        
+
     @property
     def info_texture(self):
         assert self.__is_setup
@@ -199,7 +189,7 @@ class RenderLayer:
     def __teardown(self):
         assert self.__is_setup
         self.__is_setup = False
-        
+
         GL.glDeleteFramebuffers([self.__fbo])
         del self.__info_tex
 
@@ -220,8 +210,8 @@ class RenderLayer:
             self.__teardown()
 
         self.__is_setup = True
-            
-        self.__fbo  = GL.glGenFramebuffers(1)
+
+        self.__fbo = GL.glGenFramebuffers(1)
         self.__info_tex = Texture()
 
         self.__i8_texture(self.__info_tex, GL.GL_RG8UI, GL.GL_RG_INTEGER, width, height)
@@ -255,12 +245,9 @@ class RenderLayer:
                 print("Error, could not create framebuffer. Status: %s" % str(result))
                 assert False
 
-
-
     def __enter__(self):
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.__fbo)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
-

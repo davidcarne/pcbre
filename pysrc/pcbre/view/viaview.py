@@ -1,20 +1,14 @@
-from collections import defaultdict
-from pcbre.model.artwork_geom import Via
-from pcbre.model.component import Component
-from pcbre.model.pad import Pad
-from pcbre.view.rendersettings import RENDER_SELECTED, RENDER_OUTLINES, RENDER_HINT_NORMAL
-import weakref
-from pcbre.view.target_const import COL_VIA, COL_SEL, COL_CMP_LINE
+from pcbre.view.target_const import COL_VIA, COL_SEL
 
 __author__ = 'davidc'
 import math
+import OpenGL
 from OpenGL import GL
 from OpenGL.arrays.vbo import VBO
 import numpy
 from pcbre.ui.gl import VAO, vbobind, glimports as GLI
 
 N_OUTLINE_SEGMENTS = 100
-
 
 
 class THRenderer:
@@ -41,7 +35,6 @@ class THRenderer:
             filled_points, dtype=[("vertex", numpy.float32, 2)])
 
         self._sq_vbo = VBO(ar, GL.GL_STATIC_DRAW)
-
 
         # Build geometry for outline rendering
         outline_points = []
@@ -89,9 +82,7 @@ class THRenderer:
             vbobind(self._outline_shader, self.__dtype, "r", div=1).assign()
 
     def render_filled(self, mat, va, color=COL_VIA):
-
         self.filled_instance_vbo.set_array(va.buffer()[:])
-
 
         try:
             with self._filled_shader, self.__filled_vao, self.filled_instance_vbo, self._sq_vbo:
@@ -99,8 +90,7 @@ class THRenderer:
                 GL.glUniform1ui(self._filled_shader.uniforms.color, color)
                 GL.glDrawArraysInstancedBaseInstance(GL.GL_TRIANGLE_STRIP, 0, 4, va.count(), 0)
         except OpenGL.error.GLError as e:
-            print("Threw OGL error:")
-
+            print("Threw OGL error:", e)
 
     def render_outlines(self, mat, va):
         if not va.count():

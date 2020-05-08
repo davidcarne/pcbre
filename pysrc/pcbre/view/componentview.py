@@ -1,17 +1,9 @@
 import math
-
-import weakref
-
 from pcbre import units
-from pcbre.accel.vert_array import VA_xy, VA_thickline
-from pcbre.matrix import Rect, Point2, projectPoint, projectPoints, Vec2
-from pcbre.model.const import SIDE
+from pcbre.matrix import Rect, Point2, projectPoint, Vec2
 from pcbre.model.dipcomponent import DIPComponent
 from pcbre.model.passivecomponent import Passive2BodyType, Passive2Component
 from pcbre.model.smd4component import SMD4Component
-from pcbre.view.rendersettings import RENDER_STANDARD, RENDER_SELECTED, RENDER_HINT_NORMAL, \
-    RENDER_HINT_ONCE
-from pcbre.view.target_const import COL_CMP_LINE
 
 __author__ = 'davidc'
 
@@ -21,11 +13,12 @@ TRANSITION_POINT_2 = 50
 RATIO = 0.6
 RGAP = 0.1
 
+
 def _text_to(view, pad, r, mat, textcol_a):
     mat = mat.dot(pad.translate_mat)
 
     # zero-out rotation
-    mat[0:2,0:2] = view.viewState.glMatrix[0:2,0:2]
+    mat[0:2, 0:2] = view.viewState.glMatrix[0:2, 0:2]
 
     # Hack
     text_height_px = view.viewState.scale_factor * r.height
@@ -63,7 +56,6 @@ def _text_to(view, pad, r, mat, textcol_a):
         view.text_batch.submit_text_box(mat, "%s" % pname, r, textcol_a, None)
 
 
-
 def passive_border_va(va, cmp):
     """
     :type cmp: pcbre.model.passivecomponent.Passive2Component
@@ -87,7 +79,7 @@ def passive_border_va(va, cmp):
         # Add legs
         pa = cmp.pin_d * vec
         pb = cmp.body_corner_vec.x * vec
-        va.add_line( pa.x + cmp.center.x,  pa.y + cmp.center.y,  pb.x + cmp.center.x,  pb.y + cmp.center.y)
+        va.add_line(pa.x + cmp.center.x, pa.y + cmp.center.y, pb.x + cmp.center.x, pb.y + cmp.center.y)
         va.add_line(-pa.x + cmp.center.x, -pa.y + cmp.center.y, -pb.x + cmp.center.x, -pb.y + cmp.center.y)
 
     elif cmp.body_type == Passive2BodyType.TH_RADIAL:
@@ -106,8 +98,8 @@ def dip_border_va(va_xy, dip):
     pt_center = projectPoint(dip.matrix, Point2(0, by))
     va_xy.add_arc(pt_center.x, pt_center.y, r, dip.theta + math.pi, dip.theta, 28)
 
+
 def smd_border_va(va_xy, smd):
-    #va_xy.add_box()
     va_xy.add_box(smd.center.x, smd.center.y, smd.dim_2_body, smd.dim_1_body, smd.theta)
 
     # Calculate size / position of marker
@@ -122,9 +114,9 @@ def smd_border_va(va_xy, smd):
     posx = -smd.dim_2_body/2 + offs
     posy = smd.dim_1_body/2 - offs
 
-
     pt = projectPoint(smd.matrix, Point2(posx, posy))
     va_xy.add_circle(pt.x, pt.y, size, 40)
+
 
 def cmp_border_va(dest, component):
     if isinstance(component, DIPComponent):
@@ -133,6 +125,7 @@ def cmp_border_va(dest, component):
         smd_border_va(dest, component)
     elif isinstance(component, Passive2Component):
         passive_border_va(dest, component)
+
 
 def cmp_pad_periph_va(va_xy, va_trace, component):
     for i in component.get_pads():

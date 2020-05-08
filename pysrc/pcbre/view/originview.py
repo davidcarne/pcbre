@@ -1,7 +1,4 @@
 from OpenGL import GL
-from OpenGL.arrays.vbo import VBO
-from pcbre.ui.gl import VAO
-import numpy
 
 
 class OriginView(object):
@@ -13,8 +10,8 @@ class OriginView(object):
 
         # Build a VBO for rendering square "drag-handles"
         # Coords are pixel coords
-        #self.vbo_triangles_ar = numpy.ndarray(4, dtype=[("vertex", numpy.float32, 2, "color", numpy.float32, j)])
-        #self.vbo_triangles_ar["vertex"][]
+        # self.vbo_triangles_ar = numpy.ndarray(4, dtype=[("vertex", numpy.float32, 2, "color", numpy.float32, j)])
+        # self.vbo_triangles_ar["vertex"][]
 
     def render(self, viewState):
         pass

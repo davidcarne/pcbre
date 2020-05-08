@@ -1,5 +1,6 @@
 __author__ = 'davidc'
 
+
 def get_consolidated_draws(dr):
     """
     Given a list dr of tuples (first, last), where first is inclusive, and last is exclusive,
@@ -31,6 +32,7 @@ def get_consolidated_draws(dr):
 
     return draw_ranges_consolidated
 
+
 def get_consolidated_draws_1(dl):
     """
     Similar to get_consolidated_get_consolidated_draws, but for individual indicies
@@ -58,6 +60,3 @@ def get_consolidated_draws_1(dl):
     consolidated.append((current_first, current_last))
 
     return consolidated
-
-
-
