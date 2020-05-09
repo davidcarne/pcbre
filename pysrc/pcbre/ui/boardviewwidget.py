@@ -1,7 +1,7 @@
 from collections import defaultdict
 import math
 import time
-from pcbre.ui.action import MoveEvent, ActionEvent, EventID, Modifier
+from pcbre.ui.tool_action import MoveEvent, ActionEvent, EventID, Modifier
 from qtpy import QtOpenGL
 import qtpy.QtCore as QtCore
 import qtpy.QtGui as QtGui

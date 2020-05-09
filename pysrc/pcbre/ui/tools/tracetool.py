@@ -11,7 +11,7 @@ from pcbre.model.artwork_geom import Trace, Via
 from pcbre.ui.boardviewwidget import QPoint_to_pair
 from pcbre.ui.undo import UndoMerge
 
-from pcbre.ui.action import ActionDescription, ActionShortcut, Modifier, EventID
+from pcbre.ui.tool_action import ActionDescription, ActionShortcut, Modifier, EventID
 
 from pcbre.ui.widgets.unitedit import UnitLineEdit, UNIT_GROUP_MM
 from pcbre.view.rendersettings import RENDER_OUTLINES

@@ -1,6 +1,6 @@
 from qtpy import QtCore, QtGui, QtWidgets
 
-class ActionHistoryLogger:
+class ToolActionHistoryLogger:
     def __init__(self, depth = None):
         self.log_entries = []
         self.depth = None
@@ -16,7 +16,7 @@ class ActionHistoryLogger:
         for notify in self.notify:
             notify()
 
-class ActionHistoryListModel(QtCore.QAbstractListModel):
+class ToolActionHistoryListModel(QtCore.QAbstractListModel):
     def __init__(self, history, parent=None):
         QtCore.QAbstractListModel.__init__(self, parent)
         self.history = history
@@ -38,12 +38,12 @@ class ActionHistoryListModel(QtCore.QAbstractListModel):
         self.history.notify.remove(self._changed)
 
 
-class DebugActionHistoryWidget(QtWidgets.QDockWidget):
+class DebugToolActionHistoryWidget(QtWidgets.QDockWidget):
     def __init__(self, history):
         super(DebugActionHistoryWidget, self).__init__("Action History")
         self.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
 
-        self.model = ActionHistoryListModel(history)
+        self.model = ToolActionHistoryListModel(history)
 
         self.history = QtWidgets.QListView(self)
         self.history.setModel(self.model)
