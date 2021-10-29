@@ -1,5 +1,5 @@
 from pcbre import units
-from pcbre.matrix import Point2, Vec2, projectPoint, rotate, translate
+from pcbre.matrix import Point2, Vec2, project_point, rotate, translate
 from pcbre.model.const import SIDE
 from pcbre.model.dipcomponent import DIPComponent, SIPComponent
 from pcbre.ui.tools.multipoint import MultipointEditFlow, EditablePoint, OffsetDefaultPoint
@@ -28,7 +28,7 @@ class SIPEditFlow(MultipointEditFlow):
 
         v_aligned = Vec2(0, dy)
 
-        v_delta = projectPoint(rmat, v_aligned)
+        v_delta = project_point(rmat, v_aligned)
 
         # the pin on the end of the same row as P1
         self.p_bottom_corner = OffsetDefaultPoint(self.p1_point, v_delta)
@@ -61,7 +61,7 @@ class SIPEditFlow(MultipointEditFlow):
 
         center_to_corner = Vec2(0, self._model.pin_space * (self._model.pin_count - 1) / 2)
 
-        center_to_corner_w = projectPoint(rot, center_to_corner)
+        center_to_corner_w = project_point(rot, center_to_corner)
 
         self._cmodel.center = self.p1_point.get() - center_to_corner_w
 
@@ -98,5 +98,5 @@ class SIPEditWidget(AutoSettingsWidget):
 
 def SIP_getComponent(mdl, ctrl, flow):
     ctrl.flow.update_matrix()
-    return SIPComponent(flow.center, flow.theta, ctrl.view.current_side(), ctrl.view.project,
+    return SIPComponent(ctrl.view.project, flow.center, flow.theta, ctrl.view.current_side(), ctrl.view.project,
                         mdl.pin_count, mdl.pin_space, mdl.pad_diameter)

@@ -1,7 +1,7 @@
-from OpenGL.arrays.vbo import VBO
+from OpenGL.arrays.vbo import VBO  # type: ignore
 from pcbre.accel.vert_array import VA_xy
 from pcbre.ui.gl import VAO
-import OpenGL.GL as GL
+import OpenGL.GL as GL  # type: ignore
 import numpy
 
 __author__ = 'davidc'
@@ -13,8 +13,7 @@ class BackgroundGridRender:
     def __init__(self):
         self.__width = 0
         self.__height = 0
-
-        self.__vbo_dtype = numpy.dtype([("vertex". numpy.float32, 2)])
+        self.__vbo_dtype = numpy.dtype([("vertex", numpy.float32, 2)])
 
     def initializeGL(self, gls, width, height):
         # Get shader

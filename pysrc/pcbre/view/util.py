@@ -1,7 +1,9 @@
 __author__ = 'davidc'
 
+from typing import Sequence, Tuple, List
 
-def get_consolidated_draws(dr):
+
+def get_consolidated_draws(dr: Sequence[Tuple[int, int]]) -> List[Tuple[int, int]]:
     """
     Given a list dr of tuples (first, last), where first is inclusive, and last is exclusive,
     generate a list of consolidated ranges
@@ -33,7 +35,7 @@ def get_consolidated_draws(dr):
     return draw_ranges_consolidated
 
 
-def get_consolidated_draws_1(dl):
+def get_consolidated_draws_1(dl: Sequence[int]) -> List[Tuple[int, int]]:
     """
     Similar to get_consolidated_get_consolidated_draws, but for individual indicies
     :param dl:

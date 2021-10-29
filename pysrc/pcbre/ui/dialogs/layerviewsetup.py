@@ -6,27 +6,28 @@ from qtpy import QtGui
 from qtpy import QtWidgets
 from qtpy.QtCore import Qt
 
-
 import pcbre.model.project
 import pcbre.model.stackup
 
+from typing import Set
+from pcbre.model.stackup import Layer
+from pcbre.model.imagelayer import ImageLayer
+
+
 FIRST_VIEW_COL = 1
 class LayerViewSetupDialog(QtWidgets.QDialog):
-    def __init__(self, parent, data_list):
+    def __init__(self, parent, project: pcbre.model.project.Project):
         QtWidgets.QDialog.__init__(self, parent)
 
         self.resize(470, 350)
         self.setWindowTitle("Layer imagery")
 
-        self.table_model = MyTableModel(self, data_list)
-
+        self.table_model : LayerViewAdapter = LayerViewAdapter(self, project)
 
         self.table_view = QtWidgets.QTableView()
 
-        self.table_view.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection) 
+        self.table_view.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.table_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
-
-
 
         self.table_view.setModel(self.table_model)
         # set font
@@ -57,21 +58,21 @@ class LayerViewSetupDialog(QtWidgets.QDialog):
 
         self.table_view.selectRow(0)
 
-
     def accept(self):
         self.table_model.update()
         return QtWidgets.QDialog.accept(self)
 
-class EditableLayer(object):
-    def __init__(self, mdl, ref, name, ils):
+
+class EditableLayer:
+    def __init__(self, mdl : 'LayerViewAdapter', ref: Layer, name: str, ils):
         self.name = name
         self.mdl = mdl
         self.ref = ref
-        self.view_set = set(ils)
+        self.view_set : Set[ImageLayer] = set(ils)
 
 
-class MyTableModel(QtCore.QAbstractTableModel):
-    def __init__(self, parent, project, *args):
+class LayerViewAdapter(QtCore.QAbstractTableModel):
+    def __init__(self, parent, project: pcbre.model.project.Project, *args):
         QtCore.QAbstractTableModel.__init__(self, parent, *args)
         self.p = project
         self._layers =  [
@@ -80,11 +81,9 @@ class MyTableModel(QtCore.QAbstractTableModel):
 
         self._views = project.imagery.imagelayers
 
-
     def update(self):
         for i in self._layers:
             i.ref.imagelayers = list(i.view_set)
-
 
     def rowCount(self, parent):
         return len(self._layers)
@@ -100,14 +99,12 @@ class MyTableModel(QtCore.QAbstractTableModel):
         row = index.row()
 
         if role == Qt.DisplayRole:
-
             return None
 
         elif role == Qt.CheckStateRole:
             layer = self._layers[row]
             view = self._views[col]
             return Qt.Checked if view in layer.view_set else Qt.Unchecked
-
 
         return None
 
@@ -139,7 +136,6 @@ class MyTableModel(QtCore.QAbstractTableModel):
         flags = Qt.ItemIsEnabled | Qt.ItemIsUserCheckable
         return flags
 
-
     def headerData(self, index, orientation, role):
         if orientation == Qt.Vertical and role == Qt.DisplayRole:
             return self._layers[index].name
@@ -150,16 +146,12 @@ class MyTableModel(QtCore.QAbstractTableModel):
             return os.path.basename(self._views[index].name)
         return None
 
+
 # Test harness
 if __name__ == "__main__":
-    app = QtWidgets.QtQApplication([])
-    import os.path
-    PATH = '/tmp/test.pcbre'
-    if os.path.exists(PATH):
-        project = pcbre.model.project.Project.open(PATH)
-    else:
-        project = pcbre.model.project.Project.create(PATH)
+    app = QtWidgets.QApplication([])
+    project = pcbre.model.project.Project.create()
 
-    win = LayerViewSetupDialog(project)
+    win = LayerViewSetupDialog(None, project)
     win.show()
     app.exec_()

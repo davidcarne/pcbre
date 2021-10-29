@@ -1,8 +1,12 @@
 import enum
+from typing import Union, List, Iterable, Any, Optional
 
 import qtpy.QtCore as QtCore
-from qtpy.QtCore import Qt
 import qtpy.QtGui as QtGui
+from qtpy.QtCore import Qt
+
+from pcbre.matrix import Vec2, Point2
+
 
 @enum.unique
 class EventID(enum.Enum):
@@ -40,25 +44,28 @@ class EventID(enum.Enum):
     Key_Return = 0x101
     Key_Escape = 0x102
 
-    Mouse_B1 = 0x211 # Typically left button
-    Mouse_B2 = 0x212 # Typically right button
-    Mouse_B3 = 0x213 # Typically middle button
+    Key_Backspace = 0x103
+    Key_Delete = 0x104
+
+    Mouse_B1 = 0x211  # Typically left button
+    Mouse_B2 = 0x212  # Typically right button
+    Mouse_B3 = 0x213  # Typically middle button
     Mouse_B4 = 0x214
     Mouse_B5 = 0x215
 
-    Mouse_B1_DragStart = 0x221 # Typically left button
-    Mouse_B2_DragStart = 0x222 # Typically right button
-    Mouse_B3_DragStart = 0x223 # Typically middle button
+    Mouse_B1_DragStart = 0x221  # Typically left button
+    Mouse_B2_DragStart = 0x222  # Typically right button
+    Mouse_B3_DragStart = 0x223  # Typically middle button
     Mouse_B4_DragStart = 0x224
     Mouse_B5_DragStart = 0x225
 
-    Mouse_WheelUp =     0x231
-    Mouse_WheelDown =   0x232
-    Mouse_WheelLeft =   0x233
-    Mouse_WheelRight =  0x234
+    Mouse_WheelUp = 0x231
+    Mouse_WheelDown = 0x232
+    Mouse_WheelLeft = 0x233
+    Mouse_WheelRight = 0x234
 
     @staticmethod
-    def from_key_event(qe):
+    def from_key_event(qe: QtGui.QKeyEvent) -> 'Optional[EventID]':
         qt_key = qe.key()
         if qt_key in _key_map:
             return _key_map[qt_key]
@@ -66,7 +73,7 @@ class EventID(enum.Enum):
         return None
 
     @staticmethod
-    def from_mouse_event(qe):
+    def from_mouse_event(qe: QtGui.QMouseEvent) -> 'Optional[EventID]':
         if qe.type() == QtCore.QEvent.MouseButtonRelease:
             if qe.button() == Qt.LeftButton:
                 return EventID.Mouse_B1
@@ -83,7 +90,19 @@ class EventID(enum.Enum):
                 return EventID.Mouse_B3_DragStart
 
         return None
-                
+
+    def mouse_triggered(self) -> bool:
+        return self in (
+            EventID.Mouse_B1,
+            EventID.Mouse_B2,
+            EventID.Mouse_B3,
+            EventID.Mouse_B4,
+            EventID.Mouse_B5,
+            EventID.Mouse_B1_DragStart,
+            EventID.Mouse_B2_DragStart,
+            EventID.Mouse_B3_DragStart,
+            EventID.Mouse_B4_DragStart,
+            EventID.Mouse_B5_DragStart)
 
 
 _key_map = {}
@@ -92,20 +111,20 @@ for i in EventID:
     if i.name.startswith("Key_"):
         if hasattr(Qt, i.name):
             _key_map[getattr(Qt, i.name)] = i
-        
+
 
 class Modifier(enum.Flag):
     Shift = 0x01
-    Ctrl =  0x02
-    Alt =   0x04
-    Meta =  0x08
+    Ctrl = 0x02
+    Alt = 0x04
+    Meta = 0x08
 
     @staticmethod
-    def from_qevent(qe):
-        if isinstance(qe, QtGui.QInputEvent):
-            v = Modifier(0)
+    def from_qevent(qe: QtCore.QEvent) -> 'Modifier':
+        v = Modifier(0)
 
-            qt_modifiers = qe.modifiers()
+        if isinstance(qe, QtGui.QInputEvent):
+            qt_modifiers = int(qe.modifiers())
 
             if qt_modifiers & Qt.ShiftModifier:
                 v |= Modifier.Shift
@@ -118,42 +137,56 @@ class Modifier(enum.Flag):
 
             if qt_modifiers & Qt.MetaModifier:
                 v |= Modifier.Meta
-        
+
         return v
 
-class ActionShortcut:
-    def __init__(self, evtid, modifiers=Modifier(0)):
+
+class ToolActionShortcut:
+    def __init__(self, evtid: EventID, modifiers: Modifier = Modifier(0)):
         self.evtid = evtid
         self.modifiers = modifiers
 
-class ActionDescription:
-    def __init__(self, default_shortcuts, event_code, description):
+
+class ToolActionDescription:
+    def __init__(self, default_shortcuts: Union[ToolActionShortcut, Iterable[ToolActionShortcut]],
+                 event_code: Any, description: str):
 
         # Take one or more shortcuts as an iterable
-        try:
+        if isinstance(default_shortcuts, Iterable):
             self.default_shortcuts = list(default_shortcuts)
-        except TypeError:
+        else:
             self.default_shortcuts = [default_shortcuts]
 
         self.event_code = event_code
         self.description = description
-    
-class MoveEvent:
-    def __init__(self, cursor_pos, 
-                            world_pos,):
 
+
+class MoveEvent:
+    def __init__(self, cursor_pos: Vec2,
+                 world_pos: Vec2, potential_events: List[Any]):
         # cursor_pos: view area point in pixels
         # world_pos: view area point in world coordinates
-        # amount: only set for mouse wheel, otherwise defaults to 1
+        # potential_events: Event that would be generated if the primary interaction
+        # (typically mouse-press/enter/return) were triggered
         self.cursor_pos = cursor_pos
         self.world_pos = world_pos
 
-class ActionEvent:
-    def __init__(self, code, cursor_pos, world_pos, amount=1):
+        self.potential_events = potential_events
 
-        # code: Event code in pixels
+    def __repr__(self) -> str:
+        return "<MoveEvent cursor=%r world=%r potential=%r>" % (
+            self.cursor_pos, self.world_pos, self.potential_events)
+
+
+class ToolActionEvent:
+    def __init__(self, code: Any, cursor_pos: Point2, world_pos: Point2, amount: float = 1.0) -> None:
+        # code: Event code
         # amount: only set for mouse wheel, otherwise defaults to 1
         self.code = code
         self.cursor_pos = cursor_pos
         self.world_pos = world_pos
         self.amount = amount
+
+    def __repr__(self) -> str:
+        return "<ToolAction code=%r cursor=%r world=%r amount=%f>" % (
+            self.code, self.cursor_pos, self.world_pos, self.amount)

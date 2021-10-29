@@ -1,17 +1,16 @@
-from OpenGL import GL
+from OpenGL import GL  # type: ignore
 
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from  pcbre.ui.gl.glshared import GLShared
 
 class OriginView(object):
-    def initializeGL(self, gls):
+    def initializeGL(self, gls: 'GLShared') -> None:
         self.gls = gls
 
         self.prog = self.gls.shader_cache.get("vert2", "frag1")
-        self.mat_loc = GL.glGetUniformLocation(self.prog, "mat")
+        self.mat_loc = GL.glGetUniformLocation(self.prog.program, "mat")
 
-        # Build a VBO for rendering square "drag-handles"
-        # Coords are pixel coords
-        # self.vbo_triangles_ar = numpy.ndarray(4, dtype=[("vertex", numpy.float32, 2, "color", numpy.float32, j)])
-        # self.vbo_triangles_ar["vertex"][]
-
-    def render(self, viewState):
+    def render(self, viewState: Any) -> None:
         pass

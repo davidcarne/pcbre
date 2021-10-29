@@ -1,19 +1,25 @@
 from pcbre.model.component import Component
 from pcbre.util import Timer
-import OpenGL.GL as GL
-from OpenGL.arrays.vbo import VBO
+import OpenGL.GL as GL  # type: ignore
+from OpenGL.arrays.vbo import VBO  # type: ignore
 from pcbre.accel.vert_array import VA_xy
 from pcbre.ui.gl import VAO, glimports as GLI
 import ctypes
+import numpy
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pcbre.ui.boardviewwidget import BoardViewWidget
+    from pcbre.ui.gl.glshared import GLShared
 
 class DebugRender:
-    def __init__(self, boardview):
+    def __init__(self, boardview: 'BoardViewWidget') -> None:
         self.debug_draw = False
         self.debug_draw_bbox = True
         self.parent = boardview
 
-    def initializeGL(self, gls):
+    def initializeGL(self, gls: 'GLShared') -> None:
         self.shader = gls.shader_cache.get("vert2", "frag1")
 
         self.vao = VAO()
@@ -22,7 +28,7 @@ class DebugRender:
 
         # bind the shader
         with self.vao, self.vbo:
-            loc = GL.glGetAttribLocation(self.shader, "vertex")
+            loc = GL.glGetAttribLocation(self.shader.program, "vertex")
             assert loc != -1
             GL.glEnableVertexAttribArray(loc)
 
@@ -31,7 +37,7 @@ class DebugRender:
             GL.glVertexAttribPointer(loc, 2, GL.GL_FLOAT, False, 8, ctypes.c_void_p(0))
             GL.glVertexAttribDivisor(loc, 0)
 
-    def render(self):
+    def render(self) -> None:
 
         if not self.debug_draw:
             return
@@ -41,6 +47,7 @@ class DebugRender:
         buf_sel = VA_xy(1024)
 
         t_debug_bbox = Timer()
+        t_debug_bbox_add = Timer()
         with t_debug_bbox:
             if self.debug_draw_bbox:
 
@@ -53,7 +60,7 @@ class DebugRender:
                         for j in i.get_pads():
                             bboxes.append((j.bbox, j in self.parent.selectionList))
 
-                with Timer() as t_debug_bbox_add:
+                with t_debug_bbox_add:
                     # Add bboxes to buffers
                     for bbox, selected in bboxes:
                         cx = (bbox.left + bbox.right) / 2
@@ -75,8 +82,8 @@ class DebugRender:
             self.vbo.set_array(buf_r, None)
 
             # Now render the two buffers
-            with self.shader, self.vao, self.vbo:
-                GL.glUniformMatrix3fv(self.shader.uniforms.mat, 1, True, self.parent.viewState.glMatrix.ctypes.data_as(GLI.c_float_p))
+            with self.shader.program, self.vao, self.vbo:
+                GL.glUniformMatrix3fv(self.shader.uniforms.mat, 1, True, self.parent.viewState.glMatrix.astype(numpy.float32))
 
                 GL.glUniform4f(self.shader.uniforms.color, 255, 0, 255, 255)
                 GL.glDrawArrays(GL.GL_LINES, 0, buf.count())

@@ -1,30 +1,42 @@
 __author__ = 'davidc'
 
-import pkg_resources
-import OpenGL.GL as GL
-from pcbre.ui.gl.shader import compileProgram, compileShader
+from typing import Dict, Tuple, FrozenSet, Optional
 
-class UniformProxy(object):
-    def __init__(self, parent):
+import OpenGL.GL as GL  # type: ignore
+import pkg_resources
+
+from pcbre.ui.gl.shader import compileProgram, compileShader, EnhShaderProgram
+
+
+class UniformProxy:
+    def __init__(self, parent: EnhShaderProgram):
         self._prog = parent
 
-        self._dict = {}
+        self._dict: Dict[str, int] = {}
 
-    def __getattr__(self, key):
-        v = GL.glGetUniformLocation(self._prog, key)
+    def __getattr__(self, key: str) -> int:
+        try:
+            return self._dict[key]
+        except KeyError:
+            pass
+
+        v: int = GL.glGetUniformLocation(self._prog.program, key)
         if v == -1:
             raise KeyError(key)
-        self.__dict__[key] = v
+        self._dict[key] = v
         return v
 
-class ShaderCache(object):
-    def __init__(self):
-        self.cache = {}
 
-    def __build_s(self, d):
-        return "".join("#define %s %s\n" % (k,v) for k, v in d.items())
+class ShaderCache:
+    def __init__(self) -> None:
+        self.cache: Dict[
+            Tuple[str, str, Tuple[FrozenSet[Tuple[str, str]], FrozenSet[Tuple[str, str]]]],
+            EnhShaderProgram] = {}
 
-    def extract_version(self, s):
+    def __build_s(self, d: Dict[str, str]) -> str:
+        return "".join("#define %s %s\n" % (k, v) for k, v in d.items())
+
+    def extract_version(self, s: str) -> Tuple[str, str]:
         lines = s.split("\n")
 
         if lines[0].startswith("#version"):
@@ -33,19 +45,32 @@ class ShaderCache(object):
             return "", "\n".join(lines)
 
     @staticmethod
-    def __get_shader_text(name):
-            byte_str = pkg_resources.resource_string('pcbre.resources', "shaders/%s.glsl" % name)
-            return byte_str.decode('ascii')
+    def __get_shader_text(name: str) -> str:
+        byte_str = pkg_resources.resource_string('pcbre.resources', "shaders/%s.glsl" % name)
+        return byte_str.decode('ascii')
 
-    def get(self, vert_name, frag_name, defines={}, vertex_defines={}, fragment_defines={}, fragment_bindings={}):
+    def get(self, vert_name: str, frag_name: str,
+            defines: Optional[Dict[str, str]] = None,
+            vertex_defines: Optional[Dict[str, str]] = None,
+            fragment_defines: Optional[Dict[str, str]] = None,
+            fragment_bindings: Optional[Dict[str, int]] = None) -> EnhShaderProgram:
 
-        _fragment_defines={}
-        _fragment_defines.update(fragment_defines)
-        _fragment_defines.update(defines)
+        _fragment_defines = {}
+        if fragment_defines is not None:
+            _fragment_defines.update(fragment_defines)
 
-        _vertex_defines={}
-        _vertex_defines.update(vertex_defines)
-        _vertex_defines.update(defines)
+        if defines is not None:
+            _fragment_defines.update(defines)
+
+        _vertex_defines = {}
+        if vertex_defines is not None:
+            _vertex_defines.update(vertex_defines)
+
+        if defines is not None:
+            _vertex_defines.update(defines)
+
+        if fragment_bindings is None:
+            fragment_bindings = {}
 
         frag_prepend = self.__build_s(_fragment_defines)
         vert_prepend = self.__build_s(_vertex_defines)
@@ -72,10 +97,10 @@ class ShaderCache(object):
                 lines = shader_body.split("\n")
                 for i in lines:
                     print("\t%s" % i.strip())
-                return None
+                raise
 
-            obj.uniforms = UniformProxy(obj)
+            # TODO - determine if this is needed
+            obj.uniforms = UniformProxy(obj)  # type: ignore
 
             self.cache[key] = obj
         return self.cache[key]
-

@@ -1,19 +1,20 @@
 __author__ = 'davidc'
 
 from qtpy import QtCore, QtGui, QtOpenGL
-from OpenGL import GL
+from OpenGL import GL  # type: ignore
 import re
+from typing import Tuple, Union
 
 
 class _33ProbeWidget(QtOpenGL.QGLWidget):
-    def __init__(self):
+    def __init__(self) -> None:
         f = QtOpenGL.QGLFormat()
         f.setVersion(3, 3)
         f.setProfile(QtOpenGL.QGLFormat.CoreProfile)
         c = QtOpenGL.QGLContext(f)
         QtOpenGL.QGLWidget.__init__(self, c)
 
-def probe():
+def probe() -> Union[Tuple[int, int], None]:
     w = QtOpenGL.QGLWidget()
     w.makeCurrent()
 

@@ -169,10 +169,10 @@ class MultipointEditFlow:
         if not world_to_point:
             pt = self.view.viewState.tfW2V(self.current_point.get())
 
-            bounds = Rect.fromPoints(Point2(0,0), Point2(self.view.width(), self.view.height()))
+            bounds = Rect.from_points(Point2(0, 0), Point2(self.view.width(), self.view.height()))
             pt_clipped = clip_point_to_rect(pt, bounds)
 
-            screen_pt = self.view.mapToGlobal(QtCore.QPoint(*pt_clipped.intTuple()))
+            screen_pt = self.view.mapToGlobal(QtCore.QPoint(*pt_clipped.to_int_tuple()))
 
             QtGui.QCursor.setPos(screen_pt)
         else:
@@ -238,7 +238,7 @@ class MultipointEditFlow:
     def do_jog(self, vec):
         p = self.view.viewState.tfW2V(self.current_point.get())
         self.current_point.set(self.view.viewState.tfV2W(p + vec))
-        self.updated()
+        self.updated(self.current_point)
 
     def keyReleaseEvent(self, evt):
         if evt.key() in [QtCore.Qt.Key_Q, QtCore.Qt.Key_W, QtCore.Qt.Key_E, QtCore.Qt.Key_R,

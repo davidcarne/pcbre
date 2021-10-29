@@ -1,109 +1,222 @@
 from pcbre.ui.uimodel import GenModel
-
-__author__ = 'davidc'
-
-
 from qtpy import QtGui, QtCore, QtWidgets
+import enum
+__author__ = 'davidc'
+from typing import Any, List, Optional, List, Dict
 
-VISIBLE_NO = 0
-VISIBLE_MAYBE = 1
-VISIBLE_YES = 2
 
-class VisibilityModelLeaf(object):
-    def __init__(self, name):
+try:
+    from typing_extensions import Protocol
+    class VisibilityNode(Protocol):
+        @property
+        def name(self) -> str:
+            ...
+
+        @property
+        def root_node(self) -> 'Optional[VisibilityModelRoot]':
+            ...
+
+        @root_node.setter
+        def root_node(self, value: 'VisibilityModelRoot') -> None:
+            ...
+
+        @property
+        def children(self) -> 'List[VisibilityNode]':
+            ...
+        
+        @property
+        def visible(self) -> 'Visible':
+            ...
+        
+        def setVisible(self, visible: 'Visible') -> None:
+            ...
+
+        @property
+        def obj(self) -> Any:
+            ...
+
+except ImportError:
+    pass
+
+
+class Visible(enum.Enum):
+    """MAYBE enum type indicates that some children are visible. 
+        Only returned for non-leaf nodes"""
+    NO = 0
+    MAYBE = 1
+    YES = 2
+
+    def as_qt_vis(self) -> 'QtCore.Qt.CheckState':
+        if self == Visible.NO:
+            return QtCore.Qt.Unchecked
+        elif self == Visible.YES:
+            return QtCore.Qt.Checked
+        else:
+            return QtCore.Qt.PartiallyChecked
+
+    @staticmethod
+    def from_qt_state(s: 'QtCore.Qt.CheckState') -> 'Visible':
+        if s == QtCore.Qt.Unchecked:
+            return Visible.NO
+        elif s == QtCore.Qt.Checked:
+            return Visible.YES
+        elif s == QtCore.Qt.PartiallyChecked:
+            return Visible.MAYBE
+        else:
+            raise ValueError("Invalid argument %s" % s)
+
+
+
+class VisibilityModelLeaf:
+    def __init__(self, name: str, obj: Any = None) -> None:
         super(VisibilityModelLeaf, self).__init__()
-        self.name = name
-        self._visible = VISIBLE_YES
-        self.model = None
+        self.__name: str = name
+        self._visible: Visible = Visible.YES
+        self.obj = obj
+        self.__root_node : Optional[VisibilityModelRoot] = None
+
 
     @property
-    def children(self):
+    def root_node(self) -> 'Optional[VisibilityModelRoot]':
+        return self.__root_node
+
+    @root_node.setter
+    def root_node(self, value: 'VisibilityModelRoot') -> None:
+        self.__root_node = value
+
+    @property
+    def name(self) -> str:
+        return self.__name
+
+    @property
+    def children(self) -> 'frozenset[Any]':
         return frozenset()
 
     @property
-    def visible(self):
-        if self._visible:
-            return VISIBLE_YES
-        return VISIBLE_NO
+    def visible(self) -> Visible:
+        return self._visible
 
-    def setVisible(self, visible):
+    def setVisible(self, visible: Visible) -> None:
         self._visible = visible
-        self.model.change()
+        if self.root_node is not None:
+            self.root_node.change()
 
-class VisibilityModelGroup(object):
-    def __init__(self, name):
+class VisibilityModelGroup:
+    def __init__(self, name: str):
         super(VisibilityModelGroup, self).__init__()
-        self.__children = []
-        self.name = name
+        self.__children : 'List[VisibilityNode]' = []
+        self.__name = name
+        self.__root_node: Optional[VisibilityModelRoot] = None
+        self.obj: Any = None
 
-    def addChild(self, child):
+    @property
+    def root_node(self) -> 'Optional[VisibilityModelRoot]':
+        return self.__root_node
+
+    @root_node.setter
+    def root_node(self, value: 'VisibilityModelRoot') -> None:
+        self.__root_node = value
+
+    @property
+    def name(self) -> str:
+        return self.__name
+
+    def addChild(self, child: 'VisibilityNode') -> None:
         self.__children.append(child)
 
     @property
-    def children(self):
+    def children(self) -> 'List[VisibilityNode]':
         return list(self.__children)
 
     @property
-    def visible(self):
+    def visible(self) -> 'Visible':
         child_vis = [i.visible for i in self.children]
-        if all(i == VISIBLE_YES for i in child_vis):
-            return VISIBLE_YES
-        if all(i == VISIBLE_NO for i in child_vis):
-            return VISIBLE_NO
+        if all(i == Visible.YES for i in child_vis):
+            return Visible.YES
+        if all(i == Visible.NO for i in child_vis):
+            return Visible.NO
 
-        return VISIBLE_MAYBE
+        return Visible.MAYBE
 
-    def setVisible(self, visible):
-        with self.model.edit():
-            for i in self.children:
-                i.setVisible(visible)
+    def setVisible(self, visible: Visible) -> None:
+        if self.root_node is not None:
+            with self.root_node.edit():
+                for i in self.children:
+                    i.setVisible(visible)
 
 
-
-class VisibilityModel(GenModel):
-    def __init__(self):
-        super(VisibilityModel, self).__init__()
-        self.__children = []
-
-    def addChild(self, child):
-        self.__children.append(child)
-
-    def propagate_model(self, node=None):
-        if node is None:
-            node = self
-
-        for i in node.children:
-            i.model = self
-            self.propagate_model(i)
+class VisibilityModelRoot(GenModel):
+    def __init__(self) -> None:
+        super(VisibilityModelRoot, self).__init__()
+        self.__children : 'List[VisibilityNode]' = []
 
     @property
-    def children(self):
+    def name(self) -> str:
+        return ""
+
+    def addChild(self, child: 'VisibilityNode') -> None:
+        self.__children.append(child)
+
+    # this is a very strange way of phrasing it. review?
+    def propagate_root(self, child: 'Optional[VisibilityNode]'=None) -> None:
+        _child: VisibilityNode
+        if child is None:
+            _child = self
+        else:
+            _child = child
+
+        for i in _child.children:
+            i.root_node = self
+            self.propagate_root(i)
+
+    @property
+    def children(self) -> 'List[VisibilityNode]':
         return list(self.__children)
+
+    @property
+    def root_node(self) -> 'Optional[VisibilityModelRoot]':
+        return self
+
+    @root_node.setter
+    def root_node(self, v: 'VisibilityModelRoot') -> None:
+        pass
+
+    @property
+    def visible(self) -> 'Visible':
+        return Visible.MAYBE
+
+    def setVisible(self, visible: 'Visible') -> None:
+        pass
+
+    @property
+    def obj(self) -> Any:
+        None
+
 
 class VisibilityAdaptor(QtCore.QAbstractItemModel):
-
-    @staticmethod
-    def recursive_stuff_parent(parent):
+    def __recursive_stuff_parent(self, parent: 'VisibilityNode') -> None:
         for i in parent.children:
-            i.__adaptor_parent = parent
-            VisibilityAdaptor.recursive_stuff_parent(i)
+            self.__adapter_parents[i] = parent
+            self.__recursive_stuff_parent(i)
 
-    def __init__(self, model):
+    def __init__(self, model: VisibilityModelRoot) -> None:
         super(VisibilityAdaptor, self).__init__()
         self.model = model
 
         # Build parent links
-        self.recursive_stuff_parent(self.model)
-        self.model.__adaptor_parent = None
+        self.__recursive_stuff_parent(self.model)
 
-    def index_get_node(self, index):
+        self.__adapter_parents: 'Dict[Any, Any]' = dict()
+        self.__adapter_parents[self.model] = None
+
+    def index_get_node(self, index: 'QtCore.QModelIndex') -> 'VisibilityNode':
         if not index.isValid():
             obj = self.model
         else:
             obj = index.internalPointer()
         return obj
 
-    def index(self, row, col, parent):
+    def index(self, row: int, col: int, parent: QtCore.QModelIndex) -> QtCore.QModelIndex:
         obj = self.index_get_node(parent)
 
         assert 0 <= col < 2
@@ -114,18 +227,19 @@ class VisibilityAdaptor(QtCore.QAbstractItemModel):
         idx = self.createIndex(row, col, child)
         return idx
 
-    def node_row(self, node):
+    def node_row(self, node: 'VisibilityNode') -> int:
         # parent of the parent to get the row
-        parent = node.__adaptor_parent
+
+        parent = self.__adapter_parents[node]
         if parent is None:
             row = 0
         else:
             row = parent.children.index(node)
         return row
 
-    def parent(self, index):
+    def parent(self, index: 'QtCore.QModelIndex') -> 'QtCore.QModelIndex':
         node = self.index_get_node(index)
-        p_obj = node.__adaptor_parent
+        p_obj = self.__adapter_parents[node]
 
         if p_obj is None:
             return QtCore.QModelIndex()
@@ -134,44 +248,37 @@ class VisibilityAdaptor(QtCore.QAbstractItemModel):
 
         return self.createIndex(row, 0, p_obj)
 
-    def columnCount(self, index):
+    def columnCount(self, index: Any) -> int:
         return 2
 
-    def rowCount(self, index):
+    def rowCount(self, index: Any) -> int:
         obj = self.index_get_node(index)
         return len(obj.children)
 
-    def data(self, index, role):
+    def data(self, index: 'QtCore.QModelIndex', role: int) -> Any:
         node = self.index_get_node(index)
 
         col = index.column()
         if role == QtCore.Qt.DisplayRole:
             if col == 0:
                 return node.name
-
             return ""
 
         elif role == QtCore.Qt.CheckStateRole:
             if col == 1:
-                vis = node.visible
-                if vis == VISIBLE_NO:
-                    return QtCore.Qt.Unchecked
-                elif vis == VISIBLE_YES:
-                    return QtCore.Qt.Checked
-                else:
-                    return QtCore.Qt.PartiallyChecked
+                return node.visible.as_qt_vis()
 
-    def flags(self, index):
+    def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlags:
         node = self.index_get_node(index)
 
-        flags = QtCore.Qt.ItemIsEnabled
+        flags: int = QtCore.Qt.ItemIsEnabled
 
         if index.column() == 1:
             flags |= QtCore.Qt.ItemIsUserCheckable
 
-        return flags
+        return flags # type: ignore
 
-    def __recursive_emit_changed(self, node):
+    def __recursive_emit_changed(self, node: 'VisibilityNode') -> None:
         if not node.children:
             return
 
@@ -182,19 +289,19 @@ class VisibilityAdaptor(QtCore.QAbstractItemModel):
         for i in node.children:
             self.__recursive_emit_changed(i)
 
-    def setData(self, index, data, role):
+    def setData(self, index: QtCore.QModelIndex, data: Any, role: int) -> bool:
         node = self.index_get_node(index)
         if index.column() == 1 and role == QtCore.Qt.CheckStateRole:
-            node.setVisible(data)
+            node.setVisible(Visible.from_qt_state(data))
 
-            # Update heirarchy above
+            # Update hierarchy above
             n_i = node
             while n_i is not None:
                 ci = self.createIndex(self.node_row(n_i), 1, n_i)
                 self.dataChanged.emit(ci, ci)
-                n_i = n_i.__adaptor_parent
+                n_i = self.__adapter_parents[n_i]
 
-            # Update heirarchy below
+            # Update hierarchy below
             self.__recursive_emit_changed(node)
 
             return True
@@ -202,13 +309,10 @@ class VisibilityAdaptor(QtCore.QAbstractItemModel):
         return False
 
 
-
-
-
 class VisibilityTree(QtWidgets.QTreeView):
-    def __init__(self, model):
+    def __init__(self, model: VisibilityModelRoot) -> None:
         super(VisibilityTree, self).__init__()
-        self.model = model
+        self.__model = model
         self.adaptor = VisibilityAdaptor(model)
 
         self.setModel(self.adaptor)
@@ -218,32 +322,3 @@ class VisibilityTree(QtWidgets.QTreeView):
         header.setSectionResizeMode(0,QtWidgets.QHeaderView.Stretch)
         header.setSectionResizeMode(1,QtWidgets.QHeaderView.ResizeToContents)
         header.hide()
-
-
-
-if __name__ == "__main__":
-    app = QtWidgets.QApplication([])
-
-    model = VisibilityModel()
-    child1 = VisibilityModelLeaf("test1")
-    model.addChild(child1)
-
-    group1 = VisibilityModelGroup("group-level-1")
-    model.addChild(group1)
-
-    group2 = VisibilityModelGroup("group-level-1")
-    child2 = VisibilityModelLeaf("leaf2")
-    group2.addChild(child2)
-    group1.addChild(group2)
-
-    child3 = VisibilityModelLeaf("leaf1")
-    group1.addChild(child3)
-    model.propagate_model()
-
-
-    widg = VisibilityTree(model)
-    widg.show()
-    widg.resize(100,500)
-
-    app.exec_()
-

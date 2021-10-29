@@ -20,14 +20,12 @@ PCBRE requires the following dependencies. Some will probably need to come from 
 
 **System Packages**
 
+<!-- begin list -->
 - python3.4
 - python3-pip (for installing python packages)
-- numpy
-- scipy
 - qtpy
-- PySide **or** PyQt5
-
-<!-- begin list -->
+	- PySide **or** PyQt5
+- OpenGL
 - Cython (required by poly2tri and pypotrace)
 - geos (required by shapely, be sure to install geos with development headers)
 - capnp (required by pycapnp)
@@ -35,31 +33,22 @@ PCBRE requires the following dependencies. Some will probably need to come from 
 - freetype (required by freetype_py)
 - opencv3 (with Python 3 bindings)
 
-<!-- begin list -->
-- libagg (required by pypotrace, not yet needed)
-- potrace (required by pypotrace, not yet needed)
 
-**Python Packages**
+Setting up an installation:
 
-- pycapnp
-- shapely
-- rtree
-- freetype\_py
-- git+https://github.com/davidcarne/poly2tri.python.git
-- pyopengl
+    virtualenv --system-site-packages -p python3 ~/usr/pcbre/
+    . ~/usr/pcbre/bin/activate
+    pip install -r requirements.txt .
 
-<!-- begin list -->
-- mock (only needed for tests)
-- git+https://github.com/davidcarne/pypotrace.git (will be needed in the future)
+Then add ~/usr/pcbre/bin to your path. You can then launch PCBRE by typing "pcbre-launcher"in your shell.
 
-Personally, I use the following sequence to setup a test environment
+Setting up a dev environment:
 
-    virtualenv --system-site-packages -p python3.4 .env
+    virtualenv --system-site-packages -p python3 .env
     . .env/bin/activate
-    pip install shapely signalslot mock freetype_py git+https://github.com/davidcarne/pypotrace.git git+https://github.com/davidcarne/poly2tri.python.git
-    python setup.py develop
+    pip install -r requirements.txt -e .
 
-Then you can just run pcbre by typing `pcbre` into your shell (its in the virtualenv path)
+
 
 ## Debian/Ubuntu Specific Installation notes
 

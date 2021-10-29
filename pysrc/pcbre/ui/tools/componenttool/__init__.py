@@ -8,9 +8,6 @@ from pcbre.ui.undo import UndoMerge
 from pcbre.view.componentview import cmp_border_va, cmp_pad_periph_va
 from pcbre.view.rendersettings import RENDER_OUTLINES, RENDER_HINT_ONCE
 from pcbre.view.target_const import COL_SEL
-
-__author__ = 'davidc'
-
 from qtpy import QtCore, QtGui, QtWidgets
 from pcbre.ui.tools.basetool import BaseToolController, BaseTool
 from pcbre.ui.uimodel import mdlacc, GenModel
@@ -23,8 +20,10 @@ from pcbre.ui.tools.componenttool.sip import SIPModel, SIPEditWidget, SIP_getCom
 from pcbre.ui.dialogs.settingsdialog import MultiAutoSettingsDialog, UnitEditable, FloatTrait, LineEditable, \
     DegreeEditable
 from .basicsmd import BasicSMDICEditWidget
-from pcbre.ui.boardviewwidget import QPoint_to_pair
 from pcbre.matrix import translate, rotate, Point2
+
+__author__ = 'davidc'
+
 
 MDL_TYPE_BASICSMD = 0
 MDL_TYPE_DIP = 1

@@ -1,29 +1,33 @@
-# Signed distance field based text rendering
+.0# Signed distance field based text rendering
 
-from OpenGL.arrays.vbo import VBO
+from OpenGL.arrays.vbo import VBO  # type: ignore
 from collections import namedtuple, defaultdict
 from pcbre.accel.vert_array import VA_tex
-from pcbre.matrix import Rect, translate, scale, Point2, projectPoint
-from pcbre.ui.gl import Texture, vbobind, VAO
-from OpenGL import GL
+from pcbre.matrix import Rect, translate, scale, Point2, project_point, Vec2
+from pcbre.ui.gl import Texture, VBOBind, VAO
+from OpenGL import GL  # type: ignore
 import ctypes
 import numpy
 
-from pcbre.ui.gl.textatlas import BASE_FONT
+from pcbre.ui.gl.textatlas import BASE_FONT, SDFTextAtlas
 from pcbre.view.target_const import COL_TEXT
+
+from typing import TYPE_CHECKING, List, Tuple, Dict, Any
+if TYPE_CHECKING:
+    import numpy.typing as npt
 
 __author__ = 'davidc'
 
 class TextBatch:
-    __tag = namedtuple("tag", ['mat','inf'])
-    def __init__(self, tr):
+    __tag = namedtuple("__tag", ['mat','inf'])
+    def __init__(self, tr: 'TextRender') -> None:
         self.__text_render = tr
 
         self.__elem_count = 0
         self.__color = (255, COL_TEXT, 0, 0)
 
-    def initializeGL(self):
-        self.vbo = VBO(numpy.ndarray(0, dtype=self.__text_render.buffer_dtype), GL.GL_STATIC_DRAW, GL.GL_ARRAY_BUFFER)
+    def initializeGL(self) -> None:
+        self.vbo = VBO(numpy.ndarray([], dtype=self.__text_render.buffer_dtype), GL.GL_STATIC_DRAW, GL.GL_ARRAY_BUFFER)
         self.vao = VAO()
 
 
@@ -33,11 +37,11 @@ class TextBatch:
             self.__text_render.b1.assign()
             self.__text_render.b2.assign()
 
-    def restart(self):
-        self.__strs = []
+    def restart(self) -> None:
+        self.__strs : List[TextBatch.__tag] = []
 
     # TEMP
-    def get_string(self, text):
+    def get_string(self, text: str) -> '_StringMetrics':
         """
 
         :param text:
@@ -46,7 +50,7 @@ class TextBatch:
         """
         return self.__text_render.getStringMetrics(text)
 
-    def add(self, mat, str_info):
+    def add(self, mat: 'npt.NDArray[numpy.float64]', str_info: '_StringMetrics') -> None:
         """
         Queues a text string to be rendered in the batch
         :param mat: location matrix
@@ -56,7 +60,7 @@ class TextBatch:
         """
         self.__strs.append(TextBatch.__tag(mat, str_info))
 
-    def prepare(self):
+    def prepare(self) -> None:
         self.__text_render.updateTexture()
 
 
@@ -71,32 +75,32 @@ class TextBatch:
         self.__elem_count = self._va.count()
 
 
-    def render(self, mat):
-        with self.__text_render.sdf_shader, self.__text_render.tex.on(GL.GL_TEXTURE_2D), self.vao:
+    def render(self, mat: 'npt.NDArray[numpy.float64]') -> None:
+        with self.__text_render.sdf_shader.program, self.__text_render.tex.on(GL.GL_TEXTURE_2D), self.vao:
             GL.glUniform1i(self.__text_render.sdf_shader.uniforms.tex1, 0)
             GL.glUniformMatrix3fv(self.__text_render.sdf_shader.uniforms.mat, 1, True, mat.astype(numpy.float32))
             GL.glUniform4ui(self.__text_render.sdf_shader.uniforms.layer_info, *self.__color)
 
             GL.glDrawArrays(GL.GL_TRIANGLES, 0, self.__elem_count)
 
-class TextBatcher(object):
-    __tag_type = namedtuple("render_tag", ["textinfo", "matrix", "color"])
+class TextBatcher:
+    _render_tag = namedtuple("_render_tag", ["textinfo", "matrix", "color"])
 
-    def __init__(self, tr):
+    def __init__(self, tr: 'TextRender') -> None:
         self.text_render = tr
-        self.__cached = {}
+        self.__cached : Dict[str,'_StringMetrics']= {}
         self._va = VA_tex(1024)
 
         self.restart()
 
-    def restart(self):
-        self.__render_tags = defaultdict(list)
+    def restart(self) -> None:
+        self.__render_tags :Dict[Any, List['TextBatcher._render_tag']] = defaultdict(list)
         self._va.clear()
 
 
-    def initializeGL(self):
+    def initializeGL(self) -> None:
         # Working VBO that will contain glyph data
-        self.vbo = VBO(numpy.ndarray(0, dtype=self.text_render.buffer_dtype), GL.GL_DYNAMIC_DRAW, GL.GL_ARRAY_BUFFER)
+        self.vbo = VBO(numpy.ndarray([], dtype=self.text_render.buffer_dtype), GL.GL_DYNAMIC_DRAW, GL.GL_ARRAY_BUFFER)
         self.vao = VAO()
 
         with self.vao, self.vbo:
@@ -106,7 +110,8 @@ class TextBatcher(object):
         self.__vbo_needs_update = True
 
 
-    def render(self, key=None):
+    def render(self, key:Any=None) -> None:
+        return
         if self.__vbo_needs_update:
 
             self.vbo.data = self._va.buffer()[:]
@@ -115,8 +120,8 @@ class TextBatcher(object):
 
         self.text_render.updateTexture()
 
-        with self.text_render.sdf_shader, self.text_render.tex.on(GL.GL_TEXTURE_2D), self.vao:
-            GL.glUniform1i(self.text_render.sdf_shader.uniforms.tex1, 0)
+        with self.text_render.sdf_shader.program, self.text_render.tex.on(GL.GL_TEXTURE_2D), self.vao:
+            GL.glUniform1i(self.text_render.sdf_shader.program.uniforms.tex1, 0)
             GL.glUniform4ui(self.text_render.sdf_shader.uniforms.layer_info, 255, COL_TEXT, 0, 255)
 
             for tag in self.__render_tags[key]:
@@ -124,15 +129,15 @@ class TextBatcher(object):
                 GL.glUniformMatrix3fv(self.text_render.sdf_shader.uniforms.mat, 1, True, mat_calc.astype(numpy.float32))
                 GL.glDrawArrays(GL.GL_TRIANGLES, tag.textinfo.start, tag.textinfo.count)
 
-    def submit(self, ts, mat, color, k=None):
-        self.__render_tags[k].append(self.__tag_type(ts, mat, color))
+    def submit(self, ts: '_StringMetrics', mat: 'npt.NDArray[numpy.float64]', color:Any, k: Any=None) -> None:
+        self.__render_tags[k].append(self._render_tag(ts, mat, color))
 
-    def submit_text_box(self, premat, text, box, color, k=None):
+    def submit_text_box(self, premat: 'npt.NDArray[numpy.float64]', text: str, box: Rect, color: Any, k: Any=None) -> None:
         ts = self.get_string(text)
         mat = premat.dot(ts.get_render_to_mat(box))
         self.submit(ts, mat, color, k)
 
-    def get_string(self, text):
+    def get_string(self, text: str) -> '_StringMetrics':
         if text in self.__cached:
             return self.__cached[text]
 
@@ -140,51 +145,45 @@ class TextBatcher(object):
 
         ti.start = self._va.tell()
 
-        for (x, y), (tx, ty) in ti.arr:
-            self._va.add_tex(x, y, tx, ty)
+        self._va.extend(ti.arr)
 
-        ti.count = len(ti.arr)
+        ti.count = ti.arr.count()
         self.__vbo_needs_update = True
         return ti
 
 
 
-class _StringMetrics(object):
-    def __init__(self, arr, metrics):
+class _StringMetrics:
+    start: int
+    count: int
+
+    def __init__(self, arr: 'VA_tex', metrics: Tuple[float, float, float, float]) -> None:
         self.__rect = Rect()
         (self.__rect.left, self.__rect.right, self.__rect.bottom, self.__rect.top) = metrics
         self.arr = arr
 
-    def get_metrics(self):
-        """
-        :return: (left, right, bottom, top)
-        """
+    def get_metrics(self) -> Rect:
         return self.__rect
 
-    def get_actual_scale(self, rect):
+    def get_actual_scale(self, rect: Rect) -> float:
         hscale = rect.width / self.__rect.width
         vscale = rect.height / self.__rect.height
-
         return min(hscale, vscale)
 
-    def get_render_to_wh(self, rect):
-        """
-
-        """
+    def get_render_to_wh(self, rect: Rect) -> Tuple[float, float]:
         actual_scale = self.get_actual_scale(rect)
         return actual_scale * self.__rect.width, actual_scale * self.__rect.height
 
-    def get_render_to_mat(self, rect):
+    def get_render_to_mat(self, rect: Rect) -> 'npt.NDArray[numpy.float64]':
         actual_scale = self.get_actual_scale(rect)
 
-        cx = self.__rect.center
+        cx:Vec2 = self.__rect.center
         cx *= actual_scale
 
-        return translate(rect.center.x - cx.x, rect.center.y - cx.y).dot(scale(actual_scale))
+        return translate(rect.center.x - cx.x, rect.center.y - cx.y).dot(scale(actual_scale)) # type:ignore
 
-#_tex_vertex = namedtuple("tex_vertex", ["x", "y", "tx", "ty"])
 
-def de_bruijn(n):
+def de_bruijn(n: int) -> str:
     import operator
     """
     De Bruijn sequence for numeric alphabet of length n
@@ -195,7 +194,7 @@ def de_bruijn(n):
 
     a = [0] * k * n
     sequence = []
-    def db(t, p):
+    def db(t: int, p: int) -> None:
         if t > n:
             if n % p == 0:
                 for j in range(1, p + 1):
@@ -210,16 +209,16 @@ def de_bruijn(n):
     return "".join(map(str, sequence))
 
 
-class TextRender(object):
-    def __init__(self, gls, sdf_atlas):
+class TextRender:
+    def __init__(self, gls: Any, sdf_atlas: SDFTextAtlas) -> None:
         self.gls = gls
 
         self.sdf_atlas = sdf_atlas
 
         self.last_glyph_count = 0
-        self.__cached_metrics = {}
+        self.__cached_metrics : Dict[str, _StringMetrics]= {}
 
-    def initializeGL(self):
+    def initializeGL(self) -> None:
         self.sdf_shader = self.gls.shader_cache.get("image_vert", "tex_frag")
 
         self.buffer_dtype = numpy.dtype([
@@ -227,8 +226,8 @@ class TextRender(object):
             ("texpos", numpy.float32, 2)
         ])
 
-        self.b1 = vbobind(self.sdf_shader, self.buffer_dtype, "vertex")
-        self.b2 = vbobind(self.sdf_shader, self.buffer_dtype, "texpos")
+        self.b1 = VBOBind(self.sdf_shader.program, self.buffer_dtype, "vertex")
+        self.b2 = VBOBind(self.sdf_shader.program, self.buffer_dtype, "texpos")
 
 
         self.tex = Texture()
@@ -240,7 +239,7 @@ class TextRender(object):
         # self.int_seq += self.int_seq[:3]
 
 
-    def getStringMetrics(self, text):
+    def getStringMetrics(self, text: str) -> _StringMetrics:
         """
         create an array of coord data for rendering
         :return:
@@ -256,7 +255,7 @@ class TextRender(object):
 
         pen_x = 0
 
-        left, right, top, bottom = 0, 0, 0, 0
+        left, right, top, bottom = 0.0, 0.0, 0.0, 0.0
 
         for ch in text:
             # Fetch the glyph from the atlas
@@ -302,9 +301,7 @@ class TextRender(object):
         return cm
 
 
-
-
-    def updateTexture(self):
+    def updateTexture(self) -> None:
         # Don't update the texture if its up-to-date
         if len(self.sdf_atlas.atlas) == self.last_glyph_count:
             return

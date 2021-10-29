@@ -1,5 +1,5 @@
 from pcbre import units
-from pcbre.matrix import Point2, Vec2, projectPoint, rotate, translate
+from pcbre.matrix import Point2, Vec2, project_point, rotate, translate
 from pcbre.model.const import SIDE
 from pcbre.model.dipcomponent import DIPComponent
 from pcbre.ui.tools.multipoint import MultipointEditFlow, EditablePoint, OffsetDefaultPoint
@@ -67,7 +67,7 @@ class DIPEditFlow(MultipointEditFlow):
 
         v_aligned = Vec2(0, dy)
 
-        v_delta = projectPoint(rmat, v_aligned)
+        v_delta = project_point(rmat, v_aligned)
 
         # the pin on the end of the same row as P1
         self.p_bottom_corner = OffsetDefaultPoint(self.p1_point, v_delta)
@@ -113,7 +113,7 @@ class DIPEditFlow(MultipointEditFlow):
         center_to_corner = Vec2(sign * self._model.pin_width/2,
                                 self._model.pin_space * (self._model.pin_count / 2 - 1) / 2)
 
-        center_to_corner_w = projectPoint(rot, center_to_corner)
+        center_to_corner_w = project_point(rot, center_to_corner)
 
         self._cmodel.center = self.p1_point.get() - center_to_corner_w
 

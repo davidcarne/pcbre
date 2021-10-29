@@ -116,9 +116,9 @@ class test_rectalign_initial_save(unittest.TestCase):
         ini_align.dim_values[1] = random.randint(1, 512)
 
         for i in range(0, 4):
-            ini_align.set_handle(i, random_point())
+            ini_align.move_handle(i, random_point())
         for i in range(12, 16):
-            ini_align.set_handle(i, random_point())
+            ini_align.move_handle(i, random_point())
 
         ini_align.flip_x = random.random() > 0.5
         ini_align.flip_y = random.random() > 0.5

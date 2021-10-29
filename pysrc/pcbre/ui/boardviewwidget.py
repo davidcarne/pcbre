@@ -1,101 +1,91 @@
-from collections import defaultdict
 import math
 import time
-from pcbre.ui.tool_action import MoveEvent, ActionEvent, EventID, Modifier
-from qtpy import QtOpenGL
-import qtpy.QtCore as QtCore
-import qtpy.QtGui as QtGui
-import OpenGL.GL as GL
-import numpy
-from OpenGL.arrays.vbo import VBO
-from pcbre import units
-from pcbre.accel.vert_array import VA_thickline, VA_xy, VA_tex
-from pcbre.matrix import scale, translate, Point2, projectPoint
-from pcbre.model.const import SIDE
-from pcbre.model.dipcomponent import DIPComponent
-from pcbre.model.pad import Pad
-from pcbre.model.passivecomponent import Passive2Component, PassiveSymType, Passive2BodyType
-from pcbre.model.smd4component import SMD4Component
-from pcbre.model.stackup import Layer, ViaPair
+from typing import List, Set, Any, Optional, TYPE_CHECKING, Sequence, cast, Callable
 
-from pcbre.ui.gl import vbobind, VAO, Texture
+import OpenGL.GL as GL  # type: ignore
+import numpy
+from OpenGL.arrays.vbo import VBO  # type: ignore
+from qtpy import QtOpenGL, QtCore, QtWidgets, QtGui
+
+import pcbre.matrix as M
+from pcbre.matrix import scale, translate, Point2, project_point
+from pcbre.model.artwork_geom import Trace, Geom
+from pcbre.model.const import SIDE
+from pcbre.model.stackup import Layer, ViaPair
 from pcbre.ui.gl.glshared import GLShared
-from pcbre.ui.gl.shadercache import ShaderCache
-from pcbre.ui.gl.textrender import TextBatcher, TextBatch
-from pcbre.ui.tools.airwiretool import AIRWIRE_COLOR
+from pcbre.ui.tool_action import MoveEvent, ToolActionEvent, EventID, Modifier
 from pcbre.util import Timer
-from pcbre.view.cachedpolygonrenderer import PolygonVBOPair, CachedPolygonRenderer
+from pcbre.view.cachedpolygonrenderer import CachedPolygonRenderer
 from pcbre.view.cad_cache import CADCache, StackupRenderCommands, SelectionHighlightCache
-from pcbre.view.componenttext import ComponentTextBatcher
-from pcbre.view.componentview import cmp_border_va
 from pcbre.view.debugrender import DebugRender
 from pcbre.view.hairlinerenderer import HairlineRenderer
 from pcbre.view.imageview import ImageView
-from pcbre.view.layer_render_target import RenderLayer, CompositeManager
-from pcbre.view.rendersettings import RENDER_OUTLINES, RENDER_STANDARD, RENDER_SELECTED, RENDER_HINT_NORMAL, \
-    RENDER_HINT_ONCE
+from pcbre.view.layer_render_target import CompositeManager
 from pcbre.view.target_const import COL_LAYER_MAIN, COL_CMP_LINE, COL_SEL
 from pcbre.view.traceview import TraceRender
 from pcbre.view.viaview import THRenderer
 from pcbre.view.viewport import ViewPort
-from pcbre.model.artwork import Via
-from pcbre.model.artwork_geom import Trace, Via, Polygon, Airwire
-import pcbre.matrix as M
-#from pcbre.view.componentview import DIPRender, SMDRender, PassiveRender
-from pcbre.ui.gl import VAO, vbobind, glimports as GLI
 
+# from pcbre.view.componentview import DIPRender, SMDRender, PassiveRender
+
+if TYPE_CHECKING:
+    from pcbre.ui.tools.basetool import BaseToolController
+    from pcbre.model.project import Project
+    from pcbre.model.imagelayer import ImageLayer
+    from mypy_extensions import VarArg
 
 MODE_CAD = 0
 MODE_TRACE = 1
 MOVE_MOUSE_BUTTON = QtCore.Qt.RightButton
 
+EVT_START_FIELD_DRAG = 0
+EVT_STOP_FIELD_DRAG = 1
 
 
-EVT_START_DRAG = 0
-
-def fixed_center_dot(viewState, m, view_center=None):
-
+def fixed_center_dot(view_state: 'ViewState', m: 'numpy.ArrayLike', view_center: Point2 = None) -> None:
     if view_center is None:
-        view_center = Point2(viewState.width/2, viewState.height/2)
+        view_center = Point2(view_state.width / 2, view_state.height / 2)
 
-    world_center = viewState.tfV2W(view_center)
+    world_center = view_state.tfV2W(view_center)
 
-    proj_orig_center = projectPoint(viewState.transform, world_center)
+    proj_orig_center = project_point(view_state.transform, world_center)
 
-    viewState.transform = viewState.transform.dot(m)
+    view_state.transform = view_state.transform.dot(m)
 
-    proj_new_center = projectPoint(viewState.transform, world_center)
+    proj_new_center = project_point(view_state.transform, world_center)
 
     dx = proj_new_center[0] - proj_orig_center[0]
     dy = proj_new_center[1] - proj_orig_center[1]
 
-    viewState.transform = M.translate(-dx, -dy).dot(viewState.transform)
+    view_state.transform = M.translate(-dx, -dy).dot(view_state.transform)
 
 
-def QPoint_to_pair(p):
+def QPoint_to_point(p: QtCore.QPoint) -> Point2:
     return Point2(p.x(), p.y())
 
-def getSelectColor(c, selected):
+
+def getSelectColor(c: Sequence[float], selected: bool):
     if not selected:
         return c
 
-    r,g,b = c
+    r, g, b = c
 
     r *= 1.5
     g *= 1.5
     b *= 1.5
 
-    return (r,g,b)
+    return (r, g, b)
+
 
 class ViewStateO(QtCore.QObject):
     changed = QtCore.Signal()
     currentLayerChanged = QtCore.Signal()
 
+
 # Full view state for the multilayer view
 class ViewState(ViewPort):
-
-    def __init__(self, x, y):
-        super(ViewState,self).__init__(x, y)
+    def __init__(self, x: int, y: int) -> None:
+        super(ViewState, self).__init__(x, y)
 
         self.obj = ViewStateO()
         self.changed = self.obj.changed
@@ -106,22 +96,22 @@ class ViewState(ViewPort):
         self.__show_images = True
         self.layer_permute = 0
 
-    def permute_layer_order(self):
+    def permute_layer_order(self) -> None:
         self.layer_permute += 1
         self.changed.emit()
 
-    def rotate(self, angle):
+    def rotate(self, angle: float) -> None:
         self.transform = self.transform.dot(M.rotate(math.radians(angle)))
 
-    def flip(self, axis):
+    def flip(self, axis: int) -> None:
         fixed_center_dot(self, M.flip(axis))
 
     @property
-    def current_layer(self):
+    def current_layer(self) -> Layer:
         return self.__current_layer
 
     @current_layer.setter
-    def current_layer(self, value):
+    def current_layer(self, value: Layer) -> None:
         assert value is None or isinstance(value, Layer)
         old = self.__current_layer
         self.__current_layer = value
@@ -130,13 +120,13 @@ class ViewState(ViewPort):
             self.currentLayerChanged.emit()
 
     @property
-    def transform(self):
+    def transform(self) -> 'numpy.ArrayLike':
         mat = self._transform
         mat.flags.writeable = False
         return mat
 
     @transform.setter
-    def transform(self, value):
+    def transform(self, value: 'numpy.ArrayLike') -> None:
         old = self._transform
         self._transform = value
 
@@ -144,48 +134,39 @@ class ViewState(ViewPort):
             self.changed.emit()
 
     @property
-    def show_images(self):
+    def show_images(self) -> bool:
         return self.__show_images
 
     @show_images.setter
-    def show_images(self, value):
+    def show_images(self, value: bool) -> None:
         self.__show_images = value
         self.changed.emit()
 
 
 class MoveDragHandler:
-    def __init__(self, vs, start):
+    def __init__(self, vs: 'ViewState', start: Point2):
         self.vs = vs
         self.last = start
 
-    def move(self, cur):
+    def move(self, cur: Point2) -> None:
         lx, ly = self.vs.tfV2P(self.last)
         nx, ny = self.vs.tfV2P(cur)
 
-        delta = nx-lx, ny-ly
+        delta = nx - lx, ny - ly
 
         self.vs.transform = M.translate(*delta).dot(self.vs.transform)
 
         self.last = cur
 
-    def done(self):
+    def done(self) -> None:
         pass
 
-
-class WheelEmulation:
-    def __init__(self):
-        pass
-
-    def move(self, evt):
-        self.cb_move(evt)
-
-    def done(self):
-        pass
 
 class BaseViewWidget(QtOpenGL.QGLWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
+        super(BaseViewWidget, self).__init__(parent)
         if hasattr(QtOpenGL.QGLFormat, 'setVersion'):
-            f = QtOpenGL.QGLFormat();
+            f = QtOpenGL.QGLFormat()
             f.setVersion(3, 2)
             f.setProfile(QtOpenGL.QGLFormat.CoreProfile)
             c = QtOpenGL.QGLContext(f)
@@ -193,25 +174,24 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
         else:
             QtOpenGL.QGLWidget.__init__(self, parent)
 
-
         self.__gl_initialized = False
 
         self.viewState = ViewState(self.width(), self.height())
 
         self.viewState.changed.connect(self.update)
 
-
-        self.lastPoint = QtCore.QPoint(0,0)
+        self.lastPoint = QtCore.QPoint(0, 0)
         # Nav Handling
         self.active_drag = None
 
         self.mouse_wheel_emu = None
 
-        self.action_log_cb = None
+        self.action_log_cb: 'Optional[Callable[[VarArg(Any)], None]]' = None
         self.interactionDelegate = None
         self.setMouseTracking(True)
 
-        self.selectionList = set()
+        # TODO refine type
+        self.selectionList: Set[Any] = set()
 
         self.open_time = time.time()
 
@@ -219,22 +199,26 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
         self.gls = GLShared()
 
         #
-        self.local_actions_map = {(EventID.Mouse_B2_DragStart, Modifier(0)): EVT_START_DRAG}
+        self.local_actions_map = {
+            (EventID.Mouse_B2_DragStart, Modifier(0)): EVT_START_FIELD_DRAG,
+            (EventID.Mouse_B2, Modifier(0)): EVT_STOP_FIELD_DRAG,
+        }
 
         self.id_actions_map = {}
+        self.notify_changed_actions = []
 
-
-    def internal_event(self, action_event):
-        if action_event.code == EVT_START_DRAG:
+    def internal_event(self, action_event: ToolActionEvent) -> None:
+        if action_event.code == EVT_START_FIELD_DRAG:
             self.active_drag = MoveDragHandler(self.viewState, action_event.cursor_pos)
+        elif action_event.code == EVT_STOP_FIELD_DRAG:
+            self.active_drag = None
 
-    def _log_action(self, *args):
+    def _log_action(self, *args: Any) -> None:
         if self.action_log_cb is not None:
             self.action_log_cb(*args)
 
-    def dispatchActionEvent(self, point, event_id, modifiers, amount=1):
+    def dispatchActionEvent(self, point: QtCore.QPoint, event_id: int, modifiers: Modifier, amount: int = 1) -> bool:
         key = (event_id, modifiers)
-
 
         if key in self.local_actions_map:
             code = self.local_actions_map[key]
@@ -248,30 +232,28 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
 
             self._log_action(key, "delegate", self.id_actions_map[key].description)
             code = self.id_actions_map[key].event_code
-            cb = self.interactionDelegate.event
+            cb = self.interactionDelegate.tool_event
         else:
             self._log_action(key, "unhandled")
             return False
 
-        pt = Point2(QPoint_to_pair(point))
-
+        pt = QPoint_to_point(point)
         w_pt = self.viewState.tfV2W(pt)
 
-        event = ActionEvent(code, pt, w_pt, amount)
-
+        event = ToolActionEvent(code, pt, w_pt, amount)
 
         cb(event)
         return True
 
-
-    def eventFilter(self, target, qevent):
+    def eventFilter(self, target: Any, qevent: QtCore.QEvent) -> bool:
         if self.interactionDelegate is None:
             return False
 
         if qevent.type() == QtCore.QEvent.KeyPress:
-            event_id = EventID.from_key_event(qevent)
+            q_key_event = cast(QtGui.QKeyEvent, qevent)
+            event_id = EventID.from_key_event(q_key_event)
             modifiers = Modifier.from_qevent(qevent)
-            
+
             ate_event = self.dispatchActionEvent(self.lastPoint, event_id, modifiers)
             if ate_event:
                 self.update()
@@ -280,8 +262,7 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
 
         return False
 
-
-    def setSelectionList(self, l):
+    def setSelectionList(self, l: Optional[Sequence[Geom]]) -> None:
         old = self.selectionList
         if l is None:
             self.selectionList = set()
@@ -291,12 +272,7 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
         if old != self.selectionList:
             self.update()
 
-    def setInteractionDelegate(self, ed):
-        """
-
-        :param ed:
-        :type ed: pcbre.ui.tools.basetool.BaseToolController
-        """
+    def setInteractionDelegate(self, ed: 'BaseToolController') -> None:
         self.selectionList = set()
 
         if self.interactionDelegate == ed:
@@ -307,10 +283,13 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
 
         # Build a map of internal event IDs to actions on the delegate
         self.id_actions_map = {}
-        for action in ed.actions:
+        for action in ed.tool_actions:
             # TODO: customized shortcuts
             for shortcut in action.default_shortcuts:
                 self.id_actions_map[(shortcut.evtid, shortcut.modifiers)] = action
+
+        for notify_changed in self.notify_changed_actions:
+            notify_changed()
 
         self.interactionDelegate = ed
         ed.initialize()
@@ -324,18 +303,8 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
 
         self.update()
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
         self.lastPoint = event.pos()
-
-        #if event.button() == MOVE_MOUSE_BUTTON:
-        #    self.active_drag = MoveDragHandler(self.viewState,
-        #        Point2(QPoint_to_pair(self.lastPoint)))
-
-        #elif event.button() == QtCore.Qt.MiddleButton:
-        #    self.mouse_wheel_emu = QPoint_to_pair(event.pos())
-
-        #elif not self.active_drag and self.mouse_wheel_emu is None:
-        #    if self.interactionDelegate is not None:
 
         event_id = EventID.from_mouse_event(event)
         modifiers = Modifier.from_qevent(event)
@@ -344,51 +313,33 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
 
         self.update()
 
-    def mouseMoveEvent(self, qevent):
-
-        #delta_px = qevent.pos() - self.lastPoint
-
-        #lx, ly = self.viewState.tfV2P(Point2(self.lastPoint))
-        #nx, ny = self.viewState.tfV2P(Point2(qevent.pos()))
-
-        #delta = nx-lx, ny-ly
-
-        #self.lastPoint = qevent.pos()
-
-
+    def mouseMoveEvent(self, qevent: QtGui.QMouseEvent) -> None:
+        self.lastPoint = qevent.pos()
 
         if self.active_drag:
-            self.active_drag.move(Point2(QPoint_to_pair(qevent.pos())))
-
-        #elif qevent.buttons() & QtCore.Qt.MiddleButton and self.mouse_wheel_emu is not None:
-        #    self.zoom(-delta_px.y()/6, self.mouse_wheel_emu)
+            self.active_drag.move(QPoint_to_point(qevent.pos()))
 
         elif self.active_drag is None and not self.mouse_wheel_emu:
             if self.interactionDelegate is not None:
 
-                pos = Point2(QPoint_to_pair(qevent.pos()))
+                pos = QPoint_to_point(qevent.pos())
+
+                # TODO - revisit behaviour?
+                potential_actions = []
+                for (event_id, modifiers), act in self.id_actions_map.items():
+                    if event_id.mouse_triggered():
+                        potential_actions.append(act)
 
                 event = MoveEvent(
                     pos,
-                    self.viewState.tfV2W(pos))
+                    self.viewState.tfV2W(pos),
+                    potential_actions)
 
                 self.interactionDelegate.mouseMoveEvent(event)
-        
+
         self.update()
 
-    def mouseReleaseEvent(self, event):
-        #if event.button() == MOVE_MOUSE_BUTTON and self.active_drag:
-        #    self.active_drag.done()
-        #    self.active_drag = None
-
-        # Middle mouse button events are mapped to mouse wheel
-        #elif event.button() == QtCore.Qt.MiddleButton:
-        #    self.mouse_wheel_emu = None
-        #    return
-
-        #elif self.mouse_wheel_emu is None and self.active_drag is not None:
-        #    if self.interactionDelegate is not None:
-        #        pass
+    def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
         event_id = EventID.from_mouse_event(event)
         modifiers = Modifier.from_qevent(event)
 
@@ -396,35 +347,30 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
 
         self.update()
 
-
-    def zoom(self, step, around_point):
+    def zoom(self, step: int, around_point: Point2) -> None:
         sf = 1.1 ** step
         fixed_center_dot(self.viewState, M.scale(sf), around_point)
 
-    def wheelEvent(self, event):
-        """
-        :param event:
-        :type event: QtGui.MouseWheelEvent
-        :return:
-        """
+    def wheelEvent(self, event: QtGui.QWheelEvent) -> None:
         if not event.modifiers():
-            step = event.angleDelta().y()/120.0
-            cpt = QPoint_to_pair(event.pos())
-            self.zoom(step, cpt)
+            step = event.angleDelta().y() / 120.0
+            cpt = QPoint_to_point(event.pos())
+            self.zoom(int(round(step)), cpt)
         else:
             if self.interactionDelegate:
-                #self.interactionDelegate.mouseWheelEvent(event)
+                self.interactionDelegate.tool_event()
+                # self.interactionDelegate.mouseWheelEvent(event)
                 # FIXME
                 pass
 
         self.update()
 
-    def initializeGL(self):
+    def initializeGL(self) -> None:
         assert not self.__gl_initialized
 
         self.__gl_initialized = True
 
-        GL.glClearColor(0,0,0,1)
+        GL.glClearColor(0, 0, 0, 1)
 
         self.gls.initializeGL()
         GL.glGetError()
@@ -440,10 +386,10 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
             self.interactionDelegate.overlay.initializeGL(self.gls)
             pass
 
-    def reinit(self):
+    def reinit(self) -> None:
         pass
 
-    def paintGL(self):
+    def paintGL(self) -> None:
         if not self.__gl_initialized:
             self.initializeGL()
 
@@ -451,38 +397,34 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
 
         self.render()
 
-
-
-    def render_tool(self):
+    def render_tool(self) -> None:
         if self.interactionDelegate and self.interactionDelegate.overlay:
             self.interactionDelegate.overlay.render(self.viewState, self.compositor)
 
-
-
-    def resizeGL(self, width, height):
+    def resizeGL(self, width: int, height: int) -> None:
         if width == 0 or height == 0:
             return
 
         size = max(width, height)
 
-        GL.glViewport((width - size)// 2, (height - size) // 2, size, size)
+        GL.glViewport((width - size) // 2, (height - size) // 2, size, size)
         self.viewState.resize(width, height)
 
         # Allocate a new image buffer
-        #self.image = NPBackedImage(self.width(), self.height())
-        #super(BoardViewWidget, self).resizeEvent(event)
+        # self.image = NPBackedImage(self.width(), self.height())
+        # super(BoardViewWidget, self).resizeEvent(event)
 
-    def isModified(self):
+    def isModified(self) -> bool:
         return self.modified
 
 
 class BoardViewWidget(BaseViewWidget):
-    def __init__(self, project):
+    def __init__(self, project: 'Project') -> None:
         BaseViewWidget.__init__(self)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.project = project
 
-        self.image_view_cache = { }
+        self.image_view_cache = {}
 
         self.compositor = CompositeManager()
 
@@ -499,55 +441,41 @@ class BoardViewWidget(BaseViewWidget):
         # TODO, currently broken
         self.poly_renderer = CachedPolygonRenderer(self)
 
-
-
-
-
-
-
-
         # Initial view is a normalized 1-1-1 area.
         # Shift to be 10cm max
-        self.viewState.transform = translate(-0.9, -0.9).dot(scale(1./100000))
-
+        self.viewState.transform = translate(-0.9, -0.9).dot(scale(1. / 100000))
 
         self.render_mode = MODE_CAD
 
-
-
-
-
-    def resizeGL(self, width, height):
+    def resizeGL(self, width: int, height: int) -> None:
         super(BoardViewWidget, self).resizeGL(width, height)
 
         self.compositor.resize(width, height)
 
-    def text_color(self):
-        return [1,1,1]
+    def text_color(self) -> List[float]:
+        return [1, 1, 1]
 
-    def current_layer_hack(self):
+    def current_layer_hack(self) -> 'Layer':
         return self.viewState.current_layer
 
-    def color_for_pad(self, pad):
+    def color_for_pad(self, pad) -> List[float]:
         if pad.th_diam != 0:
             return [0.5, 0.5, 0.5]
 
         return self.color_for_layer(pad.layer)
 
-    def color_for_trace(self, trace):
+    def color_for_trace(self, trace: Trace) -> List[float]:
         return self.color_for_layer(trace.layer)
 
-    def color_for_layer(self, layer):
+    def color_for_layer(self, layer: Layer) -> List[float]:
         return list(layer.color)
 
-    def sel_colormod(self, t, oldcolor):
+    def sel_colormod(self, t: bool, oldcolor: List[float]) -> List[float]:
         if t:
-            return [1,1,1,1]
+            return [1, 1, 1, 1]
         return oldcolor
 
-
-
-    def image_view_cache_load(self, il):
+    def image_view_cache_load(self, il: 'ImageLayer') -> ImageView:
         key = id(il)
         if key not in self.image_view_cache:
             iv = ImageView(il)
@@ -556,7 +484,7 @@ class BoardViewWidget(BaseViewWidget):
 
         return self.image_view_cache[key]
 
-    def reinit(self):
+    def reinit(self) -> None:
         self.trace_renderer.initializeGL(self.gls)
         self.via_renderer.initializeGL(self.gls)
         self.poly_renderer.initializeGL()
@@ -568,11 +496,11 @@ class BoardViewWidget(BaseViewWidget):
         for i in list(self.image_view_cache.values()):
             i.initGL()
 
-    def current_side(self):
+    def current_side(self) -> None:
         side = self.project.stackup.side_for_layer(self.viewState.current_layer)
         return side
 
-    def vp_is_visible(self, via_pair):
+    def vp_is_visible(self, via_pair: ViaPair) -> bool:
         if self.viewState.current_layer is None:
             return False
 
@@ -584,7 +512,7 @@ class BoardViewWidget(BaseViewWidget):
             f, s = via_pair.layers
             return f.order <= layer.order <= s.order
 
-    def getVisible(self):
+    def getVisible(self) -> Sequence[Geom]:
         objects = []
 
         # Add visible vias
@@ -612,37 +540,35 @@ class BoardViewWidget(BaseViewWidget):
         elif self.viewState.current_layer is None:
             pass
         else:
-                cur_side = self.current_side()
-                for cmp in self.project.artwork.components:
-                    if cmp.side == cur_side:
-                        objects.append(cmp)
+            cur_side = self.current_side()
+            for cmp in self.project.artwork.components:
+                if cmp.side == cur_side:
+                    objects.append(cmp)
 
-                    for pad in cmp.get_pads():
-                        if pad.is_through():
-                            objects.append(pad)
-                        elif pad.side == cur_side:
-                            objects.append(pad)
+                for pad in cmp.get_pads():
+                    if pad.is_through():
+                        objects.append(pad)
+                    elif pad.side == cur_side:
+                        objects.append(pad)
 
         # TODO: Airwires are always visible
         objects += self.project.artwork.airwires
 
         return objects
 
-
-    def _layer_visible(self, l):
+    def _layer_visible(self, l: Layer) -> bool:
         if self.render_mode == MODE_CAD:
             return True
         else:
             return l is self.viewState.current_layer
 
-    def layer_visible(self, l):
+    def layer_visible(self, l: Layer) -> bool:
         return self.__layer_visible_lut[l.number]
 
-    def layer_visible_m(self, l):
+    def layer_visible_m(self, l: Layer) -> bool:
         return self.viewState.current_layer in l
 
-
-    def query_point(self, pt):
+    def query_point(self, pt: Point2) -> Sequence[Geom]:
         all_aw = self.project.artwork.query_point(pt)
 
         vis_aw = set(self.getVisible())
@@ -651,9 +577,7 @@ class BoardViewWidget(BaseViewWidget):
         if all_aw in vis_aw:
             return all_aw
 
-
-
-    def __render_top_half(self):
+    def __render_top_half(self) -> None:
         """
         :return:
         """
@@ -675,43 +599,55 @@ class BoardViewWidget(BaseViewWidget):
         self.__sel_cache.update_if_necessary(self.selectionList)
 
         for k, v in self.render_commands.layers.items():
+            GL.glPushDebugGroup(GL.GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Layer %r" % k)
             with self.compositor.get(k):
                 self.trace_renderer.render_va(v.va_traces, self.viewState.glMatrix, COL_LAYER_MAIN)
+            GL.glPopDebugGroup()
+
                 # TODO: Render Text
 
         # Draw all the viapairs
         for k, v in self.render_commands.vias.items():
+            GL.glPushDebugGroup(GL.GL_DEBUG_SOURCE_APPLICATION, 0, -1, "ViaPair %r" % k)
             with self.compositor.get(k):
                 self.via_renderer.render_filled(self.viewState.glMatrix, v.va_vias)
+            GL.glPopDebugGroup()
 
         # Draw the multilayer components
+        GL.glPushDebugGroup(GL.GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Multi Cmp")
         with self.compositor.get("MULTI"):
             self.via_renderer.render_filled(self.viewState.glMatrix, self.render_commands.multi.va_vias)
             # TODO: Render text
+        GL.glPopDebugGroup()
 
         # Draw the front and back sides
         for k, v in self.render_commands.sides.items():
+            GL.glPushDebugGroup(GL.GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Cmp %r" % k)
             with self.compositor.get(("LINEART", k)):
                 self.hairline_renderer.render_va(self.viewState.glMatrix, v.va_outlines, COL_CMP_LINE)
                 # TODO: Render text
-
+            GL.glPopDebugGroup()
 
         # Just create (don't actually bind) the overlay layer
+        GL.glPushDebugGroup(GL.GL_DEBUG_SOURCE_APPLICATION, 1, -1, "Overlay")
         with self.compositor.get("OVERLAY"):
+            self.hairline_renderer.render_va(self.viewState.glMatrix, self.__cad_cache.airwire_va, COL_SEL)
             self.hairline_renderer.render_va(self.viewState.glMatrix, self.__sel_cache.thinline_va, COL_SEL)
             self.trace_renderer.render_va(self.__sel_cache.thickline_va, self.viewState.glMatrix, COL_SEL)
             self.via_renderer.render_filled(self.viewState.glMatrix, self.__sel_cache.via_va, COL_SEL)
+        GL.glPopDebugGroup()
 
+        GL.glPushDebugGroup(GL.GL_DEBUG_SOURCE_APPLICATION, 1, -1, "Tool")
         self.render_tool()
+        GL.glPopDebugGroup()
 
-    def render_mode_cad(self):
+    def render_mode_cad(self) -> None:
 
         # Composite all the layers
         GL.glDisable(GL.GL_DEPTH_TEST)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
 
-        draw_things = [ ]
-
+        draw_things = []
 
         # Prepare to draw all the layers
         for i in self.project.stackup.layers:
@@ -725,7 +661,7 @@ class BoardViewWidget(BaseViewWidget):
             if not self.vp_is_visible(i):
                 continue
 
-            draw_things.append((i, (255,0, 255)))
+            draw_things.append((i, (255, 0, 255)))
 
         # Now, sort them based on an order in which layers are drawn from bottom-to-top
         # (unless the board is flipped, in which case, top-to-bottom), followed by the currently selected layer
@@ -739,6 +675,8 @@ class BoardViewWidget(BaseViewWidget):
             elif isinstance(lt, ViaPair):
                 a_l = lt.layers[0]
                 b = 1
+            else:
+                raise ValueError("Unknown layer key type for %r" % type(a))
 
             # We always draw the current layer last
             if a_l == self.viewState.current_layer:
@@ -746,25 +684,22 @@ class BoardViewWidget(BaseViewWidget):
             else:
                 a = -a_l.order
 
-            return (a,b)
-
+            return (a, b)
 
         draw_things.sort(key=layer_key)
-        draw_things.insert(0, (("LINEART", SIDE.Top), (255,255,255)))
-        draw_things.append(("MULTI", (255,255,255)))
-        draw_things.append((("LINEART", SIDE.Bottom), (255,255,255)))
+        draw_things.insert(0, (("LINEART", SIDE.Top), (255, 255, 255)))
+        draw_things.append(("MULTI", (255, 255, 255)))
+        draw_things.append((("LINEART", SIDE.Bottom), (255, 255, 255)))
 
         with self.compositor.composite_prebind() as pb:
             for key, color in draw_things:
                 pb.composite(key, color)
 
-            pb.composite("OVERLAY", (255,255,255))
+            pb.composite("OVERLAY", (255, 255, 255))
 
         return
 
-
-
-    def render_mode_trace(self):
+    def render_mode_trace(self) -> None:
 
         # Composite all the layers
         GL.glDisable(GL.GL_DEPTH_TEST)
@@ -797,16 +732,15 @@ class BoardViewWidget(BaseViewWidget):
 
             # Render the line-art
             side = self.project.stackup.side_for_layer(layer)
-            pb.composite(("LINEART", side), (255,255,255))
+            pb.composite(("LINEART", side), (255, 255, 255))
 
             # Multilayer through-holes
-            pb.composite("MULTI", (255,255,255))
+            pb.composite("MULTI", (255, 255, 255))
 
             # And the tool overlay
-            pb.composite("OVERLAY", (255,255,255))
+            pb.composite("OVERLAY", (255, 255, 255))
 
-
-    def render(self):
+    def render(self) -> None:
         with Timer() as t_render:
             # Update the layer-visible check
             self.__layer_visible_lut = [self._layer_visible(i) for i in self.project.stackup.layers]
@@ -821,11 +755,11 @@ class BoardViewWidget(BaseViewWidget):
             # Fill colors
             self.compositor.set_color_table(
                 [
-                    (255,255,255,255),  # Color 0 is always the Layer current color (ignored)
-                    (255,255,255,255),  # Color of Text
-                    (255,255,255,255),  # Color of Selection
+                    (255, 255, 255, 255),  # Color 0 is always the Layer current color (ignored)
+                    (255, 255, 255, 255),  # Color of Text
+                    (255, 255, 255, 255),  # Color of Selection
                     (128, 128, 128, 255),  # Color of Vias
-                    (128,128,0,255),  # Color of Airwires
+                    (128, 128, 0, 255),  # Color of Airwires
                     (190, 190, 0, 255),
                 ]
             )
@@ -841,4 +775,3 @@ class BoardViewWidget(BaseViewWidget):
                 self.render_mode_trace()
 
             self.debug_renderer.render()
-

@@ -1,56 +1,57 @@
-from qtpy import QtGui, QtCore, QtWidgets
+from abc import abstractmethod
+from qtpy import QtCore, QtWidgets
 from pcbre.ui.icon import Icon
-import pkg_resources
+import pcbre.model.project
+from typing import Union, List
+from pcbre.ui.tool_action import MoveEvent, ToolActionEvent, ToolActionDescription
+import pcbre.ui.boardviewwidget
+from typing import Callable
+from pcbre.ui.uimodel import TinySignal
+
 
 class BaseToolController(QtCore.QObject):
-    changed = QtCore.Signal()
 
-    def __init__(self):
+    def __init__(self) -> None:
         super(BaseToolController, self).__init__()
         self.overlay = None
+        changed = TinySignal()
 
-    def mouseReleaseEvent(self, evt):
+    def mouseMoveEvent(self, evt: MoveEvent) -> None:
         pass
 
-    def mousePressEvent(self, evt):
+    def initialize(self) -> None:
         pass
 
-    def mouseMoveEvent(self, evt):
+    def finalize(self) -> None:
         pass
 
-    """
-        called as part of the event filter, must return False unless handling
-    """
-    def keyPressEvent(self, evt):
-        return False
-
-    def keyReleaseEvent(self, evt):
-        return False
-
-    def mouseWheelEvent(self, evt):
+    def focusOutEvent(self, evt: None) -> None:
         pass
 
-    def initialize(self):
+    def showSettingsDialog(self) -> None:
         pass
 
-    def finalize(self):
+    @property
+    @abstractmethod
+    def tool_actions(self) -> List[ToolActionDescription]:
         pass
 
-    def focusOutEvent(self, evt):
+    @abstractmethod
+    def tool_event(self, event: ToolActionEvent) -> None:
         pass
 
-    def showSettingsDialog(self):
-        pass
 
 class BaseTool(object):
-    SHORTCUT=None
-    TOOLTIP=None
+    SHORTCUT: Union[str, None] = None
+    TOOLTIP: Union[str, None] = None
+    ICON_NAME: str = ""
+    NAME: str = ""
 
-    def __init__(self, project):
-        self.toolButton = None
+    def __init__(self, project: pcbre.model.project.Project):
+        self.toolButton: QtWidgets.QToolButton = None
         self.project = project
 
-    def setupToolButton(self, icon_name, name):
+    def setupToolButton(self, icon_name: str, name: str):
         ico = Icon(icon_name)
 
         self.toolButton = QtWidgets.QToolButton(None)
@@ -75,6 +76,7 @@ class BaseTool(object):
 
         return self.toolButton
 
-    def getToolController(self, view):
+    def getToolController(self, 
+                          view: 'pcbre.ui.boardviewwidget.BoardViewWidget', 
+                          submit: Callable):
         return BaseToolController()
-

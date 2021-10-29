@@ -1,34 +1,40 @@
 #!/usr/bin/python
 
+from typing import Dict, Optional
+
 from qtpy import QtCore, QtGui, QtWidgets
 
 import pcbre.model.project as P
+from pcbre.model.project import Project
+from pcbre.model.stackup import Layer
 from pcbre.ui.actions.add import AddImageDialogAction
-from pcbre.ui.actions.debug import ToggleDrawBBoxAction, ToggleDrawDebugAction, ToggleLogToolActions
+from pcbre.ui.actions.debug import ToggleDrawBBoxAction, ToggleDrawDebugAction, ToggleActionInformation
 from pcbre.ui.actions.misc import NudgeUpAction, NudgeLeftAction, NudgeDownAction, NudgeRightAction, \
     ShowToolSettingsAction
 from pcbre.ui.actions.pcb import RebuildConnectivityAction, LayerViewSetupDialogAction, StackupSetupDialogAction
+from pcbre.ui.actions.save import SaveAction, SaveAsDialogAction, ExitAction
 from pcbre.ui.actions.save import checkCloseSave
 from pcbre.ui.actions.view import LayerJumpAction, FlipXAction, FlipYAction, RotateLAction, CycleDrawOrderAction, \
     RotateRAction, SetModeTraceAction, SetModeCADAction, CycleModeAction
 from pcbre.ui.boardviewwidget import BoardViewWidget
+from pcbre.ui.panes.console import ConsoleWidget
 from pcbre.ui.panes.info import InfoWidget
 from pcbre.ui.panes.layerlist import LayerListWidget
-from pcbre.ui.panes.console import ConsoleWidget
 from pcbre.ui.panes.undostack import UndoDock
 from pcbre.ui.tools.all import TOOLS
+from pcbre.ui.tools.basetool import BaseTool, BaseToolController
 from pcbre.ui.widgets.glprobe import probe
-from pcbre.ui.actions.save import SaveAction, SaveAsDialogAction, ExitAction
 
 
 class DebugActions:
-    def __init__(self, window):
+    def __init__(self, window: BoardViewWidget) -> None:
         self.debug_draw = ToggleDrawDebugAction(window, window.viewArea)
         self.debug_draw_bbox = ToggleDrawBBoxAction(window, window.viewArea)
-        self.debug_log_action_history = ToggleLogToolActions(window, window.viewArea)
+        self.debug_log_action_history = ToggleActionInformation(window, window.viewArea)
+
 
 class MainWindowActions:
-    def __init__(self, window):
+    def __init__(self, window: BoardViewWidget) -> None:
         # File actions
         self.file_add_image = AddImageDialogAction(window)
         self.file_save = SaveAction(window)
@@ -50,7 +56,6 @@ class MainWindowActions:
         self.redo = window.undo_stack.createRedoAction(window)
         self.redo.setShortcut(QtGui.QKeySequence.Redo)
 
-
         # PCB Actions
         self.pcb_stackup_setup_dialog = StackupSetupDialogAction(window)
         self.pcb_layer_view_setup_dialog = LayerViewSetupDialogAction(window)
@@ -69,14 +74,16 @@ class MainWindowActions:
 
         window.addAction(CycleModeAction(window, window.viewArea))
 
+
 class MainWindow(QtWidgets.QMainWindow):
     layerChanged = QtCore.Signal((object,))
+
     # Emitted when something changes the currently selected layer
 
-    def __init__(self, p):
+    def __init__(self, p: Project) -> None:
         super(MainWindow, self).__init__()
 
-        self.project = p
+        self.project: Project = p
 
         self.viewArea = BoardViewWidget(self.project)
         self.installEventFilter(self.viewArea)
@@ -85,7 +92,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.undo_stack.indexChanged.connect(self.viewArea.update)
 
-        self.actions = MainWindowActions(self)
+        self.pcbre_actions = MainWindowActions(self)
         self.debug_actions = DebugActions(self)
 
         self.setCentralWidget(self.viewArea)
@@ -96,12 +103,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.setWindowTitle("PCB Reversing Suite")
 
-
-        self.current_tool = None
-        self.current_controller = None
+        self.current_tool: Optional[BaseTool] = None
+        self.current_controller: Optional[BaseToolController] = None
 
     @QtCore.Slot(object)
-    def changeViewLayer(self, layer):
+    def changeViewLayer(self, layer: Layer) -> None:
         """Change the selected view layer"""
         assert layer in self.project.stackup.layers
 
@@ -109,17 +115,17 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.layerChanged.emit(layer)
 
-    def submitCommand(self, cmd):
+    def submitCommand(self, cmd: QtWidgets.QUndoCommand) -> None:
         self.undo_stack.push(cmd)
 
-    def toolBarChanged(self, bid):
+    def toolBarChanged(self, bid: int) -> None:
         self.current_tool = self.tool_map[bid]
         controller = self.current_tool.getToolController(self.viewArea, self.submitCommand)
         self.current_controller = controller
         self.viewArea.setInteractionDelegate(controller)
         self.viewArea.setFocus()
 
-    def createToolbars(self):
+    def createToolbars(self) -> None:
         self.createViewToolbar()
         self.bg = QtWidgets.QButtonGroup()
         self.bg.setExclusive(True)
@@ -127,7 +133,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         toolbar = self.addToolBar("Tool Selection")
 
-        self.tool_map = {}
+        self.tool_map: Dict[int, BaseTool] = {}
         self.current_tool = None
 
         for n, tt in enumerate(TOOLS):
@@ -144,11 +150,11 @@ class MainWindow(QtWidgets.QMainWindow):
                 toolbutton.setChecked(True)
                 self.toolBarChanged(toolbutton)
 
-    def createDockWidgets(self):
+    def createDockWidgets(self) -> None:
         # TODO: make this modular, remember view state
 
         dock = LayerListWidget(self, self.project, self.viewArea.viewState)
-        #dock.hide()
+        # dock.hide()
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
         self._view_menu.subWindowMenu.addAction(dock.toggleViewAction())
 
@@ -158,31 +164,30 @@ class MainWindow(QtWidgets.QMainWindow):
         self._view_menu.subWindowMenu.addAction(dock.toggleViewAction())
 
         dock = UndoDock(self.undo_stack)
-        #dock.hide()
+        # dock.hide()
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
         self._view_menu.subWindowMenu.addAction(dock.toggleViewAction())
-        
+
         dock = InfoWidget(self.project)
         dock.hide()
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
         self._view_menu.subWindowMenu.addAction(dock.toggleViewAction())
 
-    def createViewToolbar(self):
+    def createViewToolbar(self) -> None:
         tb = self.addToolBar("View")
-        tb.addAction(self.actions.view_flip_x)
-        tb.addAction(self.actions.view_flip_y)
-        tb.addAction(self.actions.view_rotate_l)
-        tb.addAction(self.actions.view_rotate_r)
-        tb.addAction(self.actions.view_cycle_draw_order)
+        tb.addAction(self.pcbre_actions.view_flip_x)
+        tb.addAction(self.pcbre_actions.view_flip_y)
+        tb.addAction(self.pcbre_actions.view_rotate_l)
+        tb.addAction(self.pcbre_actions.view_rotate_r)
+        tb.addAction(self.pcbre_actions.view_cycle_draw_order)
 
-    def closeEvent(self, evt):
+    def closeEvent(self, evt: QtCore.QEvent) -> None:
         if checkCloseSave(self):
             evt.accept()
         else:
             evt.ignore()
 
-
-    def createMenubar(self):
+    def createMenubar(self) -> None:
         from pcbre.ui.menu.file import FileMenu
         from pcbre.ui.menu.edit import EditMenu
         from pcbre.ui.menu.view import ViewMenu
@@ -199,7 +204,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # TODO: Only show menu if started in debug mode
         self.menuBar().addMenu(DebugMenu(self))
 
-def main():
+
+def main() -> None:
     import sys
     import argparse
     import os.path
@@ -236,6 +242,7 @@ def main():
     window = MainWindow(p)
     window.show()
     sys.exit(app.exec_())
+
 
 if __name__ == '__main__':
     main()

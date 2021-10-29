@@ -1,9 +1,11 @@
 __author__ = 'davidc'
 import numpy
-from qtpy import QtCore, QtGui
+from qtpy import QtGui
 
 KEEP = None
-def QImage_from_numpy(arr):
+
+# Typing ignored because mypy does not find QImage inside QtGui
+def QImage_from_numpy(arr: 'numpy.ArrayLike') -> QtGui.QImage: # type: ignore
     shape = arr.shape
 
     if len(shape) == 2:

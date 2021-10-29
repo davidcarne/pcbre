@@ -2,15 +2,18 @@ __author__ = 'davidc'
 
 from collections import namedtuple, defaultdict
 from pcbre.algo.skyline import SkyLine
-import scipy.ndimage.morphology
-import scipy.ndimage.interpolation
-import time
-import freetype
+import scipy.ndimage.morphology  # type: ignore
+import scipy.ndimage.interpolation  # type: ignore
+import freetype  # type: ignore
 import numpy
 import qtpy
 from qtpy import QtCore, QtGui
 from pcbre.ui.misc import QImage_from_numpy
 import json
+
+# TODO - OS-specific caching
+SHADER_JSON_PATH = "/tmp/pcbre_shader.json"
+SHADER_PNG_PATH = "/tmp/pcbre_shader.png"
 
 BASE_FONT = 32.
 # Constant used to determine how large to expand bitmaps
@@ -22,11 +25,15 @@ PRESCALE = 4
 # but that point isn't now.
 from pcbre.accel.edtaa3 import edtaa3, compute_gradient, c_double_p, c_short_p
 
+from typing import Dict, Optional, Tuple, Any, TYPE_CHECKING
 
-def saveCached(image, atlas):
+if TYPE_CHECKING:
+    import numpy.typing as npt
+
+def saveCached(image: 'npt.NDArray[numpy.uint8]', atlas: Dict[str, 'AtlasEntry']) -> None:
     img = QImage_from_numpy(image)
     # TODO - make this better
-    img.save("/tmp/shader.png", "PNG")
+    img.save(SHADER_PNG_PATH, "PNG")
 
     ser = dict()
     for k, v in list(atlas.items()):
@@ -42,13 +49,15 @@ def saveCached(image, atlas):
             "hb": v.hb,
             }
         ser[k] = d
-    json.dump(ser, open("/tmp/shader.json", "w"))
+    json.dump(ser, open(SHADER_JSON_PATH, "w"))
 
-def loadCached():
+def loadCached() -> Optional[Tuple[Dict[str, 'AtlasEntry'], 'npt.NDArray[numpy.uint8]']]:
+    # don't bother
+    return None
     try:
         # TODO, rework to use app cache directory
         img = QtGui.QImage()
-        if img.load("/tmp/shader.png"):
+        if img.load(SHADER_PNG_PATH):
             newimg = img.convertToFormat(QtGui.QImage.Format.Format_ARGB32)
 
             shape = newimg.height(), newimg.width()
@@ -62,7 +71,7 @@ def loadCached():
             # Extract the first channel
             data = numpy.ctypeslib.as_array(ptr, (newimg.height(), newimg.width(), 4))[:,:,0].copy()
 
-            st = json.load(open("/tmp/shader.json","r"))
+            st = json.load(open(SHADER_JSON_PATH,"r"))
 
             atlas = {}
             for k, v in list(st.items()):
@@ -75,7 +84,7 @@ def loadCached():
 
     return None
 
-def distance_transform_bitmap(input, margin):
+def distance_transform_bitmap(input: Any, margin: int) -> 'npt.NDArray[numpy.uint8]':
     # Calculate the size of the surface we're drawing on
     mp = margin * PRESCALE
     width = input.width + 2 * mp
@@ -85,7 +94,7 @@ def distance_transform_bitmap(input, margin):
     # Build a buffer containing our padded-out glyph in double format for passing to EDTAA3
     data = numpy.zeros(shape, dtype=numpy.double)
     if input._FT_Bitmap.buffer:
-        data[mp:-mp, mp:-mp] = numpy.ctypeslib.as_array(input._FT_Bitmap.buffer, (input.rows, input.width))[::-1]
+        data[mp:-mp, mp:-mp] = numpy.ctypeslib.as_array(input._FT_Bitmap.buffer, (input.rows, input.width))[::-1] # type: ignore
 
     # And rescale said buffer to be in the range 0..1
     data /= 255.0
@@ -167,8 +176,10 @@ def distance_transform_bitmap(input, margin):
 
     return rv
 
-class AtlasEntry(object):
-    def __init__(self, w, h, sx, sy, tx, ty, l, t, hb):
+class AtlasEntry:
+    def __init__(self, w: int, h: int, 
+            sx: float, sy: float, tx: float, ty: float,
+            l: int, t: int, hb: int):
         # Texture Coordinates
         self.sx = sx
         self.sy = sy
@@ -190,13 +201,13 @@ class AtlasEntry(object):
 
 
     @staticmethod
-    def fromGlyph(glyph):
+    def fromGlyph(glyph: Any) -> "AtlasEntry":
         return AtlasEntry(glyph.bitmap.width//PRESCALE, glyph.bitmap.rows//PRESCALE,
                           0, 0, 0, 0,
                           glyph.metrics.horiBearingX/64.0/PRESCALE, glyph.metrics.horiBearingY/64.0/PRESCALE,
                           glyph.metrics.horiAdvance/64.0/PRESCALE)
 
-    def updatePos(self, texwidth, texheight, x0, y0, x1, y1):
+    def updatePos(self, texwidth: int, texheight: int, x0: float, y0: float, x1: float, y1: float) -> None:
         fw = float(texwidth)
         fh = float(texheight)
         self.sx = x0/fw
@@ -204,10 +215,12 @@ class AtlasEntry(object):
         self.tx = x1/fw
         self.ty = y1/fw
 
-class SDFTextAtlas(object):
-    def __init__(self, fontname):
+class SDFTextAtlas:
+    atlas: Dict[str, AtlasEntry]
+    image: 'npt.NDArray[numpy.uint8]'
+
+    def __init__(self, fontname: str) -> None:
         self.face = freetype.Face(fontname)
-        pre = time.time()
 
         height_base = int(BASE_FONT)
         self.face.set_char_size(height=PRESCALE * height_base * 64)
@@ -235,14 +248,12 @@ class SDFTextAtlas(object):
         for i in chars:
             self.getGlyph(i)
 
-        d = time.time() - pre
-
         new_set = frozenset(list(self.atlas.keys()))
         if old_set != new_set:
             saveCached(self.image, self.atlas)
 
 
-    def addGlyphs(self, multi):
+    def addGlyphs(self, multi: str) -> None:
         """
         Add multiple glyphs at a time, packing by best-packing-score first
         Execution time is poor, and gains don't seem to be worth increased execution time
@@ -278,10 +289,6 @@ class SDFTextAtlas(object):
         multiple = self.packer.pack_multiple(packlist)
         assert len(multiple) == len(packlist)
 
-        # Now fill those rects
-        fw = float(self.packer.width)
-        fh = float(self.packer.height)
-
         for (char, ae, bm), (x0, y0) in zip(glyphs, multiple):
             x1, y1 = x0 + ae.w + 2 * self.margin, y0 + ae.h + 2 * self.margin
             ae.updatePos(self.packer.width, self.packer.height, x0, y0, x1, y1)
@@ -289,7 +296,7 @@ class SDFTextAtlas(object):
             self.atlas[char] = ae
             self.image[y0:y1, x0:x1] = bm
 
-    def addGlyph(self, char):
+    def addGlyph(self, char: str) -> None:
         self.face.load_char(char)
 
         bitmap = self.face.glyph.bitmap
@@ -315,7 +322,7 @@ class SDFTextAtlas(object):
             self.atlas[char] = ae
 
 
-    def getGlyph(self, char):
+    def getGlyph(self, char: str) -> AtlasEntry:
         v = self.atlas.get(char)
         if v is not None:
             return v
@@ -324,5 +331,3 @@ class SDFTextAtlas(object):
 
         return self.atlas[char]
 
-
-text_atlas_entry = namedtuple("text_atlas_key", ["start", "count"])

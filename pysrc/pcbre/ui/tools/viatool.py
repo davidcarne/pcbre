@@ -1,154 +1,158 @@
-from qtpy import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtWidgets
 
-from pcbre.accel.vert_array import VA_xy, VA_via
+from pcbre.accel.vert_array import VA_via
 from .basetool import BaseTool, BaseToolController
-from pcbre.matrix import Point2, translate
+from pcbre.matrix import Vec2
 from pcbre.model.artwork_geom import Via
-from pcbre.model.net import Net
-from pcbre.ui.boardviewwidget import QPoint_to_pair
 
 from pcbre.ui.undo import UndoMerge
 from pcbre.ui.dialogs.settingsdialog import SettingsDialog
 from pcbre.ui.widgets.unitedit import UnitLineEdit, UNIT_GROUP_MM
-from pcbre.view.rendersettings import RENDER_OUTLINES
-from pcbre.view.viaview import THRenderer
+
+from pcbre.ui.tool_action import ToolActionDescription, ToolActionShortcut, \
+    Modifier, EventID, MoveEvent, ToolActionEvent
+
+from pcbre.model.project import Project
+from pcbre.model.stackup import ViaPair
+import pcbre.ui.boardviewwidget
+from pcbre.view.viewport import ViewPort
+import enum
+from pcbre.view.layer_render_target import CompositeManager
+from pcbre.ui.gl.glshared import GLShared
+from typing import Callable, Optional
+
+
+class ViaEventCode(enum.Enum):
+    DecreaseRadius = 0
+    IncreaseRadius = 1
+    NextViaPair = 2
+    Place = 3
 
 
 class ViaSettingsDialog(SettingsDialog):
-    def __init__(self, tpm):
+    def __init__(self, tpm: 'ViaToolModel'):
         super(ViaSettingsDialog, self).__init__()
         self.tpm = tpm
 
         self.radius_li = UnitLineEdit(UNIT_GROUP_MM)
-        self.radius_li.setValue(self.tpm.radius)
+        self.radius_li.setValue(self.tpm.via_radius)
 
         self.layout.addRow("Radius:", self.radius_li)
 
     @QtCore.Slot()
     def accept(self):
-        self.tpm.radius = self.radius_li.getValue()
+        self.tpm.via_radius = self.radius_li.getValue()
         QtWidgets.QDialog.accept(self)
 
 
 class ViaToolOverlay:
-    def __init__(self, ctrl):
-        """
-        :type ctrl: ViaToolController
-        """
-        self.view = ctrl.view
-        self.tpm = ctrl.toolparammodel
-        self.ctrl = ctrl
+    def __init__(self, ctrl: 'ViaToolController'):
+        self.view: pcbre.ui.boardviewwidget.BoardViewWidget = ctrl.view
+        self.tpm: ViaToolModel = ctrl.toolparammodel
+        self.ctrl: ViaToolController = ctrl
 
         self.__va = VA_via(1024)
 
-    def initializeGL(self, gls):
-        """
-        :type gls: GLShared
-        :param gls:
-        :return:
-        """
+    def initializeGL(self, gls: GLShared):
         self.gls = gls
 
-    def render(self, viewport, compositor):
-
+    def render(self, viewport: ViewPort, compositor: CompositeManager):
         self.__va.clear()
 
         if self.tpm.current_layer_pair is not None:
-            self.__va.add_donut(self.ctrl.x, self.ctrl.y, self.tpm.radius, 0)
-            #self.render_b.deferred(Point2(self.ctrl.x, self.ctrl.y), self.tpm.radius, 0, RENDER_OUTLINES)
+            if self.ctrl.pt is not None:
+                self.__va.add_donut(
+                    self.ctrl.pt.x, self.ctrl.pt.y, self.tpm.via_radius, 0)
 
         with compositor.get("OVERLAY"):
-            self.view.via_renderer.render_outlines(viewport.glMatrix, self.__va)
-
-
+            self.view.via_renderer.render_outlines(
+                viewport.glMatrix, self.__va)
 
 
 class ViaToolController(BaseToolController):
-    def __init__(self, view, submit, project, toolparammodel):
-        """
-
-        :type view: pcbre.ui.boardviewwidget.BoardViewWidget
-        """
+    def __init__(self,
+                 view: pcbre.ui.boardviewwidget.BoardViewWidget,
+                 submit: Callable,
+                 project: Project,
+                 toolparammodel: 'ViaToolModel'):
         super(ViaToolController, self).__init__()
 
-        self.view = view
-        self.project = project
-        self.submit = submit
+        self.view: pcbre.ui.boardviewwidget.BoardViewWidget = view
+        self.project: Project = project
+        self.submit: Callable = submit
 
-        self.toolparammodel = toolparammodel
-        self.toolparammodel.changed.connect(self.__modelchanged)
+        self.toolparammodel: ViaToolModel = toolparammodel
 
-        self.x = 0
-        self.y = 0
+        self.pt: Optional[Vec2] = None
         self.show = False
 
         self.overlay = ViaToolOverlay(self)
 
+    @property
+    def tool_actions(self):
+        return g_ACTIONS
+        
     def showSettingsDialog(self):
         ViaSettingsDialog(self.toolparammodel).exec_()
 
-
-    def __modelchanged(self):
-        self.changed.emit()
-
-    def mousePressEvent(self, evt):
-        pt_screen = Point2(evt.pos())
-        pt_world = Point2(self.view.viewState.tfV2W(pt_screen))
-
+    def event_place(self, evt: ToolActionEvent):
         # New object with dummy net
         if self.toolparammodel.current_layer_pair is not None:
-            v = Via(pt_world, self.toolparammodel.current_layer_pair, self.toolparammodel.radius, None)
+            v = Via(evt.world_pos, self.toolparammodel.current_layer_pair,
+                    self.toolparammodel.via_radius, None)
             self.submit(UndoMerge(self.project, v, "Add Via"))
-
-    def mouseReleaseEvent(self, evt):
         pass
 
-    def mouseMoveEvent(self, evt):
-        self.show = True
-        self.x, self.y = self.view.viewState.tfV2W(Point2(evt.pos()))
-        self.changed.emit()
+    def mouseMoveEvent(self, evt: MoveEvent):
+        self.pt = evt.world_pos
 
-    def mouseWheelEvent(self, event):
-        if event.modifiers() & QtCore.Qt.ShiftModifier:
-            # TODO: Remove hack on step
-            step = event.angleDelta().y()/120.0
-            self.toolparammodel.radius += step
-            if self.toolparammodel.radius <= 0:
-                self.toolparammodel.radius = 0.00001
+    def event_radius(self, amount: float):
+        self.toolparammodel.via_radius += amount
+        if self.toolparammodel.via_radius <= 0:
+            self.toolparammodel.via_radius = 0.00001
 
-class ViaToolModel(QtCore.QObject):
-    def __init__(self, project):
-        super(ViaToolModel, self).__init__()
-        self.project = project
+    def tool_event(self, event: ToolActionEvent):
+        if event.code == ViaEventCode.DecreaseRadius:
+            self.event_radius(-1 * event.amount)
+        elif event.code == ViaEventCode.IncreaseRadius:
+            self.event_radius(1 * event.amount)
+        elif event.code == ViaEventCode.NextViaPair:
+            self.event_change_pair()
+        elif event.code == ViaEventCode.Place:
+            self.event_place(event)
 
-        self.__current_layer_pair = None
-        self.__r = 1000
 
-    changed = QtCore.Signal()
+g_ACTIONS = [
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Mouse_WheelDown, Modifier.Shift),
+        ViaEventCode.DecreaseRadius,
+        "Decrease Via Radius"
+        ),
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Mouse_WheelUp, Modifier.Shift),
+        ViaEventCode.IncreaseRadius,
+        "Increase Via Radius"),
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Key_Tab),
+        ViaEventCode.NextViaPair,
+        "Next Via Pair"),
+    ToolActionDescription(
+        [
+            ToolActionShortcut(EventID.Key_Enter),
+            ToolActionShortcut(EventID.Mouse_B1),
+        ],
+        ViaEventCode.Place,
+        "Place Via"),
+        ]
 
-    @property
-    def current_layer_pair(self):
-        return self.__current_layer_pair
 
-    @current_layer_pair.setter
-    def current_layer_pair(self, value):
-        old = self.__current_layer_pair
-        self.__current_layer_pair = value
+class ViaToolModel:
+    __slots__ = ["via_radius", "current_layer_pair"]
 
-        if old != value:
-            self.changed.emit()
+    def __init__(self):
+        self.via_radius : float = 1000
+        self.current_layer_pair : Optional[ViaPair] = None
 
-    @property
-    def radius(self):
-        return self.__r
-
-    @radius.setter
-    def radius(self, value):
-        old = self.__r
-        self.__r = value
-
-        if old != value:
-            self.changed.emit()
 
 class ViaTool(BaseTool):
     ICON_NAME = "via"
@@ -156,13 +160,13 @@ class ViaTool(BaseTool):
     SHORTCUT = 'v'
     TOOLTIP = 'Via (v)'
 
-    def __init__(self, project):
+    def __init__(self, project: Project):
         super(ViaTool, self).__init__(project)
 
         self.project = project
-        self.model = ViaToolModel(project)
+        self.model = ViaToolModel()
 
-    def __changed_selected_viapair(self, vp):
+    def __changed_selected_viapair(self, vp: ViaPair):
         self.model.current_layer_pair = vp
 
     def __setupMenu(self):
@@ -192,10 +196,10 @@ class ViaTool(BaseTool):
             self.menu.addAction(a1)
             self.ag.addAction(a1)
 
-
     def setupToolButtonExtra(self):
         self.__setupMenu()
 
-    def getToolController(self, view, submit):
+    def getToolController(self,
+                          view: pcbre.ui.boardviewwidget.BoardViewWidget,
+                          submit: Callable):
         return ViaToolController(view, submit, self.project, self.model)
-

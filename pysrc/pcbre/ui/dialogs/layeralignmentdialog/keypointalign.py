@@ -1,18 +1,32 @@
-from qtpy import QtCore, QtGui, QtWidgets
-from pcbre.model.imagelayer import KeyPointAlignment, KeyPoint
-from pcbre.ui.tools.basetool import BaseToolController
-from pcbre.matrix import translate, scale, Vec2, project_point_line, rotate, line_intersect, INTERSECT_NORMAL, Point2, \
-    Rect, projectPoint
-from pcbre.ui.uimodel import GenModel, mdlacc
-from pcbre.ui.gl import VAO, vbobind
-from pcbre.ui.widgets.lineedit import PLineEdit
-from pcbre.ui.widgets.unitedit import UnitLineEdit, UNIT_GROUP_MM, UNIT_GROUP_PX
-from pcbre.util import float_or_None
-from OpenGL.arrays.vbo import VBO
-import OpenGL.GL as GL
-import numpy
-import cv2
 import colorsys
+import enum
+
+import OpenGL.GL as GL  # type: ignore
+import cv2  # type: ignore
+import numpy
+import numpy.linalg
+from OpenGL.arrays.vbo import VBO  # type: ignore
+from qtpy import QtCore, QtWidgets, QtGui
+
+from pcbre.matrix import translate, scale, Vec2, \
+    Rect, project_point
+from pcbre.model.imagelayer import KeyPointAlignment, KeyPoint, ImageLayer
+from pcbre.ui.gl import VAO, VBOBind
+from pcbre.ui.tool_action import ToolActionDescription, ToolActionShortcut, Modifier, EventID, ToolActionEvent, \
+    MoveEvent
+from pcbre.ui.tools.basetool import BaseToolController
+from pcbre.ui.uimodel import GenModel, mdlacc
+from pcbre.ui.widgets.unitedit import UnitLineEdit, UNIT_GROUP_MM, UNIT_GROUP_PX
+
+from typing import TYPE_CHECKING, Optional, Any, Tuple, List, cast, Dict
+
+if TYPE_CHECKING:
+    from pcbre.model.project import Project
+    from pcbre.ui.gl.glshared import GLShared
+    from pcbre.ui.boardviewwidget import ViewState
+    import numpy.typing as npt
+    from pcbre.ui.dialogs.layeralignmentdialog.dialog import AlignmentViewModel
+    from pcbre.ui.dialogs.layeralignmentdialog.dialog import LayerAlignmentDialog
 
 ADD_MODIFIER = QtCore.Qt.ControlModifier
 DEL_MODIFIER = QtCore.Qt.ShiftModifier
@@ -20,14 +34,17 @@ DEL_MODIFIER = QtCore.Qt.ShiftModifier
 MODE_NONE = 0
 MODE_DRAGGING = 1
 
+
 # Type-of-constraint constants - used to determine what kind of constraint solution was calculated
-CONS_UNCONSTRAINED = 0
-CONS_TRANSLATION = 1
-CONS_ROTATE_SCALE = 2
-CONS_ORTHOGONAL = 3
-CONS_PERSPECTIVE = 4
-CONS_OVERCONSTRAINED = 5
-CONS_SINGULAR = 6
+class Constraint(enum.Enum):
+    Unconstrained = 0
+    Translation = 1
+    Rotate_Scale = 2
+    Orthogonal = 3
+    Perspective = 4
+    Overconstrained = 5
+    Singular = 6
+
 
 class AlignKeypoint(object):
     """
@@ -35,12 +52,13 @@ class AlignKeypoint(object):
     in that these only care about the world-space coordinates of the keypoint, and the layer-space coords
     of the layer that is currently being aligned
     """
-    def __init__(self, is_new=True):
+
+    def __init__(self, is_new: bool=True) -> None:
         # World-space coordinates of the keypoint
-        self.world = Point2(0,0)
+        self.world = Vec2(0, 0)
 
         # Current align-layer-space coordinates of the keypoint (in pixels, not in normalized image coords)
-        self.layer = Point2(0,0)
+        self.layer = Vec2(0, 0)
 
         # Keypoint created for this layer or existing?
         # if existing, keypoint should not be moved in worldspace or deleted
@@ -52,7 +70,10 @@ class AlignKeypoint(object):
         # Use this keypoint for the alignment solution
         self.use = False
 
-def NAME_FOR_KPT(idx, kpt):
+        self._orig_kp : Optional[KeyPoint] = None
+
+
+def NAME_FOR_KPT(idx: int, kpt: 'AlignKeypoint') -> str:
     """
     Get the full name of a keypoint
     :param idx: Index of the keypoint to get the name for
@@ -62,44 +83,48 @@ def NAME_FOR_KPT(idx, kpt):
     lbl = ""
     if kpt.is_new:
         lbl = " (new)"
-    return "Keypoint %d%s" %  ((idx + 1), lbl)
+    return "Keypoint %d%s" % ((idx + 1), lbl)
+
 
 class KeypointAlignmentModelQAI(QtCore.QAbstractListModel):
     """
     Adapter for the keypoint alignment index
     """
-    def __init__(self, mdl):
+
+    def __init__(self, mdl: 'KeypointAlignmentModel') -> None:
         super(KeypointAlignmentModelQAI, self).__init__()
         self.mdl = mdl
 
-    def rowCount(self, idx):
+    def rowCount(self, idx: QtCore.QModelIndex) -> int:
         if not idx.isValid():
             l = len(self.mdl.keypoints)
             return l
         return 0
 
-    def index(self, row, col, parent):
+    def index(self, row:int, col:int, parent: QtCore.QModelIndex) -> QtCore.QModelIndex:
         assert not parent.isValid()
         return self.createIndex(row, col)
 
-    def data(self, idx, role):
+    def data(self, idx: QtCore.QModelIndex, role: int) -> Any:
         if role == QtCore.Qt.DisplayRole:
             return NAME_FOR_KPT(idx.row(), self.mdl.keypoints[idx.row()])
         return None
 
+
 class KeypointAlignmentModel(GenModel):
     """ Full model including the keypoint alignment state
     """
-    def __init__(self, image):
+
+    def __init__(self, image: ImageLayer) -> None:
         GenModel.__init__(self)
         self.combo_adapter = KeypointAlignmentModelQAI(self)
-        self.__keypoints = []
+        self.__keypoints : List[AlignKeypoint] = []
         self.__image = image
 
     # Currently selected keypoint index. None for no selection
     selected_idx = mdlacc(None)
 
-    def load(self, project):
+    def load(self, project: 'Project') -> None:
         # Initialize all the known keypoints
         for pkp in project.imagery.keypoints:
             idx = self.add_keypoint()
@@ -109,16 +134,16 @@ class KeypointAlignmentModel(GenModel):
             obj._orig_kp = pkp
 
             # World position = copy of existing position (allocate new mutable obj)
-            obj.world = Point2(pkp.world_position)
+            obj.world = pkp.world_position.dup()
 
             for kp_layer, position in pkp.layer_positions:
                 if kp_layer is self.__image:
-                    obj.layer = Point2(position)
+                    obj.layer = position.dup()
                     obj.use = True
                 else:
                     obj.is_new = False
 
-    def save(self, project):
+    def save(self, project: 'Project') -> None:
         al = KeyPointAlignment()
 
         # Remove all keypoints that were deleted
@@ -130,8 +155,8 @@ class KeypointAlignmentModel(GenModel):
         # Now for all remaining keypoints, recreate
         for kp in self.keypoints:
             # Create or update the world kp
-            if not hasattr(kp, "_orig_kp"):
-                pkp = KeyPoint(kp.world)
+            if kp._orig_kp is None:
+                pkp = KeyPoint(project, kp.world)
                 kp._orig_kp = pkp
                 project.imagery.add_keypoint(pkp)
             else:
@@ -140,14 +165,14 @@ class KeypointAlignmentModel(GenModel):
 
         for kp in self.keypoints:
             if kp.use:
-                al.set_keypoint_position(kp._orig_kp, kp.layer)
+                if kp._orig_kp is not None:
+                    al.set_keypoint_position(kp._orig_kp, kp.layer)
 
         # Now, save the changes to the layer
         self.__image.set_alignment(al)
         self.__image.transform_matrix = self.image_matrix
 
-
-    def set_keypoint_world(self, idx, pos):
+    def set_keypoint_world(self, idx: int, pos: Vec2) -> None:
         """
         set the world coordinates of a keypoint by index
         idx must be within the range of known keypoints
@@ -163,19 +188,18 @@ class KeypointAlignmentModel(GenModel):
         self.__keypoints[idx].world = pos
         self.change()
 
-    def set_keypoint_px(self, idx, pos):
+    def set_keypoint_px(self, idx: int, pos: Vec2) -> None:
         """
         set the keypoint position on a layer. Pos=None to remove
         :param idx:
         :param pos:
-        :param layer:
         :return:
         """
         self.__keypoints[idx].layer = pos
 
         self.change()
 
-    def set_keypoint_used(self, idx, use):
+    def set_keypoint_used(self, idx: int, use: bool) -> None:
         """
         Set whether a keypoint is used in the current layer solution
         :param idx:
@@ -185,7 +209,7 @@ class KeypointAlignmentModel(GenModel):
         self.__keypoints[idx].use = use
         self.change()
 
-    def insert_keypoint(self, idx):
+    def insert_keypoint(self, idx: int) -> None:
         """
         Returns a new keypoint inserted at index idx. Used for undos
 
@@ -197,7 +221,7 @@ class KeypointAlignmentModel(GenModel):
         self.combo_adapter.endInsertRows()
         self.change()
 
-    def add_keypoint(self):
+    def add_keypoint(self) -> int:
         """
         Adds a new keypoint. Returns the index of the new keypoint
 
@@ -212,7 +236,7 @@ class KeypointAlignmentModel(GenModel):
 
         return idx
 
-    def del_keypoint(self, idx):
+    def del_keypoint(self, idx: int) -> None:
         """
         Delete a keypoint by index
         :param idx:
@@ -228,7 +252,7 @@ class KeypointAlignmentModel(GenModel):
         self.change()
 
     @property
-    def keypoints(self):
+    def keypoints(self) -> List[AlignKeypoint]:
         """
         View-only copy of the keypoints. Do not edit the objects returned by this property
         Use the model-level getter/setter functions
@@ -237,7 +261,7 @@ class KeypointAlignmentModel(GenModel):
         return list(self.__keypoints)
 
     @property
-    def _image_transform_info(self):
+    def _image_transform_info(self) -> Tuple[Constraint, 'npt.NDArray[numpy.float64]']:
         """
         Calculate the constraint level and the transform (if possible)
         :return: constraint_level, transform_matrix
@@ -246,7 +270,7 @@ class KeypointAlignmentModel(GenModel):
 
         # Num keypoints = 0 - can't compute a transform
         if len(relevant_keypoints) == 0:
-            return CONS_UNCONSTRAINED, numpy.identity(3)
+            return Constraint.Unconstrained, numpy.identity(3)
 
         # Num keypoints = 1, just do a simple translate
         elif len(relevant_keypoints) == 1:
@@ -257,10 +281,10 @@ class KeypointAlignmentModel(GenModel):
 
             # Just basic translation in worldspace
             vec = kp.world - layer_world
-            return CONS_TRANSLATION, translate(vec.x, vec.y)
+            return Constraint.Translation, translate(vec.x, vec.y)
 
         # Calculate either translate-rotate, or translate-rotate-scale transforms
-        elif len(relevant_keypoints) in (2,3):
+        elif len(relevant_keypoints) in (2, 3):
             # Construct a system of equations to solve the positioning
             # Basic Ax = b, where x is the non-homologous terms of the translation matrix
             # 'A' is made from "rows"
@@ -275,16 +299,16 @@ class KeypointAlignmentModel(GenModel):
                 w = kp.world
 
                 #            a       b       c       d       e       f        #
-                rows.append([lw.x,   lw.y,   1,      0,      0,      0,      ])
-                rows.append([0,      0,      0,      lw.x,   lw.y,   1,      ])
+                rows.append([lw.x, lw.y, 1, 0, 0, 0, ])
+                rows.append([0, 0, 0, lw.x, lw.y, 1, ])
 
                 b.append(w.x)
                 b.append(w.y)
 
             # If we only have two keypoints, constrain scale to equal on both axes
             if len(relevant_keypoints) == 2:
-                rows.append([1,      0,      0,      0,      -1,     0       ])
-                rows.append([0,      1,      0,      1,      0,      0       ])
+                rows.append([1, 0, 0, 0, -1, 0])
+                rows.append([0, 1, 0, 1, 0, 0])
                 b.extend((0, 0))
 
             # Try to solve the system of equations
@@ -292,35 +316,36 @@ class KeypointAlignmentModel(GenModel):
             try:
                 x = numpy.linalg.solve(a, b)
 
-            except numpy.linalg.linalg.LinAlgError:
+            except numpy.linalg.LinAlgError:
                 # Cant solve, constructed matrix is singular
-                return CONS_SINGULAR, numpy.identity(3)
+                return Constraint.Singular, numpy.identity(3)
 
             # Depending on the number of keypoints, we're either constrainted to translate/rotate/equal-scale
             # or full Orthogonal projection
-            constraint = CONS_ORTHOGONAL
+            constraint = Constraint.Orthogonal
             if len(relevant_keypoints) == 2:
-                constraint = CONS_ROTATE_SCALE
+                constraint = Constraint.Rotate_Scale
 
-            return constraint, numpy.vstack((x.reshape(2, 3), (0,0,1)))
+            return constraint, numpy.vstack((x.reshape(2, 3), (0, 0, 1)))
 
         elif len(relevant_keypoints) == 4:
             # Perspective transform
             # TODO: replace this with a LMS solver for overconstrained cases
             #       plus provide error estimations and visualize
-            src = numpy.ones((4,2), dtype=numpy.float32)
-            dst = numpy.ones((4,2), dtype=numpy.float32)
+            src = numpy.ones((4, 2), dtype=numpy.float32)
+            dst = numpy.ones((4, 2), dtype=numpy.float32)
             src[:, :2] = [self.__image.p2n(kp.layer) for kp in relevant_keypoints]
             dst[:, :2] = [kp.world for kp in relevant_keypoints]
 
-            return CONS_PERSPECTIVE, cv2.getPerspectiveTransform(src, dst)
+            persp = cv2.getPerspectiveTransform(src, dst)
+            return Constraint.Perspective, cast('npt.NDArray[numpy.float64]', persp)
 
         else:
             # Temporarily refuse to solve overconstrained alignments
-            return CONS_OVERCONSTRAINED, numpy.identity(3)
+            return Constraint.Overconstrained, numpy.identity(3)
 
     @property
-    def image_matrix(self):
+    def image_matrix(self) -> 'npt.NDArray[numpy.float64]':
         """
         return the transform matrix (from normalized image coordinates to world space)
         :return:
@@ -329,17 +354,17 @@ class KeypointAlignmentModel(GenModel):
         return matrix
 
     @property
-    def image_matrix_inv(self):
+    def image_matrix_inv(self) -> 'npt.NDArray[numpy.float64]':
         """
         returns the world-space to normalized image coordinate matrix
         :return:
         """
-        return numpy.linalg.inv(self.image_matrix)
+        return cast('npt.NDArray[numpy.float64]', numpy.linalg.inv(self.image_matrix))
 
     @property
-    def constraint_info(self):
+    def constraint_info(self) -> Constraint:
         """
-        Get the constraint info for the current solution (IE, one of the CONS_* constants)
+        Get the constraint info for the current solution (IE, one of the Constraint.* constants)
         :return:
         """
         constraint, _ = self._image_transform_info
@@ -349,51 +374,55 @@ class KeypointAlignmentModel(GenModel):
 # Command objects for undo.
 
 class cmd_add_keypoint(QtWidgets.QUndoCommand):
-    def __init__(self, model):
+    def __init__(self, model: 'KeypointAlignmentModel') -> None:
         super(cmd_add_keypoint, self).__init__()
-        self.index = None
+        self.index: int = -1
         self.model = model
 
-    def redo(self):
+    def redo(self) -> None:
         self.index = self.model.add_keypoint()
 
-    def undo(self):
+    def undo(self) -> None:
+        assert self.index != -1
         self.model.del_keypoint(self.index)
 
+
 class cmd_set_keypoint_world(QtWidgets.QUndoCommand):
-    def __init__(self, model, index, world, merge=False, final=False):
+    def __init__(self, model: 'KeypointAlignmentModel', index: int, world: Vec2, merge: bool=False, final: bool=False):
         super(cmd_set_keypoint_world, self).__init__()
-        self.world =  world
+        self.world = world
         self.index = index
         self.model = model
         self.merge = merge
         self.final = final
 
-    def id(self):
+    def id(self) -> int:
         return 0x20000
 
-    def mergeWith(self, new):
-        if (self.merge and new.merge and
-                    self.model is new.model and
-                    self.index == new.index and
-                    (self.world is None) == (new.world is None)):
+    def mergeWith(self, new: QtWidgets.QUndoCommand) -> bool:
+        new_ = cast('cmd_set_keypoint_world', new)
 
-            self.world = new.world
-            if new.final:
+        if (self.merge and new_.merge and
+                self.model is new_.model and
+                self.index == new_.index and
+                (self.world is None) == (new_.world is None)):
+
+            self.world = new_.world
+            if new_.final:
                 self.merge = False
             return True
         return False
 
-    def redo(self):
+    def redo(self) -> None:
         self.old_world = self.model.keypoints[self.index].world
         self.model.set_keypoint_world(self.index, self.world)
 
-    def undo(self):
+    def undo(self) -> None:
         self.model.set_keypoint_world(self.index, self.old_world)
 
 
 class cmd_set_keypoint_px(QtWidgets.QUndoCommand):
-    def __init__(self, model, index, pxpos, merge=False, final=False):
+    def __init__(self, model: 'KeypointAlignmentModel', index: int, pxpos: Vec2, merge:bool=False, final:bool=False):
         super(cmd_set_keypoint_px, self).__init__()
         self.model = model
         self.index = index
@@ -402,56 +431,61 @@ class cmd_set_keypoint_px(QtWidgets.QUndoCommand):
         self.merge = merge
         self.final = final
 
-        self.oldpos = None
+        self.oldpos : Optional[Vec2] = None
 
-    def id(self):
+    def id(self) -> int:
         return 0x20001
 
-    def mergeWith(self, new):
-        if (self.merge and new.merge and
-            self.model is new.model and
-            self.index == new.index and
-            (self.pxpos is None) == (new.pxpos is None)):
+    def mergeWith(self, new: QtWidgets.QUndoCommand) -> bool:
+        new_ = cast('cmd_set_keypoint_px', new)
+        if (self.merge and new_.merge and
+                self.model is new_.model and
+                self.index == new_.index and
+                (self.pxpos is None) == (new_.pxpos is None)):
 
-            self.pxpos = new.pxpos
-            if new.final:
+            self.pxpos = new_.pxpos
+            if new_.final:
                 self.merge = False
             return True
         return False
 
-    def redo(self):
+    def redo(self) -> None:
         self.oldpos = self.model.keypoints[self.index].layer
         self.model.set_keypoint_px(self.index, self.pxpos)
 
-    def undo(self):
+    def undo(self) -> None:
+        assert self.oldpos is not None
         self.model.set_keypoint_px(self.index, self.oldpos)
 
 
 class cmd_set_keypoint_used(QtWidgets.QUndoCommand):
-    def __init__(self, model, idx, use):
+    def __init__(self, model: 'KeypointAlignmentModel', idx: int, use: bool) -> None:
         super(cmd_set_keypoint_used, self).__init__()
         self.model = model
         self.idx = idx
         self.use = use
 
-    def redo(self):
+    def redo(self) -> None:
         self.used = self.model.keypoints[self.idx].use
         self.model.set_keypoint_used(self.idx, self.use)
 
-    def undo(self):
+    def undo(self) -> None:
         self.model.set_keypoint_used(self.idx, self.used)
 
+
 class cmd_del_keypoint(QtWidgets.QUndoCommand):
-    def __init__(self, model, idx):
+    def __init__(self, model: 'KeypointAlignmentModel', idx: int) -> None:
         super(cmd_del_keypoint, self).__init__()
         self.model = model
         self.idx = idx
+        self.save : Optional[AlignKeypoint] = None
 
-    def redo(self):
+    def redo(self) -> None:
         self.save = self.model.keypoints[self.idx]
         self.model.del_keypoint(self.idx)
 
-    def undo(self):
+    def undo(self) -> None:
+        assert self.save is not None
         with self.model.edit():
             self.model.insert_keypoint(self.idx)
             self.model.set_keypoint_used(self.idx, self.save.use)
@@ -462,19 +496,19 @@ class cmd_del_keypoint(QtWidgets.QUndoCommand):
 
 # View-area interaction controller and overlay
 class KeypointAlignmentControllerView(BaseToolController):
-    def __init__(self, parent, model):
+    def __init__(self, parent: 'LayerAlignmentDialog', model: 'AlignmentViewModel') -> None:
         super(KeypointAlignmentControllerView, self).__init__()
         self.model = model
         self._parent = parent
         self.initialize()
 
-    def initialize(self):
+    def initialize(self) -> None:
         self.behave_mode = MODE_NONE
 
-    def finalize(self):
+    def finalize(self) -> None:
         self.behave_mode = MODE_NONE
 
-    def initializeGL(self, gls):
+    def initializeGL(self, gls: 'GLShared') -> None:
         self.gls = gls
 
         # zap the cached text on GL reinitialize (VBO handles / etc are likely invalid)
@@ -498,15 +532,15 @@ class KeypointAlignmentControllerView(BaseToolController):
 
         points["vertex"] = [
             # Lines making up keypoint cross (rendered with GL_LINES)
-            (-d1, -d1), (-d1,  d1),
-            (-d1,  d1), ( d1,  d1),
-            ( d1,  d1), ( d1, -d1),
-            ( d1, -d1), (-d1, -d1),
-            ( 0,  -d1), ( 0,   d1),
-            (-d1,   0), ( d1,   0),
+            (-d1, -d1), (-d1, d1),
+            (-d1, d1), (d1, d1),
+            (d1, d1), (d1, -d1),
+            (d1, -d1), (-d1, -d1),
+            (0, -d1), (0, d1),
+            (-d1, 0), (d1, 0),
 
             # flag (rendered with GL_TRIANGLE_STRIP)
-            (-d1, -d1), (-d1, -d1 - th), (-tw, -d1), (-tw,  -d1 - th)
+            (-d1, -d1), (-d1, -d1 - th), (-tw, -d1), (-tw, -d1 - th)
         ]
 
         # Pack it all into a VBO
@@ -515,9 +549,9 @@ class KeypointAlignmentControllerView(BaseToolController):
         # and bind the program for rendering
         self.handle_vao = VAO()
         with self.handle_vao, self.handle_vbo:
-            vbobind(self.prog, dtype, "vertex").assign()
+            VBOBind(self.prog.program, dtype, "vertex").assign()
 
-    def render(self, vs):
+    def render(self, vs: 'ViewState') -> None:
         self.vs = vs
 
         # Standard alpha-blending. We emit alpha=1 or alpha=0 (no real blending),
@@ -531,16 +565,16 @@ class KeypointAlignmentControllerView(BaseToolController):
         for n, kp in enumerate(self.model.kp.keypoints):
 
             # In unaligned view mode we don't need to show any keypoints that aren't in use
-            if self.model.view_mode == 0 and not kp.use:
+            if not self.model.view_mode.is_aligned() and not kp.use:
                 continue
 
             # Generate a number of colors, separated by as far in hue-space as possible
-            color = colorsys.hsv_to_rgb(float(n) / count, 1,0.8) + (1,)
+            color = colorsys.hsv_to_rgb(float(n) / count, 1, 0.8) + (1,)
 
             # use colors based on current selection
             selected = n == self.model.kp.selected_idx
-            frame_color = [1,1,1,1] if selected else color
-            text_color = [0,0,0,1] if selected else [1,1,1,1]
+            frame_color = [1, 1, 1, 1] if selected else color
+            text_color = [0, 0, 0, 1] if selected else [1, 1, 1, 1]
 
             p = self.get_keypoint_viewport_center(kp)
 
@@ -548,7 +582,7 @@ class KeypointAlignmentControllerView(BaseToolController):
             center_point = vs.glWMatrix.dot(translate(p.x, p.y))
             text_point = center_point.dot(tmove)
 
-            with self.prog, self.handle_vao:
+            with self.prog.program, self.handle_vao:
                 GL.glUniformMatrix3fv(self.prog.uniforms.mat, 1, True, center_point.astype(numpy.float32))
                 GL.glUniform4f(self.prog.uniforms.color, *frame_color)
                 # Render the frame
@@ -558,32 +592,20 @@ class KeypointAlignmentControllerView(BaseToolController):
                 GL.glDrawArrays(GL.GL_TRIANGLE_STRIP, 12, 4)
 
             # Render the text for the flag
-            s = self._parent.view.text_batch.get_string("%d" % (n+1))
+            s = self._parent.view.text_batch.get_string("%d" % (n + 1))
             self._parent.view.text_batch.submit(s, text_point, text_color)
 
-    def im2V(self, pt):
-        """Translate normalized image coordinates to viewport coordinates.
-           If in align mode, normalized-image coords == world coordinates"""
-        pt = Point2(pt)
+    def V2im(self, pt: Vec2) -> Vec2:
+        world = self.vs.tfV2W(pt)
 
-        if self.model.view_mode == 0:
-            self._parent.il.p2n(pt)
-
-        return Point2(vs.tfW2V(pt))
-
-    def V2im(self, pt):
-        pt = Point2(pt)
-
-        world = Point2(self.vs.tfV2W(pt))
-
-        if self.model.view_mode == 0:
+        if not self.model.view_mode.is_aligned():
             im = self._parent.il.n2p(world)
         else:
             im = world
 
         return im
 
-    def get_keypoint_viewport_center(self, keypoint):
+    def get_keypoint_viewport_center(self, keypoint: AlignKeypoint) -> Vec2:
         """
         Return the x/y center (in viewport coordinates) of a keypoint, depending on the view mode
         In view-mode-unaligned, "World" coordinates are just normalized image coordinates
@@ -591,14 +613,14 @@ class KeypointAlignmentControllerView(BaseToolController):
         :param keypoint:
         :return:
         """
-        if self.model.view_mode == 1:
+        if self.model.view_mode.is_aligned():
             pw = keypoint.world
         else:
             pw = self._parent.il.p2n(keypoint.layer)
 
-        return Point2(self.vs.tfW2V(pw))
+        return self.vs.tfW2V(pw)
 
-    def get_keypoint_viewport_box(self, keypoint):
+    def get_keypoint_viewport_box(self, keypoint: AlignKeypoint) -> Rect:
         """
         Get a bbox rect in view coordinates for a keypoint
         :param keypoint:
@@ -606,24 +628,21 @@ class KeypointAlignmentControllerView(BaseToolController):
         """
         p = self.get_keypoint_viewport_center(keypoint)
 
-        return Rect.fromCenterSize(p, width=self.d1 * 2, height=self.d1 * 2)
+        return Rect.from_center_size(p, width=self.d1 * 2, height=self.d1 * 2)
 
-    def get_keypoint_for_mouse(self, pos):
+    def get_keypoint_for_mouse(self, pos: Vec2) -> Optional[int]:
         """
         Pick keypoints by mouse position
         :param pos:
         :return:
         """
-        pos = Point2(pos)
-
         potential = []
         for n, kp in enumerate(self.model.kp.keypoints):
             box = self.get_keypoint_viewport_box(kp)
-            if box.point_test(pos) and (self.model.view_mode == 1 or kp.use):
+            if box.point_test(pos) and (self.model.view_mode.is_aligned() or kp.use):
                 potential.append((n, kp))
 
-
-        if self.model.view_mode == 1:
+        if self.model.view_mode.is_aligned():
             potential.sort(key=lambda n_x: (not n_x[1].is_new, -n_x[0]))
         else:
             potential.sort(key=lambda n_x1: (-n_x1[0]))
@@ -633,7 +652,7 @@ class KeypointAlignmentControllerView(BaseToolController):
 
         return None
 
-    def do_set_cmd(self, pos, final=False):
+    def do_set_cmd(self, pos: Vec2, final:bool=False) -> None:
         """
         Keypoint-position-set command helper. Sets the position of a key point depending to pos (view coordinates)
         :param pos:
@@ -641,87 +660,79 @@ class KeypointAlignmentControllerView(BaseToolController):
         :return:
         """
         w_pos = self.V2im(pos)
-        if self.model.view_mode == 0:
+
+        cmd: QtWidgets.QUndoCommand
+        if not self.model.view_mode.is_aligned():
             cmd = cmd_set_keypoint_px(self.model.kp, self.model.kp.selected_idx, w_pos, merge=True, final=final)
         else:
             cmd = cmd_set_keypoint_world(self.model.kp, self.model.kp.selected_idx, w_pos, merge=True, final=final)
 
         self._parent.undoStack.push(cmd)
 
-    def mousePressEvent(self, event):
-        handle = self.get_keypoint_for_mouse(event.pos())
+    def event_add_keypoint(self, event: ToolActionEvent) -> None:
+        # If we're in world view mode, we need to figure 
+        # out where this keypoint would be in image space as well
+        if self.model.view_mode.is_aligned():
+            # World coords of event
+            world = event.world_pos
+            # Normalized image coords of event
+            im_norm = project_point(self.model.kp.image_matrix_inv, world)
+            # Pixel coords of event
+            im_px = self._parent.il.n2p(im_norm)
+        else:
+            raise NotImplementedError("Cannot add keypoint in unaligned")
 
-        if event.button() == QtCore.Qt.LeftButton and event.modifiers() & ADD_MODIFIER:
-            # If we're in world view mode, we need to figure out where this keypoint would be in image space as well
-            if self.model.view_mode == 1:
-                # World coords of event
-                world = Point2(self.vs.tfV2W(event.pos()))
-                # Normalized image coords of event
-                im_norm = projectPoint(self.model.kp.image_matrix_inv, world)
-                # Pixel coords of event
-                im_px = self._parent.il.n2p(im_norm)
+        # Do all ops as a single macro
+        self._parent.undoStack.beginMacro("Add/Set Keypoint")
 
-            # Do all ops as a single macro
-            self._parent.undoStack.beginMacro("Add/Set Keypoint")
+        cmd = cmd_add_keypoint(self.model.kp)
+        self._parent.undoStack.push(cmd)
 
-            cmd = cmd_add_keypoint(self.model.kp)
-            self._parent.undoStack.push(cmd)
+        # Since we added it manually, we want to use it as part of the alignment
+        cmd2 = cmd_set_keypoint_used(self.model.kp, cmd.index, True)
+        self._parent.undoStack.push(cmd2)
 
-            # Since we added it manually, we want to use it as part of the alignment
-            cmd2 = cmd_set_keypoint_used(self.model.kp, cmd.index, True)
-            self._parent.undoStack.push(cmd2)
+        # If adding a keypoint in world space, setup the im-space version as well
+        if self.model.view_mode.is_aligned():
+            cmd3 = cmd_set_keypoint_px(self.model.kp, cmd.index, im_px)
+            self._parent.undoStack.push(cmd3)
 
-            # If adding a keypoint in world space, setup the im-space version as well
-            if self.model.view_mode == 1:
-                cmd2 = cmd_set_keypoint_px(self.model.kp, cmd.index, im_px)
-                self._parent.undoStack.push(cmd2)
+        # select the keypoint
+        self.model.kp.selected_idx = cmd.index
 
-            # select the keypoint
-            self.model.kp.selected_idx = cmd.index
+        # and move it to where the click was
+        self.do_set_cmd(event.cursor_pos, True)
 
-            # and move it to where the click was
-            self.do_set_cmd(event.pos(), True)
+        self._parent.undoStack.endMacro()
 
-            self._parent.undoStack.endMacro()
-
-            return
-
-        elif event.button() == QtCore.Qt.LeftButton and event.modifiers() & DEL_MODIFIER and (
-                        handle is not None):
+    def event_remove_keypoint(self, event: ToolActionEvent) -> None:
+        handle = self.get_keypoint_for_mouse(event.cursor_pos)
+        if handle is not None:
             cmd = cmd_del_keypoint(self.model.kp, self.model.kp.selected_idx)
             self._parent.undoStack.push(cmd)
             self.model.kp.selected_idx = None
 
-        elif event.button() == QtCore.Qt.LeftButton:
-            self.model.kp.selected_idx = handle
-            if handle is not None:
-                self.has_dragged = False
-                self.behave_mode = MODE_DRAGGING
+    def event_select(self, event: ToolActionEvent) -> None:
+        handle = self.get_keypoint_for_mouse(event.cursor_pos)
+        self.model.kp.selected_idx = handle
+        if handle is not None:
+            self.has_dragged = False
+            self.behave_mode = MODE_DRAGGING
 
-        else:
-            return False
-
-        return True
-
-    def mouseReleaseEvent(self, event):
-        if event.button() == QtCore.Qt.LeftButton and self.behave_mode == MODE_DRAGGING:
+    def event_end_drag(self, event: ToolActionEvent) -> None:
+        if self.behave_mode == MODE_DRAGGING:
             self.behave_mode = MODE_NONE
 
             # only update position if we've dragged the handle
             if self.has_dragged:
-                self.do_set_cmd(event.pos(), True)
-        else:
-            return False
-        return True
+                self.do_set_cmd(event.cursor_pos, True)
 
-    def mouseMoveEvent(self, event):
+    def mouseMoveEvent(self, event: MoveEvent) -> None:
         if self.behave_mode == MODE_DRAGGING:
             self.has_dragged = False
-            self.do_set_cmd(event.pos())
+            self.do_set_cmd(event.cursor_pos)
 
-        return False
-
-    def keyPressEvent(self, evt):
+    def keyPressEvent(self, evt: QtGui.QKeyEvent) -> None:
         if evt.key() == QtCore.Qt.Key_Escape:
             self.model.kp.selected_idx = None
 
@@ -734,19 +745,71 @@ class KeypointAlignmentControllerView(BaseToolController):
 
             # Basic 1-px nudging
             elif evt.key() in (QtCore.Qt.Key_Left, QtCore.Qt.Key_Right, QtCore.Qt.Key_Up, QtCore.Qt.Key_Down):
-                nudge = Point2({
-                    QtCore.Qt.Key_Left:  (-1,  0),
-                    QtCore.Qt.Key_Right: ( 1,  0),
-                    QtCore.Qt.Key_Up:    ( 0, -1),
-                    QtCore.Qt.Key_Down:  ( 0,  1),
-                    }[evt.key()])
+                kp_lut: Dict[int, Tuple[int, int]] = {
+                                   QtCore.Qt.Key_Left: (-1, 0),
+                                   QtCore.Qt.Key_Right: (1, 0),
+                                   QtCore.Qt.Key_Up: (0, -1),
+                                   QtCore.Qt.Key_Down: (0, 1),
+                               }
+                nudge = Vec2.from_mat(kp_lut[evt.key()])
 
                 current = self.get_keypoint_viewport_center(self.model.kp.keypoints[self.model.kp.selected_idx])
                 self.do_set_cmd(current + nudge, True)
 
+    def tool_event(self, event: ToolActionEvent) -> None:
+        if event.code == Event.Select:
+            self.event_select(event)
+        elif event.code == Event.EndDrag:
+            self.event_end_drag(event)
+        elif event.code == Event.Add:
+            self.event_add_keypoint(event)
+        elif event.code == Event.Remove:
+            self.event_remove_keypoint(event)
+
+    @property
+    def tool_actions(self) -> List[ToolActionDescription]:
+        return g_ACTIONS
+
+
+class Event(enum.Enum):
+    Select = 0
+    EndDrag = 1
+    Add = 2
+    Remove = 3
+    Deselect = 4
+    Delete = 5
+
+
+g_ACTIONS = [
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Mouse_B1_DragStart),
+        Event.Select,
+        "Grab"),
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Mouse_B1),
+        Event.EndDrag,
+        "Release"),
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Mouse_B1, Modifier.Ctrl),
+        Event.Add,
+        "Add"),
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Mouse_B1, Modifier.Shift),
+        Event.Remove,
+        "Remove"),
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Key_Escape),
+        Event.Deselect,
+        "Deselect"),
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Key_Backspace),
+        Event.Delete,
+        "Delete"),
+]
+
 
 class KeypointAlignmentWidget(QtWidgets.QWidget):
-    def __init__(self, parent, model):
+    def __init__(self, parent: 'LayerAlignmentDialog', model: KeypointAlignmentModel) -> None:
         super(KeypointAlignmentWidget, self).__init__()
         self.model = model
         self._parent = parent
@@ -759,7 +822,6 @@ class KeypointAlignmentWidget(QtWidgets.QWidget):
 
         edit_layout = QtWidgets.QFormLayout()
         keypoint_gb.setLayout(edit_layout)
-
 
         self.kpts_sel = QtWidgets.QComboBox()
         self.kpts_sel.setModel(self.model.combo_adapter)
@@ -780,7 +842,6 @@ class KeypointAlignmentWidget(QtWidgets.QWidget):
         self.px.edited.connect(self.update_layer)
         self.py.edited.connect(self.update_layer)
 
-
         self.use_for_alignment = QtWidgets.QCheckBox()
         edit_layout.addRow("Use", self.use_for_alignment)
         self.use_for_alignment.clicked.connect(self.update_used)
@@ -794,7 +855,6 @@ class KeypointAlignmentWidget(QtWidgets.QWidget):
         bhl.addWidget(self.del_btn)
         edit_layout.addRow(bhl)
 
-
         self.constraint_status_lbl = QtWidgets.QLabel("")
         self.constraint_status_lbl.setWordWrap(True)
         layout.addRow(self.constraint_status_lbl)
@@ -802,50 +862,62 @@ class KeypointAlignmentWidget(QtWidgets.QWidget):
         self.model.changed.connect(self.modelChanged)
         self.modelChanged()
 
-    def addKeypoint(self):
+    def addKeypoint(self) -> None:
         cmd = cmd_add_keypoint(self.model)
         self._parent.undoStack.push(cmd)
         self.kpts_sel.setCurrentIndex(cmd.index)
 
-    def delKeypoint(self):
+    def delKeypoint(self) -> None:
         cmd = cmd_del_keypoint(self.model, self.model.selected_idx)
         self._parent.undoStack.push(cmd)
 
-    def modelChanged(self):
+    def modelChanged(self) -> None:
         cmb_index = -1 if self.model.selected_idx is None else self.model.selected_idx
         self.kpts_sel.blockSignals(True)
         self.kpts_sel.setCurrentIndex(cmb_index)
         self.kpts_sel.blockSignals(False)
         self.updateTextViews()
 
-    def kptChanged(self):
+    def kptChanged(self) -> None:
         """
         Called when keypoint combo-box drop down changed
         :return:
         """
-        idx = self.kpts_sel.currentIndex()
+        idx: Optional[int] = self.kpts_sel.currentIndex()
         if idx == -1:
             idx = None
         self.model.selected_idx = idx
 
-    def update_world(self):
+    def update_world(self) -> None:
         idx = self.kpts_sel.currentIndex()
-        p = Point2(self.wx.getValue(), self.wy.getValue())
+        vx = self.wx.getValue()
+        vy = self.wy.getValue()
+        if vx is None or vy is None:
+            # TODO - flash bad box?
+            return
+
+        p = Vec2(vx, vy)
         cmd = cmd_set_keypoint_world(self.model, idx, p)
         self._parent.undoStack.push(cmd)
 
-    def update_layer(self):
+    def update_layer(self) -> None:
         idx = self.kpts_sel.currentIndex()
-        p = Point2(self.px.getValue(), self.py.getValue())
+        vx = self.px.getValue()
+        vy = self.py.getValue()
+        if vx is None or vy is None:
+            # TODO - flash bad box?
+            return
+
+        p = Vec2(vx, vy)
         cmd = cmd_set_keypoint_px(self.model, idx, p)
         self._parent.undoStack.push(cmd)
 
-    def update_used(self):
+    def update_used(self) -> None:
         idx = self.kpts_sel.currentIndex()
         cmd = cmd_set_keypoint_used(self.model, idx, self.use_for_alignment.isChecked())
         self._parent.undoStack.push(cmd)
 
-    def updateTextViews(self):
+    def updateTextViews(self) -> None:
         idx = self.model.selected_idx
 
         # Disable keypoint delete when we selected a prior-existing keypoint
@@ -886,41 +958,31 @@ class KeypointAlignmentWidget(QtWidgets.QWidget):
         self.px.setValue(kpt.layer.x)
         self.py.setValue(kpt.layer.y)
 
-    def updateConstraintLabel(self):
+    def updateConstraintLabel(self) -> None:
         cs = self.model.constraint_info
 
-        if cs == CONS_UNCONSTRAINED:
+        if cs == Constraint.Unconstrained:
             self.constraint_status_lbl.setText("Image is unconstrained. Will not be aligned in world space. " +
                                                "This is probably not what you want")
-        elif cs == CONS_TRANSLATION:
+        elif cs == Constraint.Translation:
             self.constraint_status_lbl.setText("Image is constrained only by one keypoint. This will only position " +
                                                "the image in space, but not provide scale or alignment information. " +
                                                "This is probably not what you want")
-        elif cs == CONS_ROTATE_SCALE:
+        elif cs == Constraint.Rotate_Scale:
             self.constraint_status_lbl.setText("Image is constrained by two keypoints. This will only position, " +
                                                "proportionally scale and rotate the image. That may be OK for " +
                                                "scanned images")
-        elif cs == CONS_ORTHOGONAL:
+        elif cs == Constraint.Orthogonal:
             self.constraint_status_lbl.setText("Image is constrained by three keypoints. This allows alignment of " +
                                                "scale, rotation, translation and shear. This is probably not what " +
                                                "you want, but may be useful for synthetically transformed images")
-        elif cs == CONS_PERSPECTIVE:
+        elif cs == Constraint.Perspective:
             self.constraint_status_lbl.setText("Image is constrained by four keypoints. This allows for full recovery" +
                                                " of the perspective transform. This is probably what you want " +
                                                "for camera imagery.")
-        elif cs == CONS_SINGULAR:
-            self.constraint_status_lbl.setText("Can't solve for these constraints. Are keypoints overlapping or "+
+        elif cs == Constraint.Singular:
+            self.constraint_status_lbl.setText("Can't solve for these constraints. Are keypoints overlapping or " +
                                                "colinear in either world or image space?")
-        elif cs == CONS_OVERCONSTRAINED:
+        elif cs == Constraint.Overconstrained:
             self.constraint_status_lbl.setText("Too many constraints to solve for. " +
                                                "Max 4 enabled keypoints for alignment.")
-
-
-
-
-
-
-
-
-
-

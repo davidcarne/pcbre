@@ -1,12 +1,18 @@
-from OpenGL.arrays.vbo import VBO
-import OpenGL.GL as GL
+from OpenGL.arrays.vbo import VBO  # type: ignore
+import OpenGL.GL as GL  # type: ignore
 import numpy
 import ctypes
-from pcbre.ui.gl import vbobind, Texture, VAO
+from pcbre.ui.gl import VBOBind, Texture, VAO
 
+from typing import TYPE_CHECKING
 
-class ImageView(object):
-    def __init__(self, il):
+if TYPE_CHECKING:
+    from pcbre.model.imagelayer import ImageLayer
+    from pcbre.ui.gl.glshared import GLShared
+    import numpy.typing as npt
+
+class ImageView:
+    def __init__(self, il: 'ImageLayer') -> None:
         """
 
         :param il:
@@ -18,7 +24,7 @@ class ImageView(object):
         self.im = il.decoded_image
         self.mat = None
 
-    def initGL(self, gls):
+    def initGL(self, gls: 'GLShared') -> None:
         self._tex = Texture()
 
         # Setup the basic texture parameters
@@ -47,10 +53,10 @@ class ImageView(object):
 
         self.prog = gls.shader_cache.get("image_vert", "image_frag")
 
-        ar = numpy.ndarray(4, dtype=[
+        ar = numpy.ndarray((4, ), dtype=[
             ("vertex", numpy.float32, 2),
             ("texpos", numpy.float32, 2)
-        ])
+        ]) # type: ignore
 
         sca = max(self.im.shape[0], self.im.shape[1])
         x = self.im.shape[1] / float(sca)
@@ -58,37 +64,37 @@ class ImageView(object):
         ar["vertex"] = [(-x, -y), (-x, y), (x, -y), (x, y)]
         ar["texpos"] = [(0, 0), (0, 1), (1, 0), (1, 1)]
 
-        self.b1 = vbobind(self.prog, ar.dtype, "vertex")
-        self.b2 = vbobind(self.prog, ar.dtype, "texpos")
+        self.b1 = VBOBind(self.prog.program, ar.dtype, "vertex")
+        self.b2 = VBOBind(self.prog.program, ar.dtype, "texpos")
 
         self.vbo = VBO(ar, GL.GL_STATIC_DRAW, GL.GL_ARRAY_BUFFER)
 
-        self.mat_loc = GL.glGetUniformLocation(self.prog, "mat")
-        self.tex1_loc = GL.glGetUniformLocation(self.prog, "tex1")
+        self.mat_loc = GL.glGetUniformLocation(self.prog.program, "mat")
+        self.tex1_loc = GL.glGetUniformLocation(self.prog.program, "tex1")
 
         self.vao = VAO()
         with self.vbo, self.vao:
             self.b1.assign()
             self.b2.assign()
 
-    def render(self, viewPort):
+    def render(self, viewPort: 'npt.NDArray[numpy.float64]') -> None:
         m_pre = self.mat
         if self.mat is None:
             m_pre = self.il.transform_matrix
         mat = viewPort.dot(m_pre)
 
         GL.glActiveTexture(GL.GL_TEXTURE0)
-        with self.prog, self._tex.on(GL.GL_TEXTURE_2D), self.vao:
+        with self.prog.program, self._tex.on(GL.GL_TEXTURE_2D), self.vao:
             GL.glUniformMatrix3fv(self.mat_loc, 1, True, mat.astype(numpy.float32))
             GL.glUniform1i(self.tex1_loc, 0)
 
             GL.glDrawArrays(GL.GL_TRIANGLE_STRIP, 0, 4)
 
-    def tfI2W(self, pt):
-        x_, y_, t_ = self.il.transform_matrix.dot([pt[0], pt[1], 1.])
-        return (x_/t_, y_/t_)
+    #def tfI2W(self, pt) -> Tuple[float, float]:
+    #    x_, y_, t_ = self.il.transform_matrix.dot([pt[0], pt[1], 1.])
+    #    return (x_/t_, y_/t_)
 
-    def tfW2I(self, pt):
-        reverse = numpy.linalg.inv(self.il.transform_matrix)
-        x_, y_, t_ = reverse.dot([pt[0], pt[1], 1.])
-        return (x_/t_, y_/t_)
+    #def tfW2I(self, pt) -> Tuple[float, float]:
+    #    reverse = numpy.linalg.inv(self.il.transform_matrix)
+    #    x_, y_, t_ = reverse.dot([pt[0], pt[1], 1.])
+    #    return (x_/t_, y_/t_)

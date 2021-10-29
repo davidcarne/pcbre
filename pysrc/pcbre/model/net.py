@@ -1,30 +1,33 @@
 import re
+from typing import Optional
+
+import pcbre.model.project
 
 
 class Net:
     __net_class_match = re.compile(r"N\$\d+")
 
-    def __init__(self, name=None, net_class=""):
+    def __init__(self, name: Optional[str] = None, net_class: str = "") -> None:
         self._name = name
         self.net_class = net_class
 
         # Assigned during add
         self._id = -1
-        self._project = None
+        self._project: Optional['pcbre.model.project.Project'] = None
 
     @property
-    def name(self):
+    def name(self) -> str:
         if self._name:
             return self._name
         else:
             return "N$%d" % self._id
 
     @name.setter
-    def name(self, value):
+    def name(self, value: str) -> None:
         if Net.__net_class_match.match(value) or value.strip() == "":
             self._name = None
         else:
             self._name = value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<Net %s %s %s>" % (self._id, self.name, ("(%s)" % self.net_class) if self.net_class else "")

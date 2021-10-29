@@ -1,5 +1,4 @@
 from pcbre.matrix import Point2
-from pcbre.model.component import Component
 from pcbre.model.const import TFF
 from pcbre.ui.tools.basetool import BaseToolController, BaseTool
 from .net_dialog import NetDialog

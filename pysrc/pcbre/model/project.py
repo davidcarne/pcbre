@@ -1,123 +1,98 @@
-from qtpy import QtCore
 import os
-from pcbre.model.const import SIDE
-
-from pcbre.model.net import Net
+from typing import List, Tuple, Sequence, Optional, BinaryIO
 
 import pcbre.model.serialization as ser
 from pcbre.model.artwork import Artwork
-from pcbre.model.change import ModelChange, ChangeType
+from pcbre.model.const import SIDE
 from pcbre.model.imagelayer import ImageLayer, KeyPoint
+from pcbre.model.net import Net
 from pcbre.model.serialization import SContext
 from pcbre.model.stackup import Layer, ViaPair
 from pcbre.model.util import ImmutableListProxy
-
 
 MAGIC = b"PCBRE\x00"
 VERSION_MAGIC = b"\x01\x00"
 
 
-class ProjectConfig(dict):
-    def serialize(self):
-        pass
-
-    def deserialize(self):
-        pass
-
-
 class ProjectIsBadException(Exception):
-    def __init__(self, reason):
+    def __init__(self, reason: str) -> None:
         self.__reason = reason
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.__reason
 
 
-class Stackup(QtCore.QObject):
-    def __init__(self, project):
+class Stackup:
+    def __init__(self, project: 'Project') -> None:
         super(Stackup, self).__init__()
 
         self.__project = project
-        self.__layers = []
-        self.__via_pairs = []
+        self.__layers: List[Layer] = []
+        self.__via_pairs: List[ViaPair] = []
 
         self.layers = ImmutableListProxy(self.__layers)
         self.via_pairs = ImmutableListProxy(self.__via_pairs)
 
-    changed = QtCore.Signal(ModelChange)
-
-    def add_via_pair(self, via_pair):
-        assert via_pair._project is None
-        via_pair._project = self.__project
+    def add_via_pair(self, via_pair: ViaPair) -> None:
         self.__via_pairs.append(via_pair)
-        self.changed.emit(ModelChange(self.via_pairs, ChangeType.ADD, via_pair))
 
-    def remove_via_pair(self, via_pair):
-        assert via_pair._project is self.__project
-
+    def remove_via_pair(self, via_pair: ViaPair) -> None:
         raise NotImplementedError("Via Pair removal not finished")
-        self.changed.emit(ModelChange(self.via_pairs, ChangeType.REMOVE, via_pair))
         # TODO, check for vias
 
         self.__via_pairs.erase(via_pair)
 
-    def via_pair_has_geom(self, via_pair):
+    def via_pair_has_geom(self, via_pair: ViaPair) -> None:
         raise NotImplementedError("Via Pair geom check not finished")
 
-    def via_pair_for_layers(self, layers):
+    def via_pair_for_layers(self, layers: Sequence[Layer]) -> Optional[ViaPair]:
         for vp in self.via_pairs:
             first_layer, second_layer = vp.layers
             if all(first_layer.order <= l.order <= second_layer.order for l in layers):
                 return vp
         return None
 
-    def __renumber_layers(self):
+    def __renumber_layers(self) -> None:
         for n, i in enumerate(self.__layers):
             i.number = n
 
-    def add_layer(self, layer):
-        assert not layer._project
-        layer._project = self.__project
+    def add_layer(self, layer: Layer) -> None:
         self.__layers.append(layer)
         self.__renumber_layers()
-        self.changed.emit(ModelChange(self.layers, layer, ChangeType.ADD))
 
-    def remove_layer(self, layer):
-        assert layer._project == self.__project
-        layer._project = None
+    def remove_layer(self, layer: Layer) -> None:
         self.__layers.remove(layer)
         self.__renumber_layers()
-        self.changed.emit(ModelChange(self.layers, layer, ChangeType.REMOVE))
 
-    def check_layer_has_geom(self, layer):
+    def check_layer_has_geom(self, layer: Layer) -> None:
         raise NotImplementedError("Check Layer Geom not finished")
 
-    def _order_for_layer(self, layer):
+    def _order_for_layer(self, layer: Layer) -> int:
         return self.__layers.index(layer)
 
-    def set_layer_order(self, layer, n):
+    def set_layer_order(self, layer: Layer, n: int) -> None:
         self.__layers.remove(layer)
         self.__layers.insert(n, layer)
 
     @property
-    def top_layer(self):
+    def top_layer(self) -> Layer:
         return self.__layers[0]
 
     @property
-    def bottom_layer(self):
+    def bottom_layer(self) -> Layer:
         return self.__layers[-1]
 
     @property
-    def both_sides(self):
+    def both_sides(self) -> Tuple[Layer, Layer]:
         return self.__layers[0], self.__layers[-1]
 
-    def layer_for_side(self, side):
+    def layer_for_side(self, side: SIDE) -> Layer:
         if side == SIDE.Bottom:
             return self.bottom_layer
         else:
             return self.top_layer
 
-    def side_for_layer(self, layer):
+    def side_for_layer(self, layer: Layer) -> Optional[SIDE]:
         if layer == self.bottom_layer:
             return SIDE.Bottom
         elif layer == self.top_layer:
@@ -125,20 +100,20 @@ class Stackup(QtCore.QObject):
 
         return None
 
-    def serialize(self):
+    def serialize(self) -> ser.Stackup:
         _stackup = ser.Stackup.new_message()
         _stackup.init("layers", len(self.__layers))
 
-        for n, i in enumerate(self.__layers):
-            _stackup.layers[n] = i.serialize()
+        for n, i_l in enumerate(self.__layers):
+            _stackup.layers[n] = i_l.serialize()
 
         _stackup.init("viapairs", len(self.__via_pairs))
-        for n, i in enumerate(self.__via_pairs):
-            _stackup.viapairs[n] = i.serialize()
+        for n, i_vp in enumerate(self.__via_pairs):
+            _stackup.viapairs[n] = i_vp.serialize()
 
         return _stackup
 
-    def deserialize(self, msg):
+    def deserialize(self, msg: ser.Stackup) -> None:
         self.__layers.clear()
         for i in msg.layers:
             self.__layers.append(Layer.deserialize(self.__project, i))
@@ -151,18 +126,18 @@ class Stackup(QtCore.QObject):
 
 
 class Imagery:
-    def __init__(self, project):
+    def __init__(self, project: 'Project') -> None:
         self.__project = project
 
-        self.__imagelayers = []
-        self.__keypoints = []
-        """ :type : list[KeyPointPosition] """
+        self.__imagelayers: List[ImageLayer] = []
+        self.__keypoints: List[KeyPoint] = []
 
         self.imagelayers = ImmutableListProxy(self.__imagelayers)
         self.keypoints = ImmutableListProxy(self.__keypoints)
 
-    def add_imagelayer(self, imagelayer):
-        assert not imagelayer._project
+    def add_imagelayer(self, imagelayer: ImageLayer) -> None:
+        print(imagelayer._project, self)
+        assert imagelayer._project is None or imagelayer._project is self.__project
         imagelayer._project = self.__project
 
         if imagelayer.alignment is not None:
@@ -170,19 +145,19 @@ class Imagery:
 
         self.__imagelayers.append(imagelayer)
 
-    def _order_for_layer(self, imagelayer):
+    def _order_for_layer(self, imagelayer: ImageLayer) -> int:
         return self.__imagelayers.index(imagelayer)
 
-    def _set_layer_order(self, imagelayer, n):
+    def _set_layer_order(self, imagelayer: ImageLayer, n: int) -> None:
         self.__imagelayers.remove(imagelayer)
         self.__imagelayers.insert(n, imagelayer)
 
-    def add_keypoint(self, kp):
-        assert kp._project is None
+    def add_keypoint(self, kp: KeyPoint) -> None:
+        assert kp._project is None or kp._project is self.__project
         kp._project = self.__project
         self.__keypoints.append(kp)
 
-    def del_keypoint(self, kp):
+    def del_keypoint(self, kp: KeyPoint) -> None:
         """
         Remove a keypoint from the project
         :param kp: Keypoint to remove from the project
@@ -190,7 +165,7 @@ class Imagery:
         :return:
         """
 
-        assert kp._project is self
+        assert kp._project is self.__project
         # Verify that no layers use the keypoint
         assert len(kp.layer_positions) == 0
 
@@ -198,10 +173,10 @@ class Imagery:
 
         self.__keypoints.remove(kp)
 
-    def get_keypoint_index(self, kp):
+    def get_keypoint_index(self, kp: KeyPoint) -> int:
         return self.keypoints.index(kp)
 
-    def serialize(self):
+    def serialize(self) -> ser.Imagery:
         imagery = ser.Imagery.new_message()
 
         imagery.init("imagelayers", len(self.imagelayers))
@@ -210,12 +185,12 @@ class Imagery:
 
         imagery.init("keypoints", len(self.keypoints))
 
-        for n, i in enumerate(self.keypoints):
-            imagery.keypoints[n] = i.serialize()
+        for n, i_ in enumerate(self.keypoints):
+            imagery.keypoints[n] = i_.serialize()
 
         return imagery
 
-    def deserialize(self, msg):
+    def deserialize(self, msg: ser.Imagery) -> None:
         # Keypoints may be used by the imagelayers during deserialize
         # Deserialize first to avoid a finalizer
         for i in msg.keypoints:
@@ -225,31 +200,29 @@ class Imagery:
             self.__imagelayers.append(ImageLayer.deserialize(self.__project, i))
 
 
-class Nets(QtCore.QObject):
-    changed = QtCore.Signal(ModelChange)
-
-    def __init__(self, project):
+class Nets:
+    def __init__(self, project: 'Project') -> None:
         super(Nets, self).__init__()
 
-        self.__project = project
+        self.__project: Optional[Project] = project
 
-        self.__nets = list()
+        self.__nets: List[Net] = list()
         self.__max_id = 0
 
         self.nets = ImmutableListProxy(self.__nets)
 
-    def new(self):
+    def new(self) -> Net:
         n = Net()
         self.add_net(n)
         return n
 
-    def add_net(self, net):
+    def add_net(self, net: Net) -> None:
         """
         Add a net to the project. Sets a transient unused net ID
         :param net: net to be added
         :return:
         """
-        assert net._project is None
+        assert net._project is None or net._project is self.__project
 
         net._project = self.__project
         self.__max_id += 1
@@ -257,17 +230,15 @@ class Nets(QtCore.QObject):
 
         self.__nets.append(net)
 
-        self.changed.emit(ModelChange(self, net, ChangeType.ADD))
-
-    def remove_net(self, net):
+    def remove_net(self, net: Net) -> None:
         assert net._project == self.__project
 
         # TODO, strip net from all artwork that has it / verify
-
-        self.changed.emit(ModelChange(self, net, ChangeType.REMOVE))
         self.__nets.remove(net)
 
-    def serialize(self):
+    def serialize(self) -> ser.Nets:
+        assert self.__project is not None
+
         _nets = ser.Nets.new_message()
         _nets.init("netList", len(self.nets))
         for n, i in enumerate(self.nets):
@@ -277,7 +248,9 @@ class Nets(QtCore.QObject):
 
         return _nets
 
-    def deserialize(self, msg):
+    def deserialize(self, msg: ser.Nets) -> None:
+        assert self.__project is not None
+
         for i in msg.netList:
             n = Net(name=i.name, net_class=i.nclass)
             self.__project.scontext.set_sid(i.sid, n)
@@ -286,10 +259,10 @@ class Nets(QtCore.QObject):
 
 class Project:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.scontext = SContext()
 
-        self.filepath = None
+        self.filepath: Optional[str] = None
 
         self.imagery = Imagery(self)
 
@@ -299,15 +272,14 @@ class Project:
         self.nets = Nets(self)
 
     @property
-    def can_save(self):
+    def can_save(self) -> bool:
         return self.filepath is not None
 
     @staticmethod
-    def create():
-        pass
+    def create() -> 'Project':
         return Project()
 
-    def _serialize(self):
+    def _serialize(self) -> ser.Project:
         project = ser.Project.new_message()
         project.stackup = self.stackup.serialize()
         project.imagery = self.imagery.serialize()
@@ -317,7 +289,7 @@ class Project:
         return project
 
     @staticmethod
-    def _deserialize(msg):
+    def _deserialize(msg: ser.Project) -> 'Project':
         p = Project()
         with p.scontext.restoring():
             p.stackup.deserialize(msg.stackup)
@@ -327,7 +299,7 @@ class Project:
         return p
 
     @staticmethod
-    def open(path):
+    def open(path: str) -> 'Project':
         f = open(path, "rb", buffering=0)
         self = Project.open_fd(f)
         self.filepath = path
@@ -335,7 +307,7 @@ class Project:
         return self
 
     @staticmethod
-    def open_fd(fd):
+    def open_fd(fd: BinaryIO) -> 'Project':
         magic = fd.read(8)
         if magic[:6] != MAGIC:
             raise ValueError("Unknown File Type")
@@ -348,13 +320,13 @@ class Project:
         self = Project._deserialize(_project)
         return self
 
-    def save_fd(self, fd):
+    def save_fd(self, fd: BinaryIO) -> None:
         fd.write(MAGIC + VERSION_MAGIC)
 
         message = self._serialize()
         message.write(fd)
 
-    def save(self, path=None, update_path=False):
+    def save(self, path: Optional[str] = None, update_path: bool = False) -> None:
         if path is None:
             path = self.filepath
 
@@ -387,9 +359,5 @@ class Project:
         f.flush()
         f.close()
 
-    def close(self):
+    def close(self) -> None:
         pass
-
-
-def openProject():
-    pass

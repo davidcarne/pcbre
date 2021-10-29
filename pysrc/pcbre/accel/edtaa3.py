@@ -1,4 +1,3 @@
-import os.path
 import ctypes
 from .find_so import find_so
 dll = ctypes.CDLL(find_so("_edtaa3"))

@@ -1,12 +1,18 @@
 from collections import defaultdict
-from OpenGL import GL
-from OpenGL.arrays.vbo import VBO
-from pcbre.ui.gl import VAO, vbobind, glimports as GLI
+from OpenGL import GL  # type: ignore
+from OpenGL.arrays.vbo import VBO  # type: ignore
+from pcbre.ui.gl import VAO, VBOBind, glimports as GLI
 import ctypes
 import numpy
 from pcbre.matrix import Point2
 from pcbre.view.rendersettings import RENDER_STANDARD, RENDER_OUTLINES, RENDER_SELECTED, RENDER_HINT_NORMAL
 from pcbre.view.util import get_consolidated_draws
+
+from typing import TYPE_CHECKING, List
+
+if TYPE_CHECKING:
+    from pcbre.ui.boardviewwidget import BoardViewWidget
+    from pcbre.ui.gl.glshared import GLShared
 
 __author__ = 'davidc'
 
@@ -14,7 +20,7 @@ __author__ = 'davidc'
 class PolygonVBOPair:
     __RESTART_INDEX = 2 ** 32 - 1
 
-    def __init__(self, view):
+    def __init__(self, view: 'BoardViewWidget') -> None:
         """
         :type gls: pcbre.ui.gl.glshared.GLShared
         :param gls:
@@ -23,8 +29,8 @@ class PolygonVBOPair:
         self.__view = view
         self.__gls = view.gls
 
-        self.__position_list = []
-        self.__position_lookup = {}
+        self.__position_list : List[Point2] = []
+        self.__position_lookup : dict[Point2, int] = {}
 
         # Known_polys is a list of (start,end) indicies in self.__index_list
         self.__tri_draw_ranges = {}
@@ -38,11 +44,11 @@ class PolygonVBOPair:
 
         self.restart()
 
-    def restart(self):
+    def restart(self) -> None:
         self.__deferred_tri_render_ranges = defaultdict(list)
         self.__deferred_line_render_ranges = defaultdict(list)
 
-    def initializeGL(self):
+    def initializeGL(self) -> None:
         self.__vao = VAO()
 
         # Lookup for vertex positions
@@ -58,10 +64,10 @@ class PolygonVBOPair:
         self.__shader = self.__gls.shader_cache.get("vert2", "frag1")
 
         with self.__vao, self.__vert_vbo:
-            vbobind(self.__shader, self.__vert_vbo_dtype, "vertex").assign()
+            VBOBind(self.__shader.program, self.__vert_vbo_dtype, "vertex").assign()
             self.__index_vbo.bind()
 
-    def __update_vert_vbo(self):
+    def __update_vert_vbo(self) -> None:
         if self.__vert_vbo_current or not len(self.__position_list):
             return
 
@@ -72,7 +78,7 @@ class PolygonVBOPair:
         self.__vert_vbo.bind()
         self.__vert_vbo_current = True
 
-    def __update_index_vbo(self):
+    def __update_index_vbo(self) -> None:
         if self.__index_vbo_current or not len(self.__tri_index_list):
             return
 
@@ -82,14 +88,14 @@ class PolygonVBOPair:
         self.__index_vbo.bind()
         self.__index_vbo_current = True
 
-    def __get_position_index(self, point):
+    def __get_position_index(self, point: Point2) -> int:
         """
         Get the index in the point VBO for a given Point2 coordinate
         :type point: pcbre.matrix.Point2
         :param point:
         :return:
         """
-        norm_pos = point.intTuple()
+        norm_pos = point.to_int_tuple()
 
         try:
             return self.__position_lookup[norm_pos]
@@ -149,8 +155,8 @@ class PolygonVBOPair:
             else:
                 return tuple(overall_color) + (1,)
 
-        with self.__shader, self.__vao:
-            GL.glUniformMatrix3fv(self.__shader.uniforms.mat, 1, True, matrix.ctypes.data_as(GLI.c_float_p))
+        with self.__shader.program, self.__vao:
+            GL.glUniformMatrix3fv(self.__shader.uniforms.mat, 1, True, matrix.astype(numpy.float32))
 
             for rs, ranges in self.__deferred_tri_render_ranges.items():
                 tri_draw_list = get_consolidated_draws(ranges)

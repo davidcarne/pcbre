@@ -1,22 +1,19 @@
 __author__ = "davidc"
 
-from qtpy import QtCore
 from contextlib import contextmanager
 import numpy
+from typing import List, Type, Callable, Any, Generator
 
-class mdlbase(object):
-    pass
-
-class mdlacc(mdlbase):
-    def __init__(self, initial, on=lambda self: None):
+class mdlacc:
+    def __init__(self, initial: 'Any', on : 'Callable[[Any], None]' =lambda self: None) -> None:
         self.value = initial
         self.on = on
 
-    def fixup(self, name):
+    def fixup(self, name: str) -> None:
         assert not hasattr(self, "name")
         self.name = "_%s" % name
 
-    def __get__(self, instance, objtype):
+    def __get__(self, instance: 'GenModel', objtype: Any) -> Any:
         try:
             name = self.name
         except AttributeError:
@@ -28,7 +25,7 @@ class mdlacc(mdlbase):
             setattr(instance, self.name, self.value)
             return getattr(instance, self.name)
 
-    def __set__(self, instance, value):
+    def __set__(self, instance: 'GenModel', value : Any) -> None:
         try:
             name = self.name
         except AttributeError:
@@ -48,38 +45,48 @@ class mdlacc(mdlbase):
             instance.change()
             self.on(instance)
 
-_base = type(QtCore.QObject.__bases__[0])
 
-class GenModelMeta(_base):
-    def __new__(mcs, name, bases, dict):
-        for k, v in list(dict.items()):
-            if isinstance(v, mdlbase):
+class GenModelMeta(type):
+    def __new__(mcs, name: 'str', bases: List[Type], d: 'dict[str, Any]') -> 'Any':
+        for k, v in list(d.items()):
+            if isinstance(v, mdlacc):
                 v.fixup("_%s" % k)
 
-        return _base.__new__(mcs, name, bases, dict)
+        return type.__new__(mcs, name, bases, d)
 
-wc = 0
-import threading
-class GenModel(QtCore.QObject, metaclass=GenModelMeta):
+class TinySignal:
+    def __init__(self) -> None:
+        self.__l = set()
+
+    def connect(self, x: Callable[[], None]) -> None:
+        self.__l.add(x)
+
+    def disconnect(self, x: Callable[[], None]) -> None:
+        self.__l.remove(x)
+
+    def emit(self) -> None:
+        for i in self.__l:
+            i()
+
+class GenModel(metaclass=GenModelMeta):
     """
     GenModel is a smart "model" class that may be used to construct models that will
     """
-    def __init__(self):
+    def __init__(self) -> None:
         super(GenModel, self).__init__()
         self.__editing = 0
         self.__changed = False
 
-    changed = QtCore.Signal()
+        self.changed = TinySignal()
 
-    @QtCore.Slot()
-    def change(self):
+    def change(self) -> None:
         if self.__editing:
             self.__changed = True
         else:
             self.changed.emit()
 
     @contextmanager
-    def edit(self):
+    def edit(self) -> 'Generator[None, None, None]':
         self.__editing += 1
         yield
         self.__editing -= 1
@@ -87,7 +94,7 @@ class GenModel(QtCore.QObject, metaclass=GenModelMeta):
             self.changed.emit()
             self.__changed = False
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key: str, value: Any) -> None:
         if key not in ("changed", "__editing", "__changed"):
             if hasattr(self, key):
                 old_value = getattr(self, key)

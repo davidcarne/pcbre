@@ -1,56 +1,63 @@
+import enum
 from collections import defaultdict
+from typing import Dict
 
-
+from pcbre import units
 from pcbre.accel.vert_array import VA_thickline, VA_via
+from pcbre.matrix import Vec2
+from pcbre.model.artwork_geom import Trace, Via
+from pcbre.model.stackup import Layer
+from pcbre.ui.tool_action import ToolActionDescription, ToolActionShortcut, Modifier, EventID, ToolActionEvent, \
+    MoveEvent
+from pcbre.ui.undo import UndoMerge
 from pcbre.view.target_const import COL_LAYER_MAIN
 from .basetool import BaseTool, BaseToolController
-from pcbre import units
-from pcbre.matrix import Point2, translate, Vec2
-from pcbre.model.artwork import Via
-from pcbre.model.artwork_geom import Trace, Via
-from pcbre.ui.boardviewwidget import QPoint_to_pair
-from pcbre.ui.undo import UndoMerge
 
-from pcbre.ui.tool_action import ActionDescription, ActionShortcut, Modifier, EventID
 
-from pcbre.ui.widgets.unitedit import UnitLineEdit, UNIT_GROUP_MM
-from pcbre.view.rendersettings import RENDER_OUTLINES
+from typing import TYPE_CHECKING, Any, Optional, Callable, List, Tuple
 
-import enum
+if TYPE_CHECKING:
+    from pcbre.model.project import Project
+    from pcbre.view.layer_render_target import CompositeManager
+    from pcbre.ui.boardviewwidget import BoardViewWidget
 
-ROUTING_STRAIGHT = 0
-ROUTING_45 = 1
-ROUTING_90 = 2
-ROUTING_MOD = 3
+
+class RoutingMode(enum.Enum):
+    STRAIGHT = 0
+    _45 = 1
+    _90 = 2
+    MOD = 3
 
 
 class TraceEventCode(enum.Enum):
-    DecreaseThickness = 0   # wheel-down
-    IncreaseThickness = 1   # wheel-up
-    AbortPlace = 2      # escape
-    PlaceSegment = 3         # enter, click
-    PlaceAll = 4      # shift-click, shift-enter
+    DecreaseThickness = 0  # wheel-down
+    IncreaseThickness = 1  # wheel-up
+    AbortPlace = 2  # escape
+    PlaceSegment = 3  # enter, click
+    PlaceAll = 4  # shift-click, shift-enter
     CycleRouteMode = 5  # shift-space
-    CycleRouteDir = 6   # space
+    CycleRouteDir = 6  # space
+
 
 class TraceToolOverlay:
-    def __init__(self, ctrl):
+    def __init__(self, ctrl: 'TraceToolController') -> None:
         """
         :type ctrl: TraceToolController
         """
         self.view = ctrl.view
         self.ctrl = ctrl
 
-    def initializeGL(self, _):
+    def initializeGL(self, _: Any) -> None:
         pass
 
-    def render(self, viewport, compositor):
-        via, traces =  self.ctrl.get_artwork()
+    def render(self, viewport: Any, compositor: 'CompositeManager') -> None:
+        via, traces = self.ctrl.get_artwork()
 
         va_for_via = VA_via(1024)
 
         # Render by drawing the VA
-        va_for_ly = defaultdict(lambda: VA_thickline(1024))
+        va_for_ly: Dict[Layer, VA_thickline] = \
+            defaultdict(lambda: VA_thickline(1024))
 
         if via:
             va_for_via.add_donut(via.pt.x, via.pt.y, via.r)
@@ -72,11 +79,8 @@ class TraceToolOverlay:
                         COL_LAYER_MAIN, True)
 
 
-
-
-
 class TraceToolController(BaseToolController):
-    def __init__(self, view, submit, project, toolsettings):
+    def __init__(self, view: 'BoardViewWidget', submit: 'Callable[[Any], None]', project: 'Project', toolsettings: 'TraceToolSettings') -> None:
         """
 
         :type view: pcbre.ui.boardviewwidget.BoardViewWidget
@@ -89,19 +93,20 @@ class TraceToolController(BaseToolController):
 
         self.toolsettings = toolsettings
 
-        self.cur_pt = Point2(0,0)
+        self.cur_pt = Vec2(0, 0)
         self.last_pt = None
         self.last_layer = None
 
         self.overlay = TraceToolOverlay(self)
 
-        # TODO: HACK
-        self.actions = g_ACTIONS
-
-        self.routing_mode = ROUTING_STRAIGHT
+        self.routing_mode = RoutingMode.STRAIGHT
         self.routing_dir = False
 
-    def get_artwork(self):
+    @property
+    def tool_actions(self) -> 'List[ToolActionDescription]':
+        return g_ACTIONS
+
+    def get_artwork(self) -> Tuple[Optional[Via], List[Trace]]:
         if self.view.current_layer_hack() is None:
             return None, []
 
@@ -122,28 +127,28 @@ class TraceToolController(BaseToolController):
                 initial_via = Via(self.last_pt, vp, self.toolsettings.via_radius)
 
         # Single straight trace
-        if self.routing_mode == ROUTING_STRAIGHT:
+        if self.routing_mode == RoutingMode.STRAIGHT:
             return initial_via, [Trace(self.last_pt, self.cur_pt, self.toolsettings.thickness, layer, None)]
-        
+
         # 90 degree bend
-        elif self.routing_mode == ROUTING_90:
+        elif self.routing_mode == RoutingMode._90:
 
             # position of bend point
             if self.routing_dir:
-                pa = Point2(self.last_pt.x, self.cur_pt.y)
+                pa = Vec2(self.last_pt.x, self.cur_pt.y)
             else:
-                pa = Point2(self.cur_pt.x, self.last_pt.y)
+                pa = Vec2(self.cur_pt.x, self.last_pt.y)
 
             return initial_via, [
                 Trace(self.last_pt, pa, self.toolsettings.thickness, layer, None),
                 Trace(pa, self.cur_pt, self.toolsettings.thickness, layer, None)
             ]
 
-        elif self.routing_mode == ROUTING_45:
+        elif self.routing_mode == RoutingMode._45:
 
             d_v = self.cur_pt - self.last_pt
 
-            d_nv = Vec2(d_v)
+            d_nv = d_v.dup()
 
             if abs(d_v.y) < abs(d_v.x):
                 if d_nv.x > 0:
@@ -158,7 +163,6 @@ class TraceToolController(BaseToolController):
 
             d_vh = d_v - d_nv
 
-
             if self.routing_dir:
                 pa = self.last_pt + d_nv
             else:
@@ -169,17 +173,16 @@ class TraceToolController(BaseToolController):
                 Trace(pa, self.cur_pt, self.toolsettings.thickness, layer, None)
             ]
 
+    def cycle_routing_modes(self) -> None:
+        self.routing_mode = RoutingMode((self.routing_mode.value + 1) % RoutingMode.MOD.value)
 
-    def cycle_routing_modes(self):
-        self.routing_mode = (self.routing_mode + 1) % ROUTING_MOD
-
-    def cycle_routing_dir(self):
+    def cycle_routing_dir(self) -> None:
         self.routing_dir = not self.routing_dir
 
-    def showSettingsDialog(self):
+    def showSettingsDialog(self) -> None:
         pass
 
-    def traceEnterPoint(self, evt, multi_seg=True):
+    def traceEnterPoint(self, evt: 'ToolActionEvent', multi_seg=True) -> None:
         self.cur_pt = evt.world_pos
 
         layer = self.view.current_layer_hack()
@@ -196,11 +199,17 @@ class TraceToolController(BaseToolController):
                 v_list = [via]
 
             if multi_seg:
-                self.submit(UndoMerge(self.project, v_list + list(traces), "Routing"))
+                total_list: List[Any] = []
+                total_list += v_list
+                total_list += list(traces)
+                self.submit(UndoMerge(self.project, total_list, "Routing"))
                 self.last_pt = self.cur_pt
                 self.last_layer = layer
             else:
-                self.submit(UndoMerge(self.project, v_list + [traces[0]], "Routing"))
+                total_list: List[Any] = []
+                total_list += v_list
+                total_list.append(traces[0])
+                self.submit(UndoMerge(self.project, total_list, "Routing"))
                 self.last_pt = traces[0].p1
                 self.last_layer = layer
                 self.cycle_routing_dir()
@@ -208,17 +217,16 @@ class TraceToolController(BaseToolController):
             self.last_pt = self.cur_pt
             self.last_layer = layer
 
-
-    def mouseMoveEvent(self, evt):
+    def mouseMoveEvent(self, evt: MoveEvent) -> None:
         self.cur_pt = evt.world_pos
 
-    def eventThickness(self, step):
+    def eventThickness(self, step: int) -> None:
         step = step * 0.050 * units.MM
         self.toolsettings.thickness += step
         if self.toolsettings.thickness <= 100:
             self.toolsettings.thickness = 100
 
-    def event(self, event):
+    def tool_event(self, event: ToolActionEvent) -> None:
         if event.code == TraceEventCode.DecreaseThickness:
             self.event_thickness(-1 * event.amount)
         elif event.code == TraceEventCode.IncreaseThickness:
@@ -239,50 +247,51 @@ class TraceToolController(BaseToolController):
 
 
 g_ACTIONS = [
-    ActionDescription(
-        ActionShortcut(EventID.Mouse_WheelDown, Modifier.Shift),
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Mouse_WheelDown, Modifier.Shift),
         TraceEventCode.DecreaseThickness,
         "Decrease Trace Thickness"),
-    ActionDescription(
-        ActionShortcut(EventID.Mouse_WheelUp, Modifier.Shift),
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Mouse_WheelUp, Modifier.Shift),
         TraceEventCode.IncreaseThickness,
         "Increase Trace Thickness"),
-    ActionDescription(
-        ActionShortcut(EventID.Key_Escape),
+    ToolActionDescription(
+        [ ToolActionShortcut(EventID.Key_Escape), ToolActionShortcut(EventID.Mouse_B2)],
         TraceEventCode.AbortPlace,
         "Abort Placement"),
-    ActionDescription(
+    ToolActionDescription(
         [
-            ActionShortcut(EventID.Key_Enter), 
-            ActionShortcut(EventID.Key_Return), 
-            ActionShortcut(EventID.Mouse_B1)
-            ],
+            ToolActionShortcut(EventID.Key_Enter),
+            ToolActionShortcut(EventID.Key_Return),
+            ToolActionShortcut(EventID.Mouse_B1)
+        ],
         TraceEventCode.PlaceSegment,
         "Place track segment"),
-    ActionDescription(
+    ToolActionDescription(
         [
-            ActionShortcut(EventID.Key_Enter, Modifier.Shift),
-            ActionShortcut(EventID.Key_Return, Modifier.Shift), 
-            ActionShortcut(EventID.Mouse_B1, Modifier.Shift)
-            ],
+            ToolActionShortcut(EventID.Key_Enter, Modifier.Shift),
+            ToolActionShortcut(EventID.Key_Return, Modifier.Shift),
+            ToolActionShortcut(EventID.Mouse_B1, Modifier.Shift)
+        ],
         TraceEventCode.PlaceAll,
         "Place all segments"),
 
-    ActionDescription(
-        ActionShortcut(EventID.Key_Space, Modifier.Shift),
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Key_Space, Modifier.Shift),
         TraceEventCode.CycleRouteMode,
         "Cycle routing mode"),
 
-    ActionDescription(
-        ActionShortcut(EventID.Key_Space),
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Key_Space),
         TraceEventCode.CycleRouteDir,
         "Cycle routing direction"),
 ]
 
-class TraceToolSettings(object):
+
+class TraceToolSettings:
     __slots__ = ["thickness", "via_radius"]
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.thickness = 1000
         self.via_radius = 500
 
@@ -294,12 +303,11 @@ class TraceTool(BaseTool):
     TOOLTIP = 'Trace (t)'
     ACTIONS = g_ACTIONS
 
-    def __init__(self, project):
+    def __init__(self, project: 'Project') -> None:
         super(TraceTool, self).__init__(project)
         self.project = project
         self.ext = []
         self.model = TraceToolSettings()
 
-    def getToolController(self, view, submit):
+    def getToolController(self, view: 'BoardViewWidget', submit: Callable[[Any], None]) -> 'TraceToolController':
         return TraceToolController(view, submit, self.project, self.model)
-

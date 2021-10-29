@@ -1,6 +1,6 @@
-from enum import Enum
 import enum
 import operator
+from enum import Enum
 
 
 class SIDE(Enum):
@@ -24,10 +24,10 @@ class IntersectionClass(enum.Enum):
 
 
 class _TFF(int):
-    def __new__(cls, val):
+    def __new__(cls, val: int) -> "_TFF":
         return int.__new__(cls, val)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         a = []
         ks = [(k, v) for k, v in
               [(k, getattr(TFF, k)) for k in dir(TFF)]
@@ -38,13 +38,13 @@ class _TFF(int):
                 a.append(k)
         return " | ".join("TFF_%s" % k for k in a)
 
-    def __or__(self, other):
+    def __or__(self, other: int) -> "_TFF":
         return _TFF(int.__or__(self, other))
 
-    def __add__(self, other):
+    def __add__(self, other: int) -> "_TFF":
         raise NotImplementedError
 
-    def __sub__(self, other):
+    def __sub__(self, other: int) -> "_TFF":
         raise NotImplementedError
 
 

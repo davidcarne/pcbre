@@ -7,6 +7,12 @@ from qtpy import QtGui, QtCore
 from pcbre.ui.undo import UndoMerge
 from pcbre.view.rendersettings import RENDER_HINT_ONCE
 from pcbre.view.target_const import COL_AIRWIRE
+from pcbre.ui.tool_action import ToolActionDescription, \
+    ToolActionShortcut, EventID
+
+
+class EventCode:
+    Place = 0
 
 AIRWIRE_COLOR = (0.7, 0.7, 0)
 class AirwireToolOverlay(object):
@@ -50,17 +56,24 @@ class AirwireToolController(BaseToolController):
         self.pt0 = None
         self.mouse = None
 
+    @property
+    def tool_actions(self):
+        return g_ACTIONS
+
     def mouseMoveEvent(self, evt):
-        self.mouse = self.view.viewState.tfV2W(Point2(evt.pos()))
+        self.mouse = evt.world_pos
         self.changed.emit()
 
-    def mouseReleaseEvent(self, evt):
-        pt = self.view.viewState.tfV2W(Point2(evt.pos()))
+    def event_place(self, event):
+        pt = event.world_pos
 
-
+        # Find artwork
         aw = self.view.query_point(pt)
+
+        # layer for the artwork
         aw_l = layer_for(aw)
 
+        # No layer (no artwork)
         if aw is None:
             return
 
@@ -73,15 +86,21 @@ class AirwireToolController(BaseToolController):
             aw = Airwire(self.pt0, pt, self.pt0_layer, aw_l, None)
             self.submit(UndoMerge(self.project, aw, "Add Airwire"))
 
-            # Here is where we emit the airwire
-            if evt.modifiers() & QtCore.Qt.ShiftModifier:
-                self.pt0 = pt
-                self.pt0_layer = aw_l
-            else:
-                self.state = self.STATE_IDLE
+            self.state = self.STATE_IDLE
 
         self.changed.emit()
 
+    def tool_event(self, event):
+        if event.code == EventCode.Place:
+            self.event_place(event)
+
+
+g_ACTIONS = [
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Mouse_B1),
+        EventCode.Place,
+        "Place airwire endpoint"),
+]
 
 class AirwireTool(BaseTool):
     ICON_NAME="airwire"
@@ -91,7 +110,7 @@ class AirwireTool(BaseTool):
 
 
     def __init__(self, project):
-        super(AirwireTool, self).__init__(self)
+        super(AirwireTool, self).__init__(project)
         self.project = project
 
     def getToolController(self, view, submit):

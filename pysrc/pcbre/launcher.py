@@ -1,68 +1,84 @@
-# Launcher to look for required packages and fail with a nice error and suggestions on how to proceed
+from typing import List, Dict, Tuple, Optional
+
+# Launcher to look for required packages and
+# fail with a nice error and suggestions on how to proceed
 
 required_packages = [
-        "qtpy",
-        "qtpy.QtCore",
-        "qtpy.QtGui",
-        "qtpy.QtWidgets",
-        "qtpy.QtOpenGL",
-        "capnp",
-        "numpy",
-        "shapely",
-        "p2t",
-        "rtree",
-        "cv2",
-        "OpenGL",
-        "scipy",
-        "freetype"
-        ]
+    "qtpy",
+    "qtpy.QtCore",
+    "qtpy.QtGui",
+    "qtpy.QtWidgets",
+    "qtpy.QtOpenGL",
+    "capnp",
+    "numpy",
+    "shapely",
+    "p2t",
+    "rtree",
+    "cv2",
+    "OpenGL",
+    "scipy",
+    "freetype"
+]
 
-required_objects = [
-        ]
+required_objects: List[str] = []
+
+
+def error(msg: str) -> None:
+    try:
+        import subprocess
+        subprocess.call([
+            "zenity", "--error", "--width", "640", "--text", msg])
+    except FileNotFoundError:
+        pass
+
+    print(msg)
+
+
+def missing_package_error(missing_py_packages: List[str], other: Optional[str]) -> None:
+    error_message = ((
+                             "PCBRE cannot start because the following " +
+                             "python packages are missing: {}\n\n"
+                     ).format(", ".join(sorted(missing_py_packages)))
+                     )
+
+    if other:
+        error_message += other
+
+    error(error_message)
+
+
+def missing_package_error_install(
+        missing_py_packages: List[str], distro_command: str) -> None:
+    install_cmd = (
+        "You may be able to install some or all of these packages by running the following command:\n\n{}"
+    ).format(distro_command)
+
+    missing_package_error(missing_py_packages, install_cmd)
+
 
 class DependencyInstaller:
-    def error(self, msg):
-        try:
-            import subprocess
-            subprocess.call(["zenity", "--error", "--width", "640", "--text", msg])
-        except FileNotFoundError:
-            pass
-        
-        print(msg)
-
-    def show(self, missing_py_packages, missing_objects):
-        self.missing_package_error(missing_py_packages, None)
+    def show(self, missing_py_packages: List[str], missing_objects: List[str]) -> None:
+        missing_package_error(missing_py_packages, None)
         # TODO - objects
 
-    def missing_package_error(self, missing_py_packages, other):
-            error_message = ("PCBRE cannot start because the following python packages are missing: {}\n\n"
-                .format( ", ".join(sorted(missing_py_packages)))
-                )
 
-            if other:
-                error_message += other
-
-            self.error(error_message)
-
-    def missing_package_error_install(self, missing_py_packages, distro_command):
-            install_cmd = (
-                    "You may be able to install some or all of these packages by running the following command:\n\n{}"
-                ).format(distro_command)
-
-
-            self.missing_package_error(missing_py_packages, install_cmd)
-
-class OutdatedDistroInstaller:
-    def __init__(self, distro, version, min_supported):
+class OutdatedDistroInstaller(DependencyInstaller):
+    def __init__(self, distro: str, version: float, min_supported: float):
         self.distro = distro
         self.version = version
         self.min_supported = min_supported
 
-    def show(self, missing_py_packages, missing_objects):
-        self.missing_package_error(missing_py_packages, "Your distribution (%s %s) is not officially supported by PCBRE. The minimum suppored version of %s is %s" % (self.distro, self.version, self.distro, self.min_supported))
+    def show(self, missing_py_packages: List[str], missing_objects: List[str]) -> None:
+        missing_package_error(
+            missing_py_packages,
+            "Your distribution (%s %s) is not officially supported by PCBRE. The minimum supported version of %s is %s"
+            % (self.distro, self.version, self.distro, self.min_supported))
+
 
 class AptDistroInstaller(DependencyInstaller):
-    def show(self, missing_py_packages, missing_objects):
+    PY_PKG_STEPS: Dict[str, Tuple[str, str]] = {}
+
+    def show(self, missing_py_packages: List[str], missing_objects: List[str]) -> None:
         from collections import defaultdict
         targets = defaultdict(list)
 
@@ -79,12 +95,12 @@ class AptDistroInstaller(DependencyInstaller):
         if len(targets["pip"]):
             commands.append("\t# You may wish to use a virtualenv or install with --user")
             commands.append("\tpip install %s" % " ".join(sorted([i[1] for i in targets["pip"]])))
-        
-        self.missing_package_error_install(missing_py_packages, "\n".join(commands))
+
+        missing_package_error_install(missing_py_packages, "\n".join(commands))
 
 
 class DebianBusterInstaller(AptDistroInstaller):
-    PY_PKG_STEPS={
+    PY_PKG_STEPS = {
         "qtpy.QtCore": ("apt", "python3-pyside2.qtcore"),
         "qtpy.QtGui": ("apt", "python3-pyside2.qtgui"),
         "qtpy.QtWidgets": ("apt", "python3-pyside2.qtwidgets"),
@@ -101,8 +117,7 @@ class DebianBusterInstaller(AptDistroInstaller):
     }
 
 
-
-def detect_distro_debian(kv):
+def detect_distro_debian(kv: Dict[str, str]) -> Optional[DependencyInstaller]:
     vers_id = kv.get("VERSION_ID", None)
 
     if vers_id is None:
@@ -118,8 +133,9 @@ def detect_distro_debian(kv):
     else:
         return DebianBusterInstaller()
 
-def detect_distro_linux():
-    try: 
+
+def detect_distro_linux() -> Optional[DependencyInstaller]:
+    try:
         lines = open("/etc/os-release").readlines()
 
         kv = {}
@@ -139,10 +155,10 @@ def detect_distro_linux():
         if kv["ID"] == "debian":
             return detect_distro_debian(kv)
 
-        #elif kv["ID"] == "ubuntu":
+        # elif kv["ID"] == "ubuntu":
         #    return detect_distro_ubuntu(kv)
-        
-        #elif kv["ID"] == "gentoo":
+
+        # elif kv["ID"] == "gentoo":
         #    return detect_distro_gentoo(kv)
 
     except IOError:
@@ -150,7 +166,8 @@ def detect_distro_linux():
 
     return None
 
-def detect_distro():
+
+def detect_distro() -> DependencyInstaller:
     try:
         import platform
         found = None
@@ -166,15 +183,15 @@ def detect_distro():
         print("Error during distro detection:", e)
         return DependencyInstaller()
 
-        
-def launcher_main():
+
+def launcher_main() -> None:
     import pkgutil
 
     missing_pkgs = []
     for pkg_name in required_packages:
         mods = pkg_name.split('.')
         for n in range(len(mods)):
-            gen_pkg_name = ".".join(mods[:n+1])
+            gen_pkg_name = ".".join(mods[:n + 1])
             if not pkgutil.get_loader(gen_pkg_name):
                 missing_pkgs.append(pkg_name)
                 break
@@ -187,6 +204,7 @@ def launcher_main():
     import pcbre.ui.main_gui
 
     pcbre.ui.main_gui.main()
+
 
 if __name__ == "__main__":
     launcher_main()

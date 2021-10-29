@@ -2,13 +2,22 @@ from pcbre.accel.vert_array import VA_thickline
 
 __author__ = 'davidc'
 import math
-from OpenGL import GL
-from OpenGL.arrays.vbo import VBO
+from OpenGL import GL  # type: ignore
+from OpenGL.arrays.vbo import VBO  # type: ignore
 import numpy
 from pcbre.matrix import rotate, Vec2
-from pcbre.ui.gl import VAO, vbobind, glimports as GLI
+from pcbre.ui.gl import VAO, VBOBind, glimports as GLI
 import ctypes
 from pcbre.view.target_const import COL_LAYER_MAIN, COL_SEL
+
+from typing import TYPE_CHECKING, Optional, Any
+
+if TYPE_CHECKING:
+    from pcbre.ui.boardviewwidget import BoardViewWidget
+    from pcbre.ui.gl.glshared import GLShared
+    from pcbre.ui.gl.shader import EnhShaderProgram
+    from pcbre.accel.vert_array import VA_thickline
+    import numpy.typing as npt
 
 NUM_ENDCAP_SEGMENTS = 32
 TRIANGLES_SIZE = (NUM_ENDCAP_SEGMENTS - 1) * 3 * 2 + 3 * 2
@@ -16,29 +25,31 @@ TRIANGLES_SIZE = (NUM_ENDCAP_SEGMENTS - 1) * 3 * 2 + 3 * 2
 FIRST_LINE_LOOP = NUM_ENDCAP_SEGMENTS * 2 + 2
 LINE_LOOP_SIZE = NUM_ENDCAP_SEGMENTS * 2
 
-
 # TODO: Detect automatically
 has_base_instance = True
 
 
 class TraceRender:
-    def __init__(self, parent_view):
+    def __init__(self, parent_view: 'BoardViewWidget') -> None:
         self.parent = parent_view
         self.restart()
 
-    def initializeGL(self, gls):
+    def initializeGL(self, gls: 'GLShared') -> None:
         # Build trace vertex VBO and associated vertex data
         dtype = [("vertex", numpy.float32, 2), ("ptid", numpy.uint32)]
         self.working_array = numpy.zeros(NUM_ENDCAP_SEGMENTS * 2 + 2, dtype=dtype)
         self.trace_vbo = VBO(self.working_array, GL.GL_DYNAMIC_DRAW)
+        GL.glObjectLabel(GL.GL_BUFFER, int(self.trace_vbo), -1, "Thickline Trace VBO")
 
         # Generate geometry for trace and endcaps
         # ptid is a variable with value 0 or 1 that indicates which endpoint the geometry is associated with
         self.__build_trace()
 
-        self.__attribute_shader_vao = VAO()
-        self.__attribute_shader = gls.shader_cache.get(
+        self.__attribute_shader_vao = VAO(debug_name="Thickline attribute shader VAO")
+        shader = gls.shader_cache.get(
             "line_vertex_shader", "basic_fill_frag", defines={"INPUT_TYPE": "in"})
+        assert shader is not None
+        self.__attribute_shader : 'EnhShaderProgram' = shader
 
         # Now we build an index buffer that allows us to render filled geometry from the same
         # VBO.
@@ -60,42 +71,45 @@ class TraceRender:
         arr.append(2 + NUM_ENDCAP_SEGMENTS * 2 - 1)
         arr.append(2)
 
-        arr = numpy.array(arr, dtype=numpy.uint32)
-        self.index_vbo = VBO(arr, target=GL.GL_ELEMENT_ARRAY_BUFFER)
+        arr2 = numpy.array(arr, dtype=numpy.uint32)
+        self.index_vbo = VBO(arr2, target=GL.GL_ELEMENT_ARRAY_BUFFER)
+        GL.glObjectLabel(GL.GL_BUFFER, int(self.index_vbo), -1, "Thickline Index VBO")
 
         self.instance_dtype = numpy.dtype([
             ("pos_a", numpy.float32, 2),
             ("pos_b", numpy.float32, 2),
-            ("thickness", numpy.float32, 1),
+            ("thickness", numpy.float32),
             # ("color", numpy.float32, 4)
         ])
 
+
         # Use a fake array to get a zero-length VBO for initial binding
-        instance_array = numpy.ndarray(0, dtype=self.instance_dtype)
+        instance_array : 'npt.NDArray[Any]' = numpy.ndarray(0, dtype=self.instance_dtype)
         self.instance_vbo = VBO(instance_array)
+        GL.glObjectLabel(GL.GL_BUFFER, int(self.instance_vbo), -1, "Thickline Instance VBO")
 
         with self.__attribute_shader_vao, self.trace_vbo:
-            vbobind(self.__attribute_shader, self.trace_vbo.dtype, "vertex").assign()
-            vbobind(self.__attribute_shader, self.trace_vbo.dtype, "ptid").assign()
+            VBOBind(self.__attribute_shader.program, self.trace_vbo.dtype, "vertex").assign()
+            VBOBind(self.__attribute_shader.program, self.trace_vbo.dtype, "ptid").assign()
 
         with self.__attribute_shader_vao, self.instance_vbo:
-            self.__bind_pos_a = vbobind(self.__attribute_shader, self.instance_dtype, "pos_a", div=1)
-            self.__bind_pos_b = vbobind(self.__attribute_shader, self.instance_dtype, "pos_b", div=1)
-            self.__bind_thickness = vbobind(self.__attribute_shader, self.instance_dtype, "thickness", div=1)
+            self.__bind_pos_a = VBOBind(self.__attribute_shader.program, self.instance_dtype, "pos_a", div=1)
+            self.__bind_pos_b = VBOBind(self.__attribute_shader.program, self.instance_dtype, "pos_b", div=1)
+            self.__bind_thickness = VBOBind(self.__attribute_shader.program, self.instance_dtype, "thickness", div=1)
             # vbobind(self.__attribute_shader, self.instance_dtype, "color", div=1).assign()
             self.__base_rebind(0)
 
             self.index_vbo.bind()
 
-    def __base_rebind(self, base):
+    def __base_rebind(self, base: int) -> None:
         self.__bind_pos_a.assign(base)
         self.__bind_pos_b.assign(base)
         self.__bind_thickness.assign(base)
 
-    def restart(self):
+    def restart(self) -> None:
         pass
 
-    def __build_trace(self):
+    def __build_trace(self) -> None:
         # Update trace VBO
         self.working_array["vertex"][0] = (0, 0)
         self.working_array["ptid"][0] = 0
@@ -115,42 +129,7 @@ class TraceRender:
         self.trace_vbo.bind()
         self.trace_vbo.set_array(self.working_array)
 
-    def render(self, mat):
-
-        # Build and copy VBO. Track draw start/size per layer
-        pos = {}
-
-        accuum = VA_thickline(1024)
-        for layer, ts in self.__deferred_layer.items():
-            pos[layer, False] = (accuum.tell(), ts.nonsel.count())
-            accuum.extend(ts.nonsel)
-
-        for layer, ts in self.__deferred_layer.items():
-            pos[layer, True] = (accuum.tell(), ts.sel.count())
-            accuum.extend(ts.sel)
-
-        # Force full resend of VBO
-        self.instance_vbo.set_array(accuum.buffer()[:])
-        self.instance_vbo.bind()
-
-        with self.__attribute_shader, self.__attribute_shader_vao:
-            GL.glUniformMatrix3fv(self.__attribute_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
-
-            for layer in self.__deferred_layer:
-                with self.parent.compositor.get(layer):
-                    for selected in (False, True):
-                        first, count = pos[layer, selected]
-                        if not count:
-                            continue
-
-                        if selected:
-                            col = COL_SEL
-                        else:
-                            col = COL_LAYER_MAIN
-
-                        self.__render_va_inner(col, False, first, count)
-
-    def __render_va_inner(self, col, is_outline, first, count):
+    def __render_va_inner(self, col: int, is_outline: bool, first: int, count: int) -> None:
         GL.glUniform4ui(self.__attribute_shader.uniforms.layer_info, 255, col, 0, 0)
 
         if has_base_instance:
@@ -177,14 +156,17 @@ class TraceRender:
                     GL.glDrawArraysInstanced(GL.GL_LINE_LOOP, 2, NUM_ENDCAP_SEGMENTS * 2,
                                              count)
 
-    def render_va(self, va, mat, col, is_outline=False, first=0, count=None):
+    def render_va(self, va: 'VA_thickline', mat: 'npt.NDArray[numpy.float64]', col: int, is_outline: bool=False, first:int=0, count: 'Optional[int]'=None) -> None:
+        GL.glPushDebugGroup(GL.GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Thickline Draw")
+        assert self.instance_dtype.itemsize == va.stride
+
         self.instance_vbo.set_array(va.buffer()[:])
-        self.instance_vbo.bind()
 
         if count is None:
             count = va.count() - first
 
-        with self.__attribute_shader, self.__attribute_shader_vao:
-            GL.glUniformMatrix3fv(self.__attribute_shader.uniforms.mat, 1, True, mat.ctypes.data_as(GLI.c_float_p))
+        with self.__attribute_shader.program, self.__attribute_shader_vao, self.instance_vbo:
+            GL.glUniformMatrix3fv(self.__attribute_shader.uniforms.mat, 1, True, mat.astype(numpy.float32))
 
             self.__render_va_inner(col, is_outline, first, count)
+        GL.glPopDebugGroup()

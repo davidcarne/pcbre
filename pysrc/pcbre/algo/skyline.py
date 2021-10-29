@@ -2,36 +2,38 @@
 (See: http://clb.demon.fi/files/RectangleBinPack.pdf pp 25). It is used in pcbre for packing rectangular sprites into
 textures. An example usage is text-sprite generation"""
 
-import math
 import itertools
+import math
 import operator
-
+from typing import Sequence, Optional, Tuple, List, Generator, TypeVar
 
 __author__ = 'davidc'
 
 
-class _SkyLineNode(object):
+class _SkyLineNode:
     """ A set of skyline nodes describe the skyline. They are organized in a singly linked list.
     Each node has a coordinate (left, height) that describes the upper-left corner edge of a skyline block.
     The width of the block (which continues at 'height') is implicit to either the 'left' of the next block, or to the
     width of the area on which the skyline is being run.
     """
-    def __init__(self, left=0, height=0):
+
+    def __init__(self, left: int = 0, height: int = 0) -> None:
         self.left = left
         self.height = height
 
-        self.next = None
+        self.next: Optional['_SkyLineNode'] = None
+        self.prev: Optional['_SkyLineNode'] = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<node: %d,%d>" % (self.left, self.height)
 
 
-def print_skyline(s):
+def print_skyline(s: _SkyLineNode) -> str:
     return ", ".join("%d,%d" % (s.left, s.height) for s in _node_iter(s))
 
 
-class _StartHeight(object):
-    def __init__(self, startnode, head=False):
+class _StartHeight:
+    def __init__(self, startnode: _SkyLineNode, head: bool = False) -> None:
         self.height = startnode.height
         self.node = startnode
 
@@ -41,12 +43,12 @@ class _StartHeight(object):
         self.reset()
         self.head = head
 
-    def reset(self):
+    def reset(self) -> None:
         assert self.head
-        self.prev = self
-        self.next = self
+        self.prev: '_StartHeight' = self
+        self.next: '_StartHeight' = self
 
-    def unlink(self):
+    def unlink(self) -> None:
         assert not self.head
         self.prev.next = self.next
         self.next.prev = self.prev
@@ -54,14 +56,14 @@ class _StartHeight(object):
         self.prev = self
         self.next = self
 
-    def append(self, node):
+    def append(self, node: "_StartHeight") -> None:
         node.prev = self
         node.next = self.next
 
         self.next.prev = node
         self.next = node
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if self.head:
             nodes = itertools.takewhile(lambda x: x != self, _node_iter(self.next))
             return ", ".join("%s height: %d fw:%d" % (s.node, s.height, s.wasted_width) for s in nodes)
@@ -69,38 +71,39 @@ class _StartHeight(object):
             return "<%s height: %d fw:%d>" % (self.node, self.height, self.wasted_width)
 
 
-def _node_iter(node):
+T = TypeVar('T', _SkyLineNode, _StartHeight)
+
+
+def _node_iter(node: Optional[T]) -> Generator[T, None, None]:
     while node is not None:
         yield node
         node = node.next
 
 
-class SkyLine(object):
+class SkyLine:
     """The SkyLine class represents a mutable 'SkyLine' in area (width, height). Initially, the skyline is zero-height.
     The 'pack' and 'pack_multiple' functions may be used to allocate rectangular areas, and update the skyline.
 
     The SkyLine class itself does not directly manage any
     """
-    def __init__(self, width, height):
-        self.width = width
-        self.height = height
 
-        self.first = _SkyLineNode()
+    def __init__(self, width: int, height: int) -> None:
+        self.width: int = width
+        self.height: int = height
 
-    def first_iter(self):
+        self.first: _SkyLineNode = _SkyLineNode()
+
+    def first_iter(self) -> Generator[_SkyLineNode, None, None]:
         """return an iterator that walks the nodes from left to right"""
         return _node_iter(self.first)
 
-    def width(self, node):
-        return self.next_left(node) - node.width
-
-    def next_left(self, node):
+    def next_left(self, node: _SkyLineNode) -> int:
         if node.next is None:
             return self.width
 
         return node.next.left
 
-    def merge(self):
+    def merge(self) -> None:
         node = self.first
 
         for node in self.first_iter():
@@ -109,7 +112,7 @@ class SkyLine(object):
                     break
                 node.next = next_node.next
 
-    def split(self, node, splitpoint, height):
+    def split(self, node: _SkyLineNode, splitpoint: int, height: int) -> None:
         assert splitpoint > node.left
         assert splitpoint <= self.width
         assert height > node.height
@@ -143,9 +146,6 @@ class SkyLine(object):
                     # This case should be impossible
                     # if it occurs, something is wrong with the skyline
                     assert False
-                    next.left = splitpoint
-                    node.next = next
-                    return
                 else:
                     newnode = _SkyLineNode(splitpoint, last_height)
                     newnode.next = next
@@ -160,7 +160,7 @@ class SkyLine(object):
         node.next = newnode
         self.merge()
 
-    def find(self, width, height):
+    def find(self, width: int, height: int) -> Optional[_StartHeight]:
         # We use a left-to-right sweep that tracks the viable
         # candidate start points as seen looking back to the left
 
@@ -203,7 +203,7 @@ class SkyLine(object):
 
         return None
 
-    def pack(self, width, height):
+    def pack(self, width: int, height: int) -> Optional[Tuple[int, int]]:
         width = math.ceil(width)
         height = math.ceil(height)
         cand = self.find(width, height)
@@ -215,23 +215,28 @@ class SkyLine(object):
 
         return cand.node.left, cand.height
 
-    def pack_multiple(self, tuples):
+    def pack_multiple(self, tuples: Sequence[Tuple[int, int]]) -> List[Tuple[int, int]]:
         packl = list(enumerate(tuples))
 
-        results = [None] * len(tuples)
+        results: List[Tuple[int, Tuple[int, int]]] = []
 
         while packl:
-            scores = []
+            scores: List[Tuple[int, int, _StartHeight]] = []
+
             for n_l, (n_initial, (width, height)) in enumerate(packl):
-                scores.append((n_l, height, self.find(width, height)))
+                sh = self.find(width, height)
+                if sh is not None:
+                    scores.append((n_l, height, sh))
 
             win_index, glyph_height, win_cand = min(scores, key=lambda x: (x[2].height + x[1], x[2].wasted_width))
             width, height = packl[win_index][1]
 
             self.split(win_cand.node, win_cand.node.left + width, win_cand.height + height)
 
-            results[packl[win_index][0]] = win_cand.node.left, win_cand.height
+            results.append((packl[win_index][0], (win_cand.node.left, win_cand.height)))
 
             del packl[win_index]
 
-        return results
+        assert len(results) == len(tuples)
+
+        return [t for _, t in sorted(results, key=lambda x: x[0])]

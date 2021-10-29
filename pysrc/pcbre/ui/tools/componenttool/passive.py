@@ -7,12 +7,17 @@ from pcbre.ui.dialogs.settingsdialog import AutoSettingsWidget, UnitEditable, Po
 from pcbre.ui.tools.multipoint import EditablePoint, OffsetDefaultPoint, MultipointEditFlow
 from pcbre.ui.uimodel import GenModel, mdlacc
 from pcbre.ui.widgets.unitedit import UNIT_GROUP_MM
+from typing import Tuple, Optional, NamedTuple, Dict
 
 __author__ = 'davidc'
 
-from collections import namedtuple
 
-_well_known_t = namedtuple("well_known", ["name", "body_type", "pin_d", "body_size", "pad_size"])
+_well_known_t = NamedTuple("well_known", [
+    ("name", str),
+    ("body_type", Passive2BodyType),
+    ("pin_d", float),
+    ("body_size", Vec2),
+    ("pad_size", Vec2)])
 
 # Passive SMD "chip" components come in various common sizes.
 def _wkchip(name):
@@ -100,7 +105,7 @@ class PassiveEditFlow(MultipointEditFlow):
 
 
         def other_point():
-            return Vec2.fromPolar(self._cmodel.theta, self.model.pin_d)
+            return Vec2.from_polar(self._cmodel.theta, self.model.pin_d)
 
         self.second_point = OffsetDefaultPoint(self.first_point, other_point)
 
@@ -115,7 +120,7 @@ class PassiveEditFlow(MultipointEditFlow):
 
 class PassiveEditWidget(AutoSettingsWidget):
 
-    def __add_wk(self, wk, name_override = None):
+    def __add_wk(self, wk, name_override: Optional[str] = None):
         if name_override:
             name = name_override
         else:
@@ -130,8 +135,8 @@ class PassiveEditWidget(AutoSettingsWidget):
         super(PassiveEditWidget, self).__init__()
         self.__model = model
 
-        self.__idx_to_wk = {}
-        self.__wk_to_idx = {}
+        self.__idx_to_wk : Dict[int, _well_known_t] = {}
+        self.__wk_to_idx : Dict[_well_known_t, int] = {}
 
         self.cb_well_known = QtWidgets.QComboBox()
         self.layout.addRow("Package", self.cb_well_known)
@@ -200,7 +205,7 @@ class PassiveEditWidget(AutoSettingsWidget):
         self.__model.snap_well = self.cb_snap.isChecked()
 
 def Passive_getComponent(model, ctrl, flow):
-    return Passive2Component(flow.center, flow.theta, ctrl.view.current_side(),
+    return Passive2Component(ctrl.project, flow.center, flow.theta, ctrl.view.current_side(),
                              model.sym_type, model.body_type, model.pin_d / 2,
                              model.body_corner_vec / 2, model.pin_corner_vec / 2,
                              side_layer_oracle=ctrl.project)

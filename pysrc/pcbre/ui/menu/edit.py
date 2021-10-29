@@ -1,12 +1,13 @@
 from qtpy import QtWidgets
 
+
 class EditMenu(QtWidgets.QMenu):
     def __init__(self, mw):
         QtWidgets.QMenu.__init__(self, "&Edit", mw)
 
         self.addSeparator()
-        self.addAction(mw.actions.undo)
-        self.addAction(mw.actions.redo)
+        self.addAction(mw.pcbre_actions.undo)
+        self.addAction(mw.pcbre_actions.redo)
         self.addSeparator()
 
         # Cut/Copy/Paste

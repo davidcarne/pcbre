@@ -1,5 +1,5 @@
 from qtpy import QtGui, QtCore, QtWidgets
-from pcbre.matrix import Point2, rotate, Vec2, projectPoint, translate, project_point_line
+from pcbre.matrix import Point2, rotate, Vec2, project_point, translate, project_point_line
 from pcbre.model.const import SIDE
 from pcbre.model.smd4component import SMD4Component
 from pcbre.ui.dialogs.settingsdialog import AutoSettingsWidget, LineEditable, FloatTrait, IntTrait, UnitEditable
@@ -18,14 +18,14 @@ class BodyCornerPoint:
 
     def set(self, val):
         r = rotate(-self.parent._cmodel.theta)
-        p = projectPoint(r, val - self.parent._cmodel.center)
+        p = project_point(r, val - self.parent._cmodel.center)
         self.parent._model.dim_1_body = abs(p.x) * 2
         self.parent._model.dim_2_body = abs(p.y) * 2
 
     def get(self):
         r = rotate(self.parent._cmodel.theta)
         cv = Vec2(-self.parent._model.dim_1_body/2, -self.parent._model.dim_2_body/2)
-        return self.parent._cmodel.center + projectPoint(r, cv)
+        return self.parent._cmodel.center + project_point(r, cv)
 
     def save(self):
         return self.parent._model.dim_1_body, self.parent._model.dim_2_body
@@ -45,7 +45,7 @@ class BasicSMDFlow(MultipointEditFlow):
 
         def corner_offset():
             mag = self._model.pin_spacing * (self._model.side1_pins - 1)
-            return Vec2.fromPolar(self._cmodel.theta, mag)
+            return Vec2.from_polar(self._cmodel.theta, mag)
 
         self.p_bottom_corner = OffsetDefaultPoint(self.p1_point, corner_offset)
 
@@ -54,7 +54,7 @@ class BasicSMDFlow(MultipointEditFlow):
             y = self._model.dim_2_pincenter
 
             r = rotate(self._cmodel.theta)
-            return projectPoint(r, Point2(x, y))
+            return project_point(r, Point2(x, y))
 
         self.p_side_3_1 = OffsetDefaultPoint(self.p1_point, other_corner_offset)
 
@@ -63,7 +63,7 @@ class BasicSMDFlow(MultipointEditFlow):
             y = self._model.dim_2_pincenter / 2 - (self._model.side2_pins - 1) / 2 * self._model.pin_spacing
 
             r = rotate(self._cmodel.theta)
-            return projectPoint(r, Point2(x, y))
+            return project_point(r, Point2(x, y))
 
         def p2_corner_ena():
             return self._model.side2_pins or self._model.side4_pins
@@ -88,7 +88,7 @@ class BasicSMDFlow(MultipointEditFlow):
                 self._model.pin_spacing = mag / (self._model.side1_pins - 1)
 
 
-            self.v_base = Vec2.fromPolar(self._cmodel.theta, 1)
+            self.v_base = Vec2.from_polar(self._cmodel.theta, 1)
             self.v_vert = Vec2(-self.v_base.y, self.v_base.x).norm()
 
             p_edge_center = self.v_base * self._model.pin_spacing * (self._model.side1_pins - 1) / 2
@@ -264,7 +264,7 @@ class BasicSMDICModel(GenModel):
 
 
 def BasicSMD_getComponent(mdl, ctrl, flow):
-    return SMD4Component(flow.center, flow.theta + math.pi/2, ctrl.view.current_side(), ctrl.project,
+    return SMD4Component(ctrl.project, flow.center, flow.theta + math.pi/2, ctrl.view.current_side(), ctrl.project,
                        mdl.side1_pins, mdl.side2_pins, mdl.side3_pins, mdl.side4_pins,
                        mdl.dim_1_body, mdl.dim_1_pincenter, mdl.dim_2_body, mdl.dim_2_pincenter,
                        mdl.pin_contact_length, mdl. pin_contact_width, mdl.pin_spacing)

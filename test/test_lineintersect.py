@@ -6,24 +6,24 @@ class test_mmath(unittest.TestCase):
         pass
 
     def test_line_intersect_colinear_1(self):
-        pt1 = 1, 1
-        pt2 = 2, 3
+        pt1 = Vec2(1, 1)
+        pt2 = Vec2(2, 3)
 
         why, pt = line_intersect(pt1, pt2, pt2, pt1)
 
-        self.assertEqual(why, INTERSECT_COLINEAR)
+        self.assertEqual(why, Intersect.COLINEAR)
         self.assertEqual(pt, None)
 
     def test_line_intersect_colinear_2(self):
-        pt1 = 1, 1
-        pt2 = 2, 3
+        pt1 = Vec2(1, 1)
+        pt2 = Vec2(2, 3)
 
-        pt3 = 3, 5
-        pt4 = 4, 7
+        pt3 = Vec2(3, 5)
+        pt4 = Vec2(4, 7)
 
         why, pt = line_intersect(pt1, pt2, pt3, pt4)
 
-        self.assertEqual(why, INTERSECT_COLINEAR)
+        self.assertEqual(why, Intersect.COLINEAR)
         self.assertEqual(pt, None)
 
     def test_line_intersect_parallel_1(self):
@@ -36,7 +36,7 @@ class test_mmath(unittest.TestCase):
 
         why, pt = line_intersect(pt1, pt2, pt3, pt4)
 
-        self.assertEqual(why, INTERSECT_PARALLEL)
+        self.assertEqual(why, Intersect.PARALLEL)
         self.assertEqual(pt, None)
 
     def test_line_intersect_1(self):
@@ -47,7 +47,7 @@ class test_mmath(unittest.TestCase):
         pt4 = Vec2(10, 0)
 
         why, pt = line_intersect(pt1, pt2, pt3, pt4)
-        self.assertEqual(why, INTERSECT_NORMAL)
+        self.assertEqual(why, Intersect.NORMAL)
         self.assertAlmostEqual(pt[0], 0, 5)
         self.assertAlmostEqual(pt[1], 0, 5)
 
@@ -59,7 +59,7 @@ class test_mmath(unittest.TestCase):
         pt4 = Vec2(10, 7)
 
         why, pt = line_intersect(pt1, pt2, pt3, pt4)
-        self.assertEqual(why, INTERSECT_NORMAL)
+        self.assertEqual(why, Intersect.NORMAL)
         self.assertAlmostEqual(pt[0], 0, 5)
         self.assertAlmostEqual(pt[1], 0, 5)
 
@@ -73,6 +73,6 @@ class test_mmath(unittest.TestCase):
         # passes through 1, 3
 
         why, pt = line_intersect(pt1, pt2, pt3, pt4)
-        self.assertEqual(why, INTERSECT_NORMAL)
+        self.assertEqual(why, Intersect.NORMAL)
         self.assertAlmostEqual(pt[0], 1, 5)
         self.assertAlmostEqual(pt[1], 3, 5)

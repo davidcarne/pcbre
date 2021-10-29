@@ -9,3 +9,5 @@ __pycache__
 .idea
 dist
 build
+rustsrc/va/target
+rustsrc/ra/target

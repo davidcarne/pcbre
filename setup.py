@@ -1,4 +1,9 @@
 from setuptools import setup, find_packages, Extension
+#from setuptools_rust import RustExtension, Binding
+
+rust_exts = [
+    #RustExtension("pcbre.accel.ra", path="rustsrc/ra/Cargo.toml", binding=Binding.PyO3),
+    ]
 
 extmods = [
         
@@ -33,6 +38,7 @@ setup(  name="pcbre",
                 "pcbre-app = pcbre.ui.main_gui:main"
             ],
         },
+        zip_safe = False,
 
 # No deps, since this seems to autoinstall wrong things. see readme.md
 #        install_requires = [
@@ -55,7 +61,8 @@ setup(  name="pcbre",
 #            ],
 
 
-        ext_modules = extmods
+        ext_modules = extmods,
+        #rust_extensions = rust_exts,
 )
 
 

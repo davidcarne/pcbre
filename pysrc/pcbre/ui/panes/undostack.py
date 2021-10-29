@@ -1,9 +1,12 @@
-from qtpy import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtWidgets
+
 
 class UndoDock(QtWidgets.QDockWidget):
-    def __init__(self, undo_stack):
+    def __init__(self, undo_stack: "QtWidgets.QUndoStack") -> None:
         super(UndoDock, self).__init__("Undo View")
-        self.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+
+        # ignore typing because the area union does not properly do typing
+        self.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea) # type: ignore
 
         undoview = QtWidgets.QUndoView(undo_stack, self)
         self.setWidget(undoview)

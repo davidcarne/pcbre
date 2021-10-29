@@ -1,23 +1,20 @@
-from pcbre.model.imagelayer import ImageLayer
 from pcbre.ui.dialogs.layeralignmentdialog.dialog import LayerAlignmentDialog
 
 __author__ = 'davidc'
 
+from qtpy import QtWidgets
 
-from qtpy import QtCore, QtWidgets
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pcbre.ui.main_gui import MainWindow
+
 
 class ImageSelectionMenu(QtWidgets.QMenu):
-    def __init__(self, window):
-        """
-
-        :type model: pcbre.model.project.Project
-        :param model:
-        :return:
-        """
-        
+    def __init__(self, window: 'MainWindow') -> None:
         super(ImageSelectionMenu, self).__init__()
 
-        self.window = window
+        self._window = window
 
         self.aboutToShow.connect(self.recreate)
 
@@ -25,17 +22,14 @@ class ImageSelectionMenu(QtWidgets.QMenu):
 
         self.triggered.connect(self.__triggered)
 
-    def __triggered(self, action):
+    def __triggered(self, action: QtWidgets.QAction) -> None:
         ly = action.data()
-        dlg = LayerAlignmentDialog(self.window, self.window.project, ly)
+        dlg = LayerAlignmentDialog(self._window, self._window.project, ly)
         dlg.exec_()
 
-    def recreate(self):
+    def recreate(self) -> None:
         self.clear()
 
-        def __wrap(ly):
-            return lambda: self.__changed(ly)
-
-        for ly in self.window.project.imagery.imagelayers:
+        for ly in self._window.project.imagery.imagelayers:
             a = self.addAction(ly.name)
             a.setData(ly)

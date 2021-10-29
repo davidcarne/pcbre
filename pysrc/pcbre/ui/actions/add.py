@@ -1,5 +1,7 @@
 import itertools
-from qtpy import QtGui, QtWidgets
+
+from qtpy import QtWidgets
+
 from pcbre.model.imagelayer import ImageLayer
 from pcbre.ui.dialogs.layeralignmentdialog.dialog import LayerAlignmentDialog
 
@@ -12,8 +14,9 @@ class AddImageDialogAction(QtWidgets.QAction):
     """
 
     def __init__(self, window):
-            self.window = window
-            QtWidgets.QAction.__init__(self, "Image", self.window, triggered=self.__action)
+        self.window = window
+        QtWidgets.QAction.__init__(self, "Image", self.window)
+        self.triggered.connect(self.__action)
 
     def __action(self):
 
@@ -31,7 +34,7 @@ class AddImageDialogAction(QtWidgets.QAction):
 
         filter_string = ";;".join("%s (%s)" % (i[0], " ".join(i[1])) for i in known_image_types)
 
-        fname, _ = QtWidgets.QFileDialog.getOpenFileName(self.window, "Open Image", filter=filter_string)
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(self.window, "Open Image", filter=filter_string, options=QtWidgets.QFileDialog.Options())
 
         if not fname:
             return

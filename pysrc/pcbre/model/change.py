@@ -1,6 +1,5 @@
-__author__ = 'davidc'
-
 from enum import Enum
+from typing import Any
 
 
 class ChangeType(Enum):
@@ -10,7 +9,8 @@ class ChangeType(Enum):
 
 
 class ModelChange:
-    def __init__(self, container, what, reason):
+    # TODO - need to make this more specific
+    def __init__(self, container: Any, what: Any, reason: ChangeType):
         """
 
         :param container: The object that contains the changed object
