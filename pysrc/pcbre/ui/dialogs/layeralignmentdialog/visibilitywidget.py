@@ -203,11 +203,11 @@ class VisibilityAdaptor(QtCore.QAbstractItemModel):
         super(VisibilityAdaptor, self).__init__()
         self.model = model
 
-        # Build parent links
-        self.__recursive_stuff_parent(self.model)
-
         self.__adapter_parents: 'Dict[Any, Any]' = dict()
         self.__adapter_parents[self.model] = None
+
+        # Build parent links
+        self.__recursive_stuff_parent(self.model)
 
     def index_get_node(self, index: 'QtCore.QModelIndex') -> 'VisibilityNode':
         if not index.isValid():

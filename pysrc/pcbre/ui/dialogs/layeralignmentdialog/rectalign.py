@@ -50,7 +50,7 @@ if TYPE_CHECKING:
     from pcbre.model.project import Project
     import numpy.typing as npt
     from pcbre.ui.gl.glshared import GLShared
-    from pcbre.ui.boardviewwidget import ViewState
+    from pcbre.view.viewport import ViewPort
     from pcbre.ui.tool_action import MoveEvent, ToolActionEvent
 
 
@@ -217,8 +217,11 @@ class RectAlignmentModel:
                               self.__corner_handles[1],
                               self.__corner_handles[2])
 
+        self.__dims_locked = True
+
         self.__placeholder_dim_values: List[float] = [100, 100]
         self.__dim_values: List[Optional[float]] = [None, None]
+
         self.update_matricies()
 
         self.translate_x : float = 0
@@ -231,7 +234,6 @@ class RectAlignmentModel:
         self.flip_x = False
         self.flip_y = False
 
-        self.__dims_locked = True
 
     @property
     def dims_locked(self) -> bool:
@@ -612,9 +614,9 @@ class RectAlignmentControllerView(BaseToolController):
 
         if self.model_overall.view_mode.is_aligned():
             ph = project_point(self.model.image_matrix, pt)
-            return self.viewState.tfW2V(ph)
+            return self.viewPort.tfW2V(ph)
         else:
-            return self.viewState.tfW2V(pt)
+            return self.viewPort.tfW2V(pt)
 
     def V2im(self, pt: Vec2) -> Vec2:
         """
@@ -622,7 +624,7 @@ class RectAlignmentControllerView(BaseToolController):
         :param pt:
         :return:
         """
-        world = self.viewState.tfV2W(pt)
+        world = self.viewPort.tfV2W(pt)
 
         if self.model_overall.view_mode.is_aligned():
             inv = numpy.linalg.inv(self.model.image_matrix)
@@ -668,8 +670,8 @@ class RectAlignmentControllerView(BaseToolController):
         # don't render any handles
         return not self.active or self.model_overall.view_mode.is_aligned()
 
-    def render(self, vs: 'ViewState') -> None:
-        self.viewState = vs
+    def render(self, viewPort: 'ViewPort') -> None:
+        self.viewPort = viewPort
 
         # Perimeter is defined by the first 4 handles
         self.vbo_per_dim_ar["vertex"][:4] = [self.im2V(pt) for pt in self.model.align_handles[:4]]
@@ -689,7 +691,7 @@ class RectAlignmentControllerView(BaseToolController):
 
         # ... and draw the perimeter
         with self.vao_per_dim, self.prog.program:
-            GL.glUniformMatrix3fv(self.mat_loc, 1, True, self.viewState.glWMatrix.astype(numpy.float32))
+            GL.glUniformMatrix3fv(self.mat_loc, 1, True, self.viewPort.glWMatrix.astype(numpy.float32))
 
             # Draw the outer perimeter
             if self.disabled:
@@ -756,7 +758,7 @@ class RectAlignmentControllerView(BaseToolController):
         else:
             r = numpy.identity(3)
 
-        m = self.viewState.glWMatrix.dot(translate(*position).dot(r))
+        m = self.viewPort.glWMatrix.dot(translate(*position).dot(r))
         GL.glUniformMatrix3fv(self.mat_loc, 1, True, m.astype(numpy.float32))
         GL.glUniform4f(self.col_loc, *color)
         GL.glDrawArrays(GL.GL_TRIANGLE_FAN if filled else GL.GL_LINE_LOOP, 0, 4)

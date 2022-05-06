@@ -48,8 +48,8 @@ class MainWindowActions:
         self.view_rotate_r = RotateRAction(window)
         self.view_cycle_draw_order = CycleDrawOrderAction(window)
 
-        self.view_set_mode_trace = SetModeTraceAction(window, window.viewArea)
-        self.view_set_mode_cad = SetModeCADAction(window, window.viewArea)
+        self.view_set_mode_trace = SetModeTraceAction(window, window.viewArea.boardViewState)
+        self.view_set_mode_cad = SetModeCADAction(window, window.viewArea.boardViewState)
 
         self.undo = window.undo_stack.createUndoAction(window)
         self.undo.setShortcut(QtGui.QKeySequence.Undo)
@@ -72,12 +72,10 @@ class MainWindowActions:
         window.addAction(NudgeLeftAction(window))
         window.addAction(NudgeRightAction(window))
 
-        window.addAction(CycleModeAction(window, window.viewArea))
+        window.addAction(CycleModeAction(window, window.viewArea.boardViewState))
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    layerChanged = QtCore.Signal((object,))
-
     # Emitted when something changes the currently selected layer
 
     def __init__(self, p: Project) -> None:
@@ -111,9 +109,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """Change the selected view layer"""
         assert layer in self.project.stackup.layers
 
-        self.viewArea.viewState.current_layer = layer
-
-        self.layerChanged.emit(layer)
+        self.viewArea.boardViewState.current_layer = layer
 
     def submitCommand(self, cmd: QtWidgets.QUndoCommand) -> None:
         self.undo_stack.push(cmd)
@@ -153,7 +149,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def createDockWidgets(self) -> None:
         # TODO: make this modular, remember view state
 
-        dock = LayerListWidget(self, self.project, self.viewArea.viewState)
+        dock = LayerListWidget(self, self.project, self.viewArea.boardViewState)
         # dock.hide()
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
         self._view_menu.subWindowMenu.addAction(dock.toggleViewAction())
@@ -236,6 +232,8 @@ def main() -> None:
             exit()
 
     app = QtWidgets.QApplication(sys.argv)
+
+    f = app.font()
 
     gl_version = probe()
 

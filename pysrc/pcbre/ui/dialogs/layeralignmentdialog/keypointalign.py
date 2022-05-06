@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Optional, Any, Tuple, List, cast, Dict
 if TYPE_CHECKING:
     from pcbre.model.project import Project
     from pcbre.ui.gl.glshared import GLShared
-    from pcbre.ui.boardviewwidget import ViewState
+    from pcbre.view.viewport import ViewPort
     import numpy.typing as npt
     from pcbre.ui.dialogs.layeralignmentdialog.dialog import AlignmentViewModel
     from pcbre.ui.dialogs.layeralignmentdialog.dialog import LayerAlignmentDialog
@@ -551,7 +551,7 @@ class KeypointAlignmentControllerView(BaseToolController):
         with self.handle_vao, self.handle_vbo:
             VBOBind(self.prog.program, dtype, "vertex").assign()
 
-    def render(self, vs: 'ViewState') -> None:
+    def render(self, vs: 'ViewPort') -> None:
         self.vs = vs
 
         # Standard alpha-blending. We emit alpha=1 or alpha=0 (no real blending),

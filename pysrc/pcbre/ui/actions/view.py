@@ -29,7 +29,7 @@ class LayerJumpAction(QtWidgets.QAction):
 
         self.window.changeViewLayer(layer)
 
-
+################################ Common tool actions
 class FlipXAction(QtWidgets.QAction):
     def __init__(self, window: 'MainWindow'):
         self.__window = window
@@ -88,6 +88,15 @@ class RotateRAction(QtWidgets.QAction):
         self.__window.viewArea.viewState.rotate(90)
 
 
+class ViewLastAction(QtWidgets.QAction):
+    pass
+
+class ViewZoomFitAction(QtWidgets.QAction):
+    # zoom to fit contents of view 
+    pass
+
+#####################3
+
 class CycleDrawOrderAction(QtWidgets.QAction):
     def __init__(self, window: 'MainWindow') -> None:
         self.__window = window
@@ -100,11 +109,11 @@ class CycleDrawOrderAction(QtWidgets.QAction):
         self.setToolTip("]")
 
     def __action(self) -> None:
-        self.__window.viewArea.viewState.permute_layer_order()
+        self.__window.viewArea.boardViewState.permute_layer_order()
 
 
 class SetModeTraceAction(QtWidgets.QAction):
-    def __init__(self, mw: 'MainWindow', va: 'BoardViewWidget') -> None:
+    def __init__(self, mw: 'MainWindow', va: 'BoardViewState') -> None:
         QtWidgets.QAction.__init__(self, "Tracing Mode", mw)
         self.va = va
 
@@ -112,6 +121,7 @@ class SetModeTraceAction(QtWidgets.QAction):
 
         self.update_from_prop()
         self.triggered.connect(self.__set_prop)
+        self.va.changed.connect(self.update_from_prop)
 
     def __set_prop(self) -> None:
         self.va.render_mode = MODE_TRACE
@@ -121,7 +131,7 @@ class SetModeTraceAction(QtWidgets.QAction):
 
 
 class SetModeCADAction(QtWidgets.QAction):
-    def __init__(self, mw: 'MainWindow', va: 'BoardViewWidget') -> None:
+    def __init__(self, mw: 'MainWindow', va: 'BoardViewState') -> None:
         QtWidgets.QAction.__init__(self, "CAD Mode", mw)
         self.va = va
 
@@ -129,6 +139,7 @@ class SetModeCADAction(QtWidgets.QAction):
 
         self.update_from_prop()
         self.triggered.connect(self.__set_prop)
+        self.va.changed.connect(self.update_from_prop)
 
     def __set_prop(self) -> None:
         self.va.render_mode = MODE_CAD
@@ -138,7 +149,7 @@ class SetModeCADAction(QtWidgets.QAction):
 
 
 class CycleModeAction(QtWidgets.QAction):
-    def __init__(self, mw: 'MainWindow', va: 'BoardViewWidget') -> None:
+    def __init__(self, mw: 'MainWindow', va: 'BoardViewState') -> None:
         QtWidgets.QAction.__init__(self, "Cycle view Mode", mw)
         self.setShortcut(QtGui.QKeySequence("m"))
         self.va = va

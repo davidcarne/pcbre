@@ -36,28 +36,9 @@ if TYPE_CHECKING:
 
 MODE_CAD = 0
 MODE_TRACE = 1
-MOVE_MOUSE_BUTTON = QtCore.Qt.RightButton
 
 EVT_START_FIELD_DRAG = 0
 EVT_STOP_FIELD_DRAG = 1
-
-
-def fixed_center_dot(view_state: 'ViewState', m: 'numpy.ArrayLike', view_center: Point2 = None) -> None:
-    if view_center is None:
-        view_center = Point2(view_state.width / 2, view_state.height / 2)
-
-    world_center = view_state.tfV2W(view_center)
-
-    proj_orig_center = project_point(view_state.transform, world_center)
-
-    view_state.transform = view_state.transform.dot(m)
-
-    proj_new_center = project_point(view_state.transform, world_center)
-
-    dx = proj_new_center[0] - proj_orig_center[0]
-    dy = proj_new_center[1] - proj_orig_center[1]
-
-    view_state.transform = M.translate(-dx, -dy).dot(view_state.transform)
 
 
 def QPoint_to_point(p: QtCore.QPoint) -> Point2:
@@ -77,85 +58,18 @@ def getSelectColor(c: Sequence[float], selected: bool):
     return (r, g, b)
 
 
-class ViewStateO(QtCore.QObject):
-    changed = QtCore.Signal()
-    currentLayerChanged = QtCore.Signal()
-
-
-# Full view state for the multilayer view
-class ViewState(ViewPort):
-    def __init__(self, x: int, y: int) -> None:
-        super(ViewState, self).__init__(x, y)
-
-        self.obj = ViewStateO()
-        self.changed = self.obj.changed
-        self.currentLayerChanged = self.obj.currentLayerChanged
-
-        self.__current_layer = None
-        self.currentLayerChanged.connect(self.changed)
-        self.__show_images = True
-        self.layer_permute = 0
-
-    def permute_layer_order(self) -> None:
-        self.layer_permute += 1
-        self.changed.emit()
-
-    def rotate(self, angle: float) -> None:
-        self.transform = self.transform.dot(M.rotate(math.radians(angle)))
-
-    def flip(self, axis: int) -> None:
-        fixed_center_dot(self, M.flip(axis))
-
-    @property
-    def current_layer(self) -> Layer:
-        return self.__current_layer
-
-    @current_layer.setter
-    def current_layer(self, value: Layer) -> None:
-        assert value is None or isinstance(value, Layer)
-        old = self.__current_layer
-        self.__current_layer = value
-
-        if old != self.__current_layer:
-            self.currentLayerChanged.emit()
-
-    @property
-    def transform(self) -> 'numpy.ArrayLike':
-        mat = self._transform
-        mat.flags.writeable = False
-        return mat
-
-    @transform.setter
-    def transform(self, value: 'numpy.ArrayLike') -> None:
-        old = self._transform
-        self._transform = value
-
-        if (old != value).any():
-            self.changed.emit()
-
-    @property
-    def show_images(self) -> bool:
-        return self.__show_images
-
-    @show_images.setter
-    def show_images(self, value: bool) -> None:
-        self.__show_images = value
-        self.changed.emit()
 
 
 class MoveDragHandler:
-    def __init__(self, vs: 'ViewState', start: Point2):
+    def __init__(self, vs: 'ViewPort', start: Point2):
         self.vs = vs
         self.last = start
 
     def move(self, cur: Point2) -> None:
-        lx, ly = self.vs.tfV2P(self.last)
-        nx, ny = self.vs.tfV2P(cur)
+        lx, ly = project_point(self.vs.glWMatrix, self.last)
+        nx, ny = project_point(self.vs.glWMatrix, cur)
 
-        delta = nx - lx, ny - ly
-
-        self.vs.transform = M.translate(*delta).dot(self.vs.transform)
-
+        self.vs.transform = M.translate(nx - lx, ny - ly) @ self.vs.transform 
         self.last = cur
 
     def done(self) -> None:
@@ -176,8 +90,7 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
 
         self.__gl_initialized = False
 
-        self.viewState = ViewState(self.width(), self.height())
-
+        self.viewState = ViewPort(self.width(), self.height())
         self.viewState.changed.connect(self.update)
 
         self.lastPoint = QtCore.QPoint(0, 0)
@@ -349,13 +262,13 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
 
     def zoom(self, step: int, around_point: Point2) -> None:
         sf = 1.1 ** step
-        fixed_center_dot(self.viewState, M.scale(sf), around_point)
+        self.viewState.zoom_at(around_point, sf)
 
     def wheelEvent(self, event: QtGui.QWheelEvent) -> None:
         if not event.modifiers():
             step = event.angleDelta().y() / 120.0
             cpt = QPoint_to_point(event.pos())
-            self.zoom(int(round(step)), cpt)
+            self.zoom(step, cpt)
         else:
             if self.interactionDelegate:
                 self.interactionDelegate.tool_event()
@@ -410,13 +323,63 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
         GL.glViewport((width - size) // 2, (height - size) // 2, size, size)
         self.viewState.resize(width, height)
 
-        # Allocate a new image buffer
-        # self.image = NPBackedImage(self.width(), self.height())
-        # super(BoardViewWidget, self).resizeEvent(event)
-
     def isModified(self) -> bool:
         return self.modified
 
+
+class BoardViewState(QtCore.QObject):
+    changed = QtCore.Signal()
+
+    def __init__(self) -> None:
+        super().__init__()
+
+        self.__current_layer = None
+        self.__render_mode = MODE_CAD
+        self.__show_images = True
+        self.layer_permute = 0
+
+    def permute_layer_order(self) -> None:
+        self.layer_permute += 1
+        self.changed.emit()
+
+    @property
+    def current_layer(self) -> Layer:
+        return self.__current_layer
+
+    @current_layer.setter
+    def current_layer(self, value: Layer) -> None:
+        assert value is None or isinstance(value, Layer)
+        old = self.__current_layer
+        self.__current_layer = value
+
+        if old != self.__current_layer:
+            self.changed.emit()
+
+    @property
+    def show_images(self) -> bool:
+        return self.__show_images
+
+    @show_images.setter
+    def show_images(self, value: bool) -> None:
+        issue_update = value != self.__show_images
+
+        self.__show_images = value
+        self.changed.emit()
+
+        if issue_update:
+            self.changed.emit()
+
+    @property
+    def render_mode(self):
+        return self.__render_mode
+
+    @render_mode.setter
+    def render_mode(self, value) -> None:
+        issue_update = value != self.__render_mode
+        self.__render_mode = value
+
+        if issue_update:
+            self.changed.emit()
 
 class BoardViewWidget(BaseViewWidget):
     def __init__(self, project: 'Project') -> None:
@@ -443,9 +406,11 @@ class BoardViewWidget(BaseViewWidget):
 
         # Initial view is a normalized 1-1-1 area.
         # Shift to be 10cm max
+        # TODO: 
         self.viewState.transform = translate(-0.9, -0.9).dot(scale(1. / 100000))
 
-        self.render_mode = MODE_CAD
+        self.boardViewState = BoardViewState()
+        self.boardViewState.changed.connect(self.update)
 
     def resizeGL(self, width: int, height: int) -> None:
         super(BoardViewWidget, self).resizeGL(width, height)
@@ -456,7 +421,7 @@ class BoardViewWidget(BaseViewWidget):
         return [1, 1, 1]
 
     def current_layer_hack(self) -> 'Layer':
-        return self.viewState.current_layer
+        return self.boardViewState.current_layer
 
     def color_for_pad(self, pad) -> List[float]:
         if pad.th_diam != 0:
@@ -497,18 +462,18 @@ class BoardViewWidget(BaseViewWidget):
             i.initGL()
 
     def current_side(self) -> None:
-        side = self.project.stackup.side_for_layer(self.viewState.current_layer)
+        side = self.project.stackup.side_for_layer(self.boardViewState.current_layer)
         return side
 
     def vp_is_visible(self, via_pair: ViaPair) -> bool:
-        if self.viewState.current_layer is None:
+        if self.boardViewState.current_layer is None:
             return False
 
-        if self.render_mode == MODE_CAD:
+        if self.boardViewState.render_mode == MODE_CAD:
             return True
         else:
             # In layer mode, viapair is visible if we're on any layer
-            layer = self.viewState.current_layer
+            layer = self.boardViewState.current_layer
             f, s = via_pair.layers
             return f.order <= layer.order <= s.order
 
@@ -533,11 +498,11 @@ class BoardViewWidget(BaseViewWidget):
             if self.layer_visible(polygon):
                 objects.append(polygon)
 
-        if self.render_mode == MODE_CAD:
+        if self.boardViewState.render_mode == MODE_CAD:
             objects.extend(self.project.artwork.components)
             for cmp in self.project.artwork.components:
                 objects.extend(cmp.get_pads())
-        elif self.viewState.current_layer is None:
+        elif self.boardViewState.current_layer is None:
             pass
         else:
             cur_side = self.current_side()
@@ -557,16 +522,16 @@ class BoardViewWidget(BaseViewWidget):
         return objects
 
     def _layer_visible(self, l: Layer) -> bool:
-        if self.render_mode == MODE_CAD:
+        if self.boardViewState.render_mode == MODE_CAD:
             return True
         else:
-            return l is self.viewState.current_layer
+            return l is self.boardViewState.current_layer
 
     def layer_visible(self, l: Layer) -> bool:
         return self.__layer_visible_lut[l.number]
 
     def layer_visible_m(self, l: Layer) -> bool:
-        return self.viewState.current_layer in l
+        return self.boardViewState.current_layer in l
 
     def query_point(self, pt: Point2) -> Sequence[Geom]:
         all_aw = self.project.artwork.query_point(pt)
@@ -679,7 +644,7 @@ class BoardViewWidget(BaseViewWidget):
                 raise ValueError("Unknown layer key type for %r" % type(a))
 
             # We always draw the current layer last
-            if a_l == self.viewState.current_layer:
+            if a_l == self.boardViewState.current_layer:
                 a = 1
             else:
                 a = -a_l.order
@@ -705,16 +670,16 @@ class BoardViewWidget(BaseViewWidget):
         GL.glDisable(GL.GL_DEPTH_TEST)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
 
-        layer = self.viewState.current_layer
+        layer = self.boardViewState.current_layer
         if layer is None:
             return
 
         # Draw the imagery
-        stackup_layer = self.viewState.current_layer
+        stackup_layer = self.boardViewState.current_layer
 
-        if stackup_layer is not None and self.viewState.show_images and (len(stackup_layer.imagelayers) > 0):
+        if stackup_layer is not None and self.boardViewState.show_images and (len(stackup_layer.imagelayers) > 0):
             images = list(stackup_layer.imagelayers)
-            i = self.viewState.layer_permute % len(images)
+            i = self.boardViewState.layer_permute % len(images)
             images_cycled = images[i:] + images[:i]
             for l in images_cycled:
                 self.image_view_cache_load(l).render(self.viewState.glMatrix)
@@ -766,11 +731,11 @@ class BoardViewWidget(BaseViewWidget):
 
             self.__render_top_half()
 
-            if self.render_mode == MODE_CAD:
+            if self.boardViewState.render_mode == MODE_CAD:
                 # Render layer stack bottom to top
                 self.render_mode_cad()
 
-            elif self.render_mode == MODE_TRACE:
+            elif self.boardViewState.render_mode == MODE_TRACE:
                 # Render a single layer for maximum contrast
                 self.render_mode_trace()
 
