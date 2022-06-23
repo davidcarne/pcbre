@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from pcbre.ui.main_gui import MainWindow
     from pcbre.ui.boardviewwidget import BoardViewWidget
+    from pcbre.view.viewport import ViewPort
 
 
 class LayerJumpAction(QtWidgets.QAction):
@@ -31,69 +32,84 @@ class LayerJumpAction(QtWidgets.QAction):
 
 ################################ Common tool actions
 class FlipXAction(QtWidgets.QAction):
-    def __init__(self, window: 'MainWindow'):
-        self.__window = window
+    def __init__(self, window, vp: 'ViewPort'):
+        self.__vp = vp
 
         QtWidgets.QAction.__init__(
-            self, "Flip X", self.__window)
+            self, "Flip X", window)
         self.triggered.connect(self.__action)
         self.setShortcut(QtGui.QKeySequence("f"))
         self.setIcon(Icon("flipx"))
         self.setToolTip('f')
 
     def __action(self) -> None:
-        self.__window.viewArea.viewState.flip(0)
+        self.__vp.flip(0)
 
 
 class FlipYAction(QtWidgets.QAction):
-    def __init__(self, window: 'MainWindow') -> None:
-        self.__window = window
+    def __init__(self, window, vp: 'ViewPort') -> None:
+        self.__vp = vp
 
         QtWidgets.QAction.__init__(
-            self, "Flip Y", self.__window)
+            self, "Flip Y", window)
         self.triggered.connect(self.__action)
         self.setShortcut(QtGui.QKeySequence("shift+f"))
         self.setIcon(Icon("flipy"))
         self.setToolTip('Shift+f')
 
     def __action(self) -> None:
-        self.__window.viewArea.viewState.flip(1)
+        self.__vp.flip(1)
 
 
 class RotateLAction(QtWidgets.QAction):
-    def __init__(self, window: 'MainWindow') -> None:
-        self.__window = window
+    def __init__(self, window, vp: 'ViewPort') -> None:
+        self.__vp = vp
         QtWidgets.QAction.__init__(
-            self, "Rotate 90 (CCW)", self.__window)
+            self, "Rotate 90 (CCW)", window)
         self.triggered.connect(self.__action)
         self.setShortcut(QtGui.QKeySequence("ctlr+shift+r"))
         self.setIcon(Icon("rotl"))
         self.setToolTip("Ctrl+Shift+r")
 
     def __action(self) -> None:
-        self.__window.viewArea.viewState.rotate(-90)
+        self.__vp.rotate(-90)
 
 
 class RotateRAction(QtWidgets.QAction):
-    def __init__(self, window: 'MainWindow') -> None:
-        self.__window = window
+    def __init__(self, window, vp: 'ViewPort') -> None:
+        self.__vp = vp
         QtWidgets.QAction.__init__(
-            self, "Rotate 90 (CW)", self.__window)
+            self, "Rotate 90 (CW)", window)
         self.triggered.connect(self.__action)
         self.setShortcut(QtGui.QKeySequence("ctlr+r"))
         self.setIcon(Icon("rotr"))
         self.setToolTip("Ctrl+r")
 
     def __action(self) -> None:
-        self.__window.viewArea.viewState.rotate(90)
+        self.__vp.rotate(90)
 
 
 class ViewLastAction(QtWidgets.QAction):
     pass
 
-class ViewZoomFitAction(QtWidgets.QAction):
-    # zoom to fit contents of view 
-    pass
+class ZoomFitAction(QtWidgets.QAction):
+    def __init__(self, window, vp: 'ViewPort', bbox_call) -> None:
+        QtWidgets.QAction.__init__(
+            self, "Zoom to Fit",
+            window)
+
+        self.__vp = vp
+        self.__bbox_call = bbox_call
+        self.triggered.connect(self.__action)
+        #self.setShortcut(QtGui.QKeySequence("]"))
+        #self.setIcon(Icon("changeorder"))
+        #self.setToolTip("]")
+
+    def __action(self) -> None:
+        r = self.__bbox_call()
+        if not r:
+            return
+        self.__vp.fit_rect(r)
 
 #####################3
 
@@ -110,6 +126,7 @@ class CycleDrawOrderAction(QtWidgets.QAction):
 
     def __action(self) -> None:
         self.__window.viewArea.boardViewState.permute_layer_order()
+
 
 
 class SetModeTraceAction(QtWidgets.QAction):

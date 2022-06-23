@@ -8,7 +8,7 @@ from OpenGL.arrays.vbo import VBO  # type: ignore
 from qtpy import QtOpenGL, QtCore, QtWidgets, QtGui
 
 import pcbre.matrix as M
-from pcbre.matrix import scale, translate, Point2, project_point
+from pcbre.matrix import scale, translate, Point2, project_point, Vec2
 from pcbre.model.artwork_geom import Trace, Geom
 from pcbre.model.const import SIDE
 from pcbre.model.stackup import Layer, ViaPair
@@ -66,10 +66,11 @@ class MoveDragHandler:
         self.last = start
 
     def move(self, cur: Point2) -> None:
-        lx, ly = project_point(self.vs.glWMatrix, self.last)
-        nx, ny = project_point(self.vs.glWMatrix, cur)
+        lx, ly = project_point(self.vs.revMatrix, self.last)
+        nx, ny = project_point(self.vs.revMatrix, cur)
 
-        self.vs.transform = M.translate(nx - lx, ny - ly) @ self.vs.transform 
+        self.vs.translate(Vec2(nx - lx, ny - ly))
+
         self.last = cur
 
     def done(self) -> None:
@@ -406,8 +407,7 @@ class BoardViewWidget(BaseViewWidget):
 
         # Initial view is a normalized 1-1-1 area.
         # Shift to be 10cm max
-        # TODO: 
-        self.viewState.transform = translate(-0.9, -0.9).dot(scale(1. / 100000))
+        self.viewState.set_scale(1./100000)
 
         self.boardViewState = BoardViewState()
         self.boardViewState.changed.connect(self.update)

@@ -19,6 +19,10 @@ class ViewMenu(QtWidgets.QMenu):
 
         self.addSeparator()
 
+        self.addAction(mw.pcbre_actions.view_zoom_fit)
+
+        self.addSeparator()
+
         self.addAction(mw.pcbre_actions.view_set_mode_trace)
         self.addAction(mw.pcbre_actions.view_set_mode_cad)
 

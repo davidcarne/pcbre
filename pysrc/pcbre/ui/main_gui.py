@@ -15,7 +15,7 @@ from pcbre.ui.actions.pcb import RebuildConnectivityAction, LayerViewSetupDialog
 from pcbre.ui.actions.save import SaveAction, SaveAsDialogAction, ExitAction
 from pcbre.ui.actions.save import checkCloseSave
 from pcbre.ui.actions.view import LayerJumpAction, FlipXAction, FlipYAction, RotateLAction, CycleDrawOrderAction, \
-    RotateRAction, SetModeTraceAction, SetModeCADAction, CycleModeAction
+    RotateRAction, SetModeTraceAction, SetModeCADAction, CycleModeAction, ZoomFitAction
 from pcbre.ui.boardviewwidget import BoardViewWidget
 from pcbre.ui.panes.console import ConsoleWidget
 from pcbre.ui.panes.info import InfoWidget
@@ -42,11 +42,25 @@ class MainWindowActions:
         self.file_exit = ExitAction(window)
 
         # View actions
-        self.view_flip_x = FlipXAction(window)
-        self.view_flip_y = FlipYAction(window)
-        self.view_rotate_l = RotateLAction(window)
-        self.view_rotate_r = RotateRAction(window)
+        vs = window.viewArea.viewState
+        self.view_flip_x = FlipXAction(window, vs)
+        self.view_flip_y = FlipYAction(window, vs)
+        self.view_rotate_l = RotateLAction(window, vs)
+        self.view_rotate_r = RotateRAction(window, vs)
         self.view_cycle_draw_order = CycleDrawOrderAction(window)
+
+        # TODO, migrate to the viewArea
+        def get_area():
+            a = window.viewArea.getVisible()
+            if not a:
+                return
+
+            r = a.pop().bbox
+            for g in a:
+                r.bbox_merge(g.bbox)
+            return r
+
+        self.view_zoom_fit = ZoomFitAction(window, vs, get_area)
 
         self.view_set_mode_trace = SetModeTraceAction(window, window.viewArea.boardViewState)
         self.view_set_mode_cad = SetModeCADAction(window, window.viewArea.boardViewState)

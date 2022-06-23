@@ -2,7 +2,8 @@ from typing import TYPE_CHECKING
 
 import OpenGL.GL as GL  # type: ignore
 
-from pcbre.matrix import scale
+from pcbre.matrix import scale, Point2
+from pcbre.view.viewport import ViewPort
 from pcbre.model.imagelayer import KeyPoint, KeyPointAlignment, RectAlignment, ImageLayer
 from pcbre.ui.boardviewwidget import BaseViewWidget
 from pcbre.ui.dialogs.layeralignmentdialog.keypointalign import KeypointAlignmentModel, KeypointAlignmentControllerView, \
@@ -117,13 +118,14 @@ class AlignmentViewWidget(BaseViewWidget):
 
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
-        self.viewState.transform = scale(0.80)
+        self.viewState.set_scale(0.80)
 
         self.originView = OriginView()
 
         self.text_batch = TextBatcher(self.gls.text)
 
     def reinit(self) -> None:
+        """Reinitialize self render state and subview render state"""
         self.iv.initGL(self.gls)
         self.iv_cache = {}
 
@@ -134,6 +136,7 @@ class AlignmentViewWidget(BaseViewWidget):
         self.text_batch.initializeGL()
 
     def get_imageview(self, il: ImageLayer) -> None:
+        """For an imagelayer, return an ImageView that can draw it"""
         if il is self.iv.il:
             return self.iv
 
@@ -308,7 +311,8 @@ class LayerAlignmentDialog(QtWidgets.QDialog):
         self._selected_view: Optional[int] = None
 
         self._saved_transforms = [
-            scale(0.8), scale(0.8)
+            ViewPort.build_state(Point2(0,0), 0.8),
+            ViewPort.build_state(Point2(0,0), 0.8)
         ]
 
         # Undo stack
@@ -391,10 +395,10 @@ class LayerAlignmentDialog(QtWidgets.QDialog):
 
     def save_restore_transform(self) -> None:
         if self._selected_view is not None:
-            self._saved_transforms[self._selected_view] = self.view.viewState.transform
+            self._saved_transforms[self._selected_view] = self.view.viewState.get_state()
 
         self._selected_view = idx = self.model.view_mode.value
-        self.view.viewState.transform = self._saved_transforms[idx]
+        self.view.viewState.set_state(self._saved_transforms[idx])
 
     def update_controls(self) -> None:
 

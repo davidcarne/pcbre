@@ -1,9 +1,10 @@
 import numpy
-from pcbre.matrix import project_point, Vec2, Point2
+from pcbre.matrix import project_point, Vec2, Point2, Rect
 import pcbre.matrix as M
 from typing import TYPE_CHECKING, cast
 from qtpy import QtCore
 import math
+from enum import Enum
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -20,8 +21,12 @@ if TYPE_CHECKING:
 #    0,0 = bottom-left
 #    1,1 = top-right
 #
+
 # W - World coords. World coordinates are in um
 #
+
+# ViewPort (TODO: rename) maintains the center, scaling, mirroring and rotation state
+#  and calculates all the necessary matricies for rendering and picking
 
 class ViewPort(QtCore.QObject):
     changed = QtCore.Signal()
@@ -31,7 +36,16 @@ class ViewPort(QtCore.QObject):
 
         # _transform defines the mapping from physical (world) coordinates to the projection area
         self.__transform = numpy.identity(3, dtype=numpy.float64)
-        self.__scale_factor : float = 1
+        
+        # Order of operations
+        #   Translate (position in world to center of view)
+        #   Rotate/Flip
+        #   Scale
+
+        # Master variables
+        self.__center_point = Point2(0, 0)
+        self.__rotate_flip = numpy.identity(3, dtype=numpy.float64)
+        self.__scale = 1
 
         # Initializations for mypy
         self.__w2v = numpy.identity(3, dtype=numpy.float64)
@@ -40,29 +54,70 @@ class ViewPort(QtCore.QObject):
         self.__n2v = numpy.identity(3, dtype=numpy.float64)
 
         self.resize(x, y)
-        self.transform = numpy.identity(3, dtype=numpy.float64)
+        self.__update()
+
+    @staticmethod
+    def build_state(self, center, scale):
+        return (center, scale, numpy.identity(3, dtype=numpy.float64))
+
+    # Save/restore
+    def get_state(self):
+        # Returns an opaque object representing the current view state
+        return (self.__center_point.dup(), self.__scale, self.__rotate_flip.copy())
+
+    def set_state(self, state):
+        # restores an opaque object retrieved from get_state to the current view state
+        self.__center_point, self.__scale, self.__rotate_flip = state
+
+    # Directly set aspects of the viewport
+    def set_center(self, center: Point2) -> None:
+        self.__center_point = center
+        self.__update()
+
+    def set_scale(self, scale: float) -> None:
+        self.__scale = scale
+        self.__update()
+
+    # Incremental update aspects of the viewport
+    def translate(self, delta: Vec2) -> None:
+        # Subtract delta because we're moving then center point
+        self.__center_point = self.__center_point - delta
         self.__update()
 
     def rotate(self, angle: float) -> None:
-        self.transform = M.rotate(math.radians(angle)) @ self.transform
+        # Angle is in a clockwise direction
+        self.__rotate_flip = M.rotate(math.radians(-angle)) @ self.__rotate_flip
+        self.__update()
 
-    # Flip the viewport 
     def flip(self, axis: int) -> None:
-        self.transform = M.flip(axis) @ self.transform
+        self.__rotate_flip = M.flip(axis) @ self.__rotate_flip
+        self.__update()
 
     def zoom_at(self, around_point: Point2, factor: float) -> None:
         world_center = self.tfV2W(around_point)
 
-        ndc_orig_center = project_point(self.transform, world_center)
-        new_transform = M.scale(factor) @ self.transform
-        ndc_new_center = project_point(new_transform, world_center)
+        self.__scale *= factor
+        self.__update(suppress=True)
 
-        ndc_dx = ndc_new_center[0] - ndc_orig_center[0]
-        ndc_dy = ndc_new_center[1] - ndc_orig_center[1]
+        new_world_center = self.tfV2W(around_point)
 
-        self.transform =  M.translate(-ndc_dx, -ndc_dy) @ new_transform
+        self.translate(new_world_center - world_center)
 
-    #def fit_bbox(
+    def fit_rect(self, rect: Rect):
+        # Zoom so as to fit a rect
+        viewport_aspect = self.__normal_width / self.__normal_height
+        target_aspect = rect.width / rect.height
+
+        self.__center_point = rect.center
+
+        if target_aspect > viewport_aspect:
+            self.__scale = self.__normal_width / rect.width
+        else:
+            self.__scale = self.__height / rect.height
+
+        self.__update()
+
+
 
     @property
     def transform(self) -> 'npt.NDArray[numpy.float64]':
@@ -70,17 +125,11 @@ class ViewPort(QtCore.QObject):
         mat.flags.writeable = False
         return mat
 
-    @transform.setter
-    def transform(self, value: 'npt.NDArray[numpy.float64]') -> None:
-        if (self.__transform == value).all():
-            return
-
-        self.__transform = value
-        self.__update()
-        self.changed.emit()
-
     @property
     def scale_factor(self) -> float:
+        # TODO: rename - this is the scale to draw a 1px line at
+        # Really, we shouldn't use this, and the line thickness should be configurable
+        # (HIDPI, nonrectangular displays)
         return self.__scale_factor
 
     # Forward Matrix (world to viewport)
@@ -116,22 +165,34 @@ class ViewPort(QtCore.QObject):
     def tfV2W(self, pt: Vec2) -> Vec2:
         return project_point(self.revMatrix, pt)
 
-    def __update(self) -> None:
+    def __update(self, suppress=False) -> None:
+        # Elements of the world transform
+        scale = M.scale(self.__scale)
+        translate = M.translate(-self.__center_point.x, -self.__center_point.y)
+
+        # Calculate the world transform
+
+        self.__transform = scale @ self.__rotate_flip @ translate
+
         self.__w2v = self.__n2v @ self.transform
         self.__v2w = numpy.linalg.inv(self.__w2v) # type:ignore
 
-        # mypy safe
-        self.__scale_factor = max(map(abs, [self.fwdMatrix[0][0], self.fwdMatrix[0][1], self.fwdMatrix[1][0], self.fwdMatrix[1][1]]))  # type: ignore
+        if not suppress:
+            self.changed.emit()
 
     def resize(self, newwidth: int, newheight: int) -> None:
         self.__width = newwidth
         self.__height = newheight
 
-        # Natural device coordinates to viewport matrix
-        rs = max(self.__width, self.__height)/2
+        # Normal device coordinates to viewport matrix
+        normal_to_pixels = max(self.__width, self.__height)/2
+
+        self.__normal_width = self.__width / normal_to_pixels
+        self.__normal_height = self.__height / normal_to_pixels
+
         self.__n2v = numpy.array([
-            [rs, 0, self.__width/2],
-            [0, -rs, self.__height/2],
+            [normal_to_pixels, 0, self.__width/2],
+            [0, -normal_to_pixels, self.__height/2],
             [0, 0, 1],
             ])
 
