@@ -106,6 +106,12 @@ class Rect(object):
         self.right = max(self.right, other.right)
         self.top = max(self.top, other.top)
 
+    def point_merge(self, other: 'Vec2') -> None:
+        self.left = min(self.left, other.x)
+        self.bottom = min(self.bottom, other.y)
+        self.right = max(self.right, other.x)
+        self.top = max(self.top, other.y)
+
     def point_test(self, pt: 'Vec2') -> int:
         """
         :param pt:

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, cast
 from qtpy import QtCore
 import math
 from enum import Enum
+from typing import List
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -103,12 +104,25 @@ class ViewPort(QtCore.QObject):
 
         self.translate(new_world_center - world_center)
 
-    def fit_rect(self, rect: Rect):
+    def fit_point_cloud(self, points: List[Vec2]):
+        new_points = [project_point(self.__rotate_flip, p) for p in points]
+        if not new_points:
+            return
+
+        r = Rect.from_center_size(new_points.pop())
+        for p in new_points:
+            r.point_merge(p)
+
+        self.__fit_postrotate_rect(r)
+
+
+    def __fit_postrotate_rect(self, rect: Rect):
         # Zoom so as to fit a rect
         viewport_aspect = self.__normal_width / self.__normal_height
         target_aspect = rect.width / rect.height
 
-        self.__center_point = rect.center
+        #self.__center_point = rect.center
+        self.__center_point = project_point(numpy.linalg.inv(self.__rotate_flip), rect.center)
 
         if target_aspect > viewport_aspect:
             self.__scale = self.__normal_width / rect.width

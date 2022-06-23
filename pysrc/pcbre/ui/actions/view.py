@@ -109,7 +109,7 @@ class ZoomFitAction(QtWidgets.QAction):
         r = self.__bbox_call()
         if not r:
             return
-        self.__vp.fit_rect(r)
+        self.__vp.fit_point_cloud(r)
 
 #####################3
 

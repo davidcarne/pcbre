@@ -49,18 +49,7 @@ class MainWindowActions:
         self.view_rotate_r = RotateRAction(window, vs)
         self.view_cycle_draw_order = CycleDrawOrderAction(window)
 
-        # TODO, migrate to the viewArea
-        def get_area():
-            a = window.viewArea.getVisible()
-            if not a:
-                return
-
-            r = a.pop().bbox
-            for g in a:
-                r.bbox_merge(g.bbox)
-            return r
-
-        self.view_zoom_fit = ZoomFitAction(window, vs, get_area)
+        self.view_zoom_fit = ZoomFitAction(window, vs, window.viewArea.get_visible_point_cloud)
 
         self.view_set_mode_trace = SetModeTraceAction(window, window.viewArea.boardViewState)
         self.view_set_mode_cad = SetModeCADAction(window, window.viewArea.boardViewState)

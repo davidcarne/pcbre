@@ -4,7 +4,7 @@ import pcbre.model.serialization as ser
 from pcbre.model.serialization import deserialize_matrix, serialize_matrix, serialize_point2, deserialize_point2, \
     serialize_point2f, deserialize_point2f
 from pcbre.model.util import ImmutableSetProxy
-from pcbre.matrix import project_point, Vec2
+from pcbre.matrix import project_point, Vec2, Rect
 import numpy
 
 from typing import List, Tuple, Set, Optional, Union, TYPE_CHECKING, Iterable
@@ -251,6 +251,31 @@ class ImageLayer:
             self.__cached_decode = im
 
         return self.__cached_decode
+
+    def get_corner_points(self) -> List[Vec2]:
+        # Normalized_dims
+        max_dim = float(max(self.__cached_decode.shape))
+        x = self.__cached_decode.shape[1]/max_dim
+        y = self.__cached_decode.shape[0]/max_dim
+
+        corners = (
+                (-1, -1),
+                (-1, 1),
+                (1, 1),
+                (1, -1))
+
+        # Rectangle in pixel space
+        corners_pixspace = [
+                Vec2(mx * x, my * y) for mx, my in corners
+                ]
+
+        # Possibly non-rectangular corner points
+        corners_norm = [
+                project_point(self.transform_matrix, p) for p in corners_pixspace
+                ]
+
+        return corners_norm
+
 
     def __calculate_transform_matrix(self) -> None:
         if self.__updated_transform:

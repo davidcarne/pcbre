@@ -477,6 +477,27 @@ class BoardViewWidget(BaseViewWidget):
             f, s = via_pair.layers
             return f.order <= layer.order <= s.order
 
+    def get_visible_point_cloud(self) -> List[Vec2]:
+        bboxes = [i.bbox for i in self.getVisible()]
+        points = []
+
+        # Create points from the AABB corners of geometry
+        # TODO: stop using AABB details, use convex hull points
+        for bb in bboxes:
+            points.append(bb.tl)
+            points.append(bb.tr)
+            points.append(bb.bl)
+            points.append(bb.br)
+
+        if self.boardViewState.render_mode == MODE_TRACE and self.boardViewState.show_images and len(self.boardViewState.current_layer.imagelayers) > 0:
+            for i in self.boardViewState.current_layer.imagelayers:
+                points.extend(i.get_corner_points())
+
+        if not points:
+            return
+
+        return points
+
     def getVisible(self) -> Sequence[Geom]:
         objects = []
 
