@@ -115,23 +115,10 @@ class ViewPort(QtCore.QObject):
 
         self.__fit_postrotate_rect(r)
 
-
     def __fit_postrotate_rect(self, rect: Rect):
-        # Zoom so as to fit a rect
-        viewport_aspect = self.__normal_width / self.__normal_height
-        target_aspect = rect.width / rect.height
-
-        #self.__center_point = rect.center
         self.__center_point = project_point(numpy.linalg.inv(self.__rotate_flip), rect.center)
-
-        if target_aspect > viewport_aspect:
-            self.__scale = self.__normal_width / rect.width
-        else:
-            self.__scale = self.__height / rect.height
-
+        self.__scale = min(self.__normal_width / rect.width, self.__normal_height / rect.height)
         self.__update()
-
-
 
     @property
     def transform(self) -> 'npt.NDArray[numpy.float64]':
