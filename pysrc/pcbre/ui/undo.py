@@ -43,6 +43,24 @@ class UndoMerge(QtWidgets.QUndoCommand):
         for i in reversed(self.artwork):
             self.project.artwork.remove(i)
 
+class UndoDelete(QtWidgets.QUndoCommand):
+    def __init__(self, project: 'Project', artwork: 'Union[InsertableGeomComponent, List[InsertableGeomComponent]]', desc: str) -> None:
+        super(UndoDelete, self).__init__(desc)
+
+        if isinstance(artwork, list):
+            self.artwork: List['InsertableGeomComponent'] = artwork
+        else:
+            self.artwork = [artwork]
+
+        self.project = project
+
+    def undo(self) -> None:
+        for i in self.artwork:
+            self.project.artwork.merge(i)
+
+    def redo(self) -> None:
+        for i in reversed(self.artwork):
+            self.project.artwork.remove(i)
 
 SigType = Tuple[Tuple[Any, ...], Dict[str, Any]]
 CallableType = Callable[..., SigType]

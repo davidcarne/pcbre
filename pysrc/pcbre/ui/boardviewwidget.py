@@ -266,16 +266,25 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
         self.viewState.zoom_at(around_point, sf)
 
     def wheelEvent(self, event: QtGui.QWheelEvent) -> None:
+        cpt = QPoint_to_point(event.pos())
+
         if not event.modifiers():
             step = event.angleDelta().y() / 120.0
-            cpt = QPoint_to_point(event.pos())
             self.zoom(step, cpt)
         else:
             if self.interactionDelegate:
-                self.interactionDelegate.tool_event()
-                # self.interactionDelegate.mouseWheelEvent(event)
-                # FIXME
-                pass
+                step = event.angleDelta().y() / 120.0
+                if step < 0:
+                    step = - step
+                    code = EventID.Mouse_WheelDown
+                else:
+                    code = EventID.Mouse_WheelUp
+
+                w_pt = self.viewState.tfV2W(cpt)
+
+                tool_event = ToolActionEvent(code, cpt, w_pt, step)
+                self.interactionDelegate.tool_event(tool_event)
+
 
         self.update()
 
@@ -570,14 +579,19 @@ class BoardViewWidget(BaseViewWidget):
     def layer_visible_m(self, l: Layer) -> bool:
         return self.boardViewState.current_layer in l
 
-    def query_point(self, pt: Point2) -> Sequence[Geom]:
-        all_aw = self.project.artwork.query_point(pt)
+    def query_point(self, pt: Point2) -> Optional[Geom]:
+        # todo: don't use this function anywhere, or introduce some picking heuristic
+        all_aw = self.query_point_multiple(pt)
+        if not all_aw:
+            return None
 
+        # Return an arbitrary element
+        return all_aw.pop()
+
+    def query_point_multiple(self, pt: Point2) -> Sequence[Geom]:
+        all_aw = set(self.project.artwork.query_point_multiple(pt))
         vis_aw = set(self.getVisible())
-
-        # Todo: return multiple
-        if all_aw in vis_aw:
-            return all_aw
+        return vis_aw.intersection(all_aw)
 
     def __render_top_half(self) -> None:
         """

@@ -284,12 +284,10 @@ class Artwork:
 
         return acc
 
-    def query_point(self, pt: Point2, return_multiple: bool = False) -> Union[Geom, Pad, Component, None]:
+    def query_point(self, pt: Point2) -> Union[Geom, Pad, Component, None]:
         """
         Queries a single point to identify geometry at that location
         """
-
-        assert not return_multiple
 
         for aw in self.get_all_artwork():
             if point_inside(aw, pt):
@@ -300,6 +298,23 @@ class Artwork:
                 return cmp
 
         return None
+
+    def query_point_multiple(self, pt: Point2) -> Sequence[Union[Geom, Pad, Component]]:
+        """
+        Queries a single point to identify geometry at that location
+        """
+
+        found_aw = []
+
+        for aw in self.get_all_artwork():
+            if point_inside(aw, pt):
+                found_aw.append(aw)
+
+        for cmp in self.components:
+            if cmp.point_inside(pt):
+                found_aw.append(cmp)
+
+        return found_aw
 
     def merge_aw_nets(self, new_geom: QueryableGeom) -> None:
         """

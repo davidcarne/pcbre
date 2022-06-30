@@ -3,9 +3,10 @@ import enum
 from pcbre.model.pad import Pad
 from .basetool import BaseTool, BaseToolController
 from pcbre.model.const import TFF
-from qtpy import QtWidgets
+from qtpy import QtWidgets, QtCore
 from pcbre.ui.uimodel import TinySignal
 from pcbre.ui.icon import Icon
+from pcbre.ui.undo import UndoDelete
 from pcbre.model.project import Project
 import pcbre.ui.boardviewwidget
 from typing import Optional, Callable, Any
@@ -53,6 +54,27 @@ select_icons = {
 valid_select = [SelectByModes.POINT, SelectByModes.NET]
 
 
+class SelectionMenuAction(QtWidgets.QAction):
+    def __init__(self, view, parent, name, cb, current, data, combining) -> None:
+        QtWidgets.QAction.__init__(self, name, parent)
+
+        self.data = data
+        self.combining = combining
+        self.cb = cb
+        self.current = current
+        self.view = view
+
+        self.triggered.connect(self.__call_cb)
+
+        self.hovered.connect(self.__hover)
+
+    def __call_cb(self) -> None:
+        self.cb(self.current, self.data, self.combining)
+
+    def __hover(self):
+        self.cb(self.current, self.data, self.combining)
+
+
 class SelectToolController(BaseToolController):
     def __init__(self, project: Project,
                  model: 'SelectToolModel',
@@ -63,6 +85,8 @@ class SelectToolController(BaseToolController):
         self.view: pcbre.ui.boardviewwidget.BoardViewWidget = view
         self.project: Project = project
         self.model: SelectToolModel = model
+        self.submit = submit
+
 
     @property
     def tool_actions(self):
@@ -70,20 +94,61 @@ class SelectToolController(BaseToolController):
 
     def eventSelect(self, evt: ToolActionEvent, combining: CombiningMode):
         new = set()
+        current = self.view.selectionList
 
         if self.model.vers == SelectByModes.POINT:
-            res = self.view.query_point(evt.world_pos)
-            if res is not None:
-                new.add(res)
+            res = self.view.query_point_multiple(evt.world_pos)
+
+            # prune the selection list
+            if combining == CombiningMode.UNION:
+                res = res.difference(current)
+            elif combining == CombiningMode.DIFFERENCE:
+                res = res.intersection(current)
+            else:
+                updated = new
+
+
+            # No items found, no selection change
+            if len(res) == 0:
+                new = []
+
+            # Only one item found, no need for a user query
+            elif len(res) == 1:
+                new.add(res.pop())
+
+            # More than one item found, pop a context menu
+            else:
+                # TODO, this is kludgy, rework
+                self.ctxmenu = ctxmenu = QtWidgets.QMenu()
+                for i in res:
+                    # TODO - better human names
+                    act = SelectionMenuAction(self.view, ctxmenu, "%s" % i, self.__finish_eventSelect, current, set([i]), combining)
+                    ctxmenu.addAction(act)
+
+                act = SelectionMenuAction(self.view, ctxmenu, "All (%d items)" % len(res), self.__finish_eventSelect, current, res, combining)
+                ctxmenu.addAction(act)
+
+                # Show at the cursor. TODO - offset?
+                screen_pt = self.view.mapToGlobal(QtCore.QPoint(*evt.cursor_pos))
+                ctxmenu.move(screen_pt)
+                ctxmenu.show()
+
+                def cleanup():
+                    self.view.setSelectionList(current)
+
+                ctxmenu.aboutToHide.connect(cleanup)
 
         elif self.model.vers == SelectByModes.NET:
-            res = self.view.query_point(evt.world_pos)
+            res = self.view.query_point_multiple(evt.world_pos)
             if res is not None and res.TYPE_FLAGS & TFF.HAS_NET:
                 net = res.net
                 aw = self.project.artwork.get_geom_for_net(net)
                 new.update(aw)
 
-        current = self.view.selectionList
+        self.__finish_eventSelect(current, new, combining)
+
+
+    def __finish_eventSelect(self, current, new, combining):
 
         if combining == CombiningMode.UNION:
             updated = current.union(new)
@@ -94,12 +159,16 @@ class SelectToolController(BaseToolController):
 
         self.view.setSelectionList(updated)
 
+
     def eventDelete(self):
+        del_list = []
         for v in self.view.selectionList:
             if isinstance(v, Pad):
                 continue
+            del_list.append(v)
 
-            self.project.artwork.remove(v)
+
+        self.submit(UndoDelete(self.project, del_list, "Delete %d geom items" % len(del_list)))
 
         self.view.selectionList.clear()
 
@@ -144,7 +213,7 @@ class SelectTool(BaseTool):
     def getToolController(self,
                           view: 'pcbre.ui.boardviewwidget.BoardViewWidget',
                           submit: Any):
-        return SelectToolController(self.project, self.model, view, Any)
+        return SelectToolController(self.project, self.model, view, submit)
 
     def __update_icon(self):
         ico = Icon(select_icons[self.model.vers])
@@ -207,11 +276,13 @@ g_ACTIONS = [
         SelectEventCode.SelectDifference,
         "Remove selected items from selection"),
 
+    # TODO, add drag selections
+
     ToolActionDescription(
         [
             ToolActionShortcut(EventID.Key_Backspace),
             ToolActionShortcut(EventID.Key_Delete),
         ],
-        SelectEventCode.SelectDifference,
+        SelectEventCode.DeleteSelected,
         "Delete selected items")
 ]
