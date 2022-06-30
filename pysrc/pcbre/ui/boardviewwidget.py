@@ -337,11 +337,23 @@ class BoardViewState(QtCore.QObject):
         self.__current_layer = None
         self.__render_mode = MODE_CAD
         self.__show_images = True
+        self.__show_trace_mode_geom = True
         self.layer_permute = 0
 
     def permute_layer_order(self) -> None:
         self.layer_permute += 1
         self.changed.emit()
+
+    @property
+    def show_trace_mode_geom(self) -> bool:
+        return self.__show_trace_mode_geom
+
+    @show_trace_mode_geom.setter
+    def show_trace_mode_geom(self, value: bool) -> None:
+        old = self.__show_trace_mode_geom
+        self.__show_trace_mode_geom = value
+        if old != value:
+            self.changed.emit()
 
     @property
     def current_layer(self) -> Layer:
@@ -411,6 +423,7 @@ class BoardViewWidget(BaseViewWidget):
 
         self.boardViewState = BoardViewState()
         self.boardViewState.changed.connect(self.update)
+
 
     def resizeGL(self, width: int, height: int) -> None:
         super(BoardViewWidget, self).resizeGL(width, height)
@@ -500,6 +513,9 @@ class BoardViewWidget(BaseViewWidget):
 
     def getVisible(self) -> Sequence[Geom]:
         objects = []
+
+        if self.boardViewState.render_mode == MODE_CAD and not self.boardViewState.show_trace_mode_geom:
+            return
 
         # Add visible vias
         vp_visible = {}
@@ -704,6 +720,9 @@ class BoardViewWidget(BaseViewWidget):
             images_cycled = images[i:] + images[:i]
             for l in images_cycled:
                 self.image_view_cache_load(l).render(self.viewState.glMatrix)
+
+        if not self.boardViewState.show_trace_mode_geom:
+            return
 
         with self.compositor.composite_prebind() as pb:
 

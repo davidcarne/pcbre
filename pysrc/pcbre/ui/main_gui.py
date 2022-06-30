@@ -15,7 +15,7 @@ from pcbre.ui.actions.pcb import RebuildConnectivityAction, LayerViewSetupDialog
 from pcbre.ui.actions.save import SaveAction, SaveAsDialogAction, ExitAction
 from pcbre.ui.actions.save import checkCloseSave
 from pcbre.ui.actions.view import LayerJumpAction, FlipXAction, FlipYAction, RotateLAction, CycleDrawOrderAction, \
-    RotateRAction, SetModeTraceAction, SetModeCADAction, CycleModeAction, ZoomFitAction
+    RotateRAction, SetModeTraceAction, SetModeCADAction, CycleModeAction, ZoomFitAction, HideDrawnGeometry
 from pcbre.ui.boardviewwidget import BoardViewWidget
 from pcbre.ui.panes.console import ConsoleWidget
 from pcbre.ui.panes.info import InfoWidget
@@ -50,6 +50,7 @@ class MainWindowActions:
         self.view_cycle_draw_order = CycleDrawOrderAction(window)
 
         self.view_zoom_fit = ZoomFitAction(window, vs, window.viewArea.get_visible_point_cloud)
+        self.view_hide_trace_geom = HideDrawnGeometry(window, window.viewArea.boardViewState)
 
         self.view_set_mode_trace = SetModeTraceAction(window, window.viewArea.boardViewState)
         self.view_set_mode_cad = SetModeCADAction(window, window.viewArea.boardViewState)

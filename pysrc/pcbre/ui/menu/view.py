@@ -25,6 +25,7 @@ class ViewMenu(QtWidgets.QMenu):
 
         self.addAction(mw.pcbre_actions.view_set_mode_trace)
         self.addAction(mw.pcbre_actions.view_set_mode_cad)
+        self.addAction(mw.pcbre_actions.view_hide_trace_geom)
 
         def update_sub():
             mw.pcbre_actions.view_set_mode_trace.update_from_prop()

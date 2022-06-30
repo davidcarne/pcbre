@@ -128,6 +128,23 @@ class CycleDrawOrderAction(QtWidgets.QAction):
         self.__window.viewArea.boardViewState.permute_layer_order()
 
 
+class HideDrawnGeometry(QtWidgets.QAction):
+    def __init__(self, mw: 'MainWindow', va: 'BoardViewState') -> None:
+        QtWidgets.QAction.__init__(self, "Hide Geometry in Tracing", mw)
+        self.setShortcut(QtGui.QKeySequence("h"))
+        self.va = va
+
+        self.setCheckable(True)
+
+        self.update_from_prop()
+        self.triggered.connect(self.__set_prop)
+        self.va.changed.connect(self.update_from_prop)
+
+    def __set_prop(self) -> None:
+        self.va.show_trace_mode_geom = not self.va.show_trace_mode_geom
+
+    def update_from_prop(self) -> None:
+        self.setChecked(not self.va.show_trace_mode_geom)
 
 class SetModeTraceAction(QtWidgets.QAction):
     def __init__(self, mw: 'MainWindow', va: 'BoardViewState') -> None:
