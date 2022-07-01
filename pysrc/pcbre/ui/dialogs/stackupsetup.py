@@ -227,8 +227,11 @@ class StackupSetupDialog(QtWidgets.QDialog):
         if lay is None:
             return
 
-        cur = numpy.array(lay.color) * 255
-        initial = QtGui.QColor(*cur)
+        initial = QtGui.QColor(
+            int(lay.color[0] * 255), 
+            int(lay.color[1] * 255), 
+            int(lay.color[2] * 255))
+
         c = QtWidgets.QColorDialog().getColor(initial)
         if c.isValid():
             r, g, b, _ = c.getRgb()
@@ -489,7 +492,7 @@ class StackupAdapter(QtCore.QAbstractTableModel):
             else:
                 return "Via pair"
         elif orientation == QtCore.Qt.Vertical and role == QtCore.Qt.BackgroundRole:
-            colors = [i * 255 for i in self.layers[index].color]
+            colors = [int(i * 255) for i in self.layers[index].color]
             return QtGui.QBrush(QtGui.QColor(*colors))
 
         return None

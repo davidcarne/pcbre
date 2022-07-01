@@ -301,7 +301,6 @@ class RectAlignmentModel:
 
     def set_dim_values(self, a: float, b: float) -> None:
         self.__dim_values = [a, b]
-        self.change()
 
     @property
     def image_matrix(self) -> 'npt.NDArray[numpy.float64]':
@@ -331,11 +330,9 @@ class RectAlignmentModel:
     def move_handle(self, handle_id: int, pos: Optional[Vec2]) -> None:
         if IDX_IS_CORNER(handle_id):
             assert pos is not None
-            self.__corner_handles = self.__corner_handles[:handle_id] + (pos,) + self.__corner_handles[handle_id + 1:]
             self.__update_line_pos(handle_id, pos)
         elif IDX_IS_LINE(handle_id):
             idx = handle_id - CORNER_MAX
-            self.__line_handles = self.__line_handles[:idx] + (pos,) + self.__line_handles[idx + 1:]
             self.__update_line_pos(handle_id, pos)
         elif IDX_IS_DIM(handle_id):
             idx = handle_id - ANCHOR_MAX
@@ -389,7 +386,7 @@ class RectAlignmentModel:
         :return:
         """
         if _pos is None:
-            self.move_handle(h_idx, None)
+            self.set_handle(h_idx, None)
             return
 
         pos = _pos.dup()
@@ -430,38 +427,46 @@ class RectAlignmentModel:
                     return
 
             if pt_ahead_2 is not None:
-                self.move_handle(ahead_idx_2, pt_ahead_2)
+                self.set_handle(ahead_idx_2, pt_ahead_2)
 
             if pt_behind_2 is not None:
-                self.move_handle(behind_idx_2, pt_behind_2)
+                self.set_handle(behind_idx_2, pt_behind_2)
 
-            self.move_handle(h_idx, pos)
+            self.set_handle(h_idx, pos)
 
         else:
             line_idx = (h_idx - 4) // 2
-            o_idx = (h_idx & ~1) | (h_idx ^ 1)
 
-            this_anchor = self.align_handles[h_idx].dup()
-            other_anchor = self.align_handles[o_idx]
+            this_anchor_or_none = self.align_handles[h_idx]
 
             lines = list(self.lines())
-
             this_line = lines[line_idx]
+
+            # Handle not set, no move calculation 
+            if this_anchor_or_none is None:
+                # Find nearest point on line and place handle there
+                p, _ = project_point_line(pos, this_line[0], this_line[1])
+                self.set_handle(h_idx, p)
+                return
+
+
+            this_anchor = this_anchor_or_none.dup()
+
+            other_anchor = self.align_handles[h_idx ^ 1]
+
             prev_line = lines[(line_idx - 1) % 4]
             next_line = lines[(line_idx + 1) % 4]
 
             if other_anchor is None:
-                if this_anchor is None:
-                    delta = Vec2(0, 0)
-                else:
-                    # One anchor, move the whole line by pos - this_anchor
-                    delta = pos - this_anchor
+                # One anchor, move the whole line by pos - this_anchor
+                delta = pos - this_anchor
                 pt_a = this_line[0].dup() + delta
                 pt_b = this_line[1].dup() + delta
-
             else:
                 pt_a = pos
                 pt_b = other_anchor.dup()
+
+            print(pt_a, pt_b)
 
             # Recalculate the endpoints
             intersect_cond, pt_prev = line_intersect(pt_a, pt_b, prev_line[0], prev_line[1])
@@ -474,11 +479,11 @@ class RectAlignmentModel:
             if intersect_cond != Intersect.NORMAL:
                 return
 
-            self.move_handle(line_idx, pt_prev)
-            self.move_handle((line_idx + 1) % 4, pt_next)
+            self.set_handle(line_idx, pt_prev)
+            self.set_handle((line_idx + 1) % 4, pt_next)
 
             # We can always move an anchor
-            self.move_handle(h_idx, pos)
+            self.set_handle(h_idx, pos)
 
     def update_matricies(self) -> None:
         # Build compatible arrays for cv2.getPerspectiveTransform

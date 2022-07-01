@@ -319,7 +319,11 @@ class LayerAlignmentDialog(QtWidgets.QDialog):
         self.undoStack : UndoStack = UndoStack()
         self.undoStack.setup_actions(self)
 
+        # Any time we handle a command, redraw the view
+        self.undoStack.indexChanged.connect(lambda _: self.view.update())
+
         self.update_controls()
+
 
     def visMakeLeaf(self, il: ImageLayer) -> VisibilityModelLeaf:
         l = VisibilityModelLeaf(il.name, obj=il)

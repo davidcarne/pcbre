@@ -136,7 +136,6 @@ class Imagery:
         self.keypoints = ImmutableListProxy(self.__keypoints)
 
     def add_imagelayer(self, imagelayer: ImageLayer) -> None:
-        print(imagelayer._project, self)
         assert imagelayer._project is None or imagelayer._project is self.__project
         imagelayer._project = self.__project
 

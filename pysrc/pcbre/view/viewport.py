@@ -58,7 +58,7 @@ class ViewPort(QtCore.QObject):
         self.__update()
 
     @staticmethod
-    def build_state(self, center, scale):
+    def build_state(center, scale):
         return (center, scale, numpy.identity(3, dtype=numpy.float64))
 
     # Save/restore

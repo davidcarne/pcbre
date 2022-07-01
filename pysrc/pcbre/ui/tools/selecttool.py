@@ -140,10 +140,39 @@ class SelectToolController(BaseToolController):
 
         elif self.model.vers == SelectByModes.NET:
             res = self.view.query_point_multiple(evt.world_pos)
-            if res is not None and res.TYPE_FLAGS & TFF.HAS_NET:
-                net = res.net
-                aw = self.project.artwork.get_geom_for_net(net)
-                new.update(aw)
+
+            # Gather and dedup all potential nets we might be picking
+            candidates = {} # Net -> set(geom)
+            for i in res:
+                if i.TYPE_FLAGS & TFF.HAS_NET:
+                    if i.net not in candidates:
+                        candidates[i.net] = self.project.artwork.get_geom_for_net(i.net)
+
+            # Zero nets, no selection
+            if len(candidates) == 0:
+                new = []
+
+            # One net, select it
+            elif len(candidates) == 1:
+                new = candidates.popitem()[1]
+
+            # More than one, show popup
+            else:
+                # TODO, this is kludgy, rework
+                self.ctxmenu = ctxmenu = QtWidgets.QMenu()
+                for net, aw in candidates.items():
+                    # TODO - better human names, add net names
+                    act = SelectionMenuAction(self.view, ctxmenu, "%s" % net, self.__finish_eventSelect, current, aw, combining)
+                    ctxmenu.addAction(act)
+
+                # Show at the cursor. TODO - offset?
+                screen_pt = self.view.mapToGlobal(QtCore.QPoint(*evt.cursor_pos))
+                ctxmenu.move(screen_pt)
+                ctxmenu.show()
+
+                def cleanup():
+                    self.view.setSelectionList(current)
+                ctxmenu.aboutToHide.connect(cleanup)
 
         self.__finish_eventSelect(current, new, combining)
 
