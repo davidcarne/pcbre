@@ -541,7 +541,7 @@ class BoardViewWidget(BaseViewWidget):
                 objects.append(trace)
 
         for polygon in self.project.artwork.polygons:
-            if self.layer_visible(polygon):
+            if self.layer_visible(polygon.layer):
                 objects.append(polygon)
 
         if self.boardViewState.render_mode == MODE_CAD:
@@ -614,10 +614,16 @@ class BoardViewWidget(BaseViewWidget):
         # Update Selection cache
         self.__sel_cache.update_if_necessary(self.selectionList)
 
+        self.poly_renderer.restart()
+        for p in self.project.artwork.polygons:
+            self.poly_renderer.deferred(p, 0)
+
         for k, v in self.render_commands.layers.items():
             GL.glPushDebugGroup(GL.GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Layer %r" % k)
             with self.compositor.get(k):
                 self.trace_renderer.render_va(v.va_traces, self.viewState.glMatrix, COL_LAYER_MAIN)
+                # Now, for all polygons
+                self.poly_renderer.render(self.viewState.glMatrix, k, COL_LAYER_MAIN)
             GL.glPopDebugGroup()
 
                 # TODO: Render Text
