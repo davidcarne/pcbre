@@ -133,7 +133,7 @@ class TraceRender:
         GL.glUniform4ui(self.__attribute_shader.uniforms.layer_info, 255, col, 0, 0)
 
         if has_base_instance:
-            # Many instances backport glDrawElementsInstancedBaseInstance
+            # Many GL implementations backport glDrawElementsInstancedBaseInstance
             # This is faster than continually rebinding, so support if possible
             if not is_outline:
                 # filled traces come first in the array

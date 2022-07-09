@@ -5,16 +5,20 @@ uniform mat3 mat;
 INPUT_TYPE vec2 pos_a;
 INPUT_TYPE vec2 pos_b;
 INPUT_TYPE float thickness;
-uniform vec4 color;
 
+/*
+ * the line vertex shader is an instanced renderer
+ * Each instance consists of two unit-radius semicircles
+ * Each semicircle is associated with one end of the thickline being drawn
+ * and each semicircle is translated/rotated to the end of the line
+ */
 
 in vec2 vertex;
 in int ptid;
 
-out vec4 color_vtx;
-
 void main(void)
 {
+    
     vec2 pos;
     if (ptid == 0) {
         pos = pos_a;
@@ -38,6 +42,5 @@ void main(void)
     vec3 calc = mat * vec3(pos + endcap_r * (thickness * vertex), 1);
     gl_Position = vec4(calc.x, calc.y, 0, 1);
 
-    color_vtx = color;
 }
 

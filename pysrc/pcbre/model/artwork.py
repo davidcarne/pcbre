@@ -684,13 +684,13 @@ class Artwork:
             p_repr = i_poly.get_poly_repr()
             p.init("exterior", len(p_repr.exterior.coords))
             for nn, ii in enumerate(p_repr.exterior.coords):
-                p.exterior[nn] = serialize_point2(Point2(ii.x, ii.y))
+                p.exterior[nn] = serialize_point2(Point2(ii[0], ii[1]))
 
             p.init("interiors", len(p_repr.interiors))
             for n_interior, interior in enumerate(p_repr.interiors):
                 p.interiors.init(n_interior, len(interior.coords))
                 for nn, ii in enumerate(interior.coords):
-                    p.interiors[n_interior][nn] = serialize_point2(Point2(ii.x, ii.y))
+                    p.interiors[n_interior][nn] = serialize_point2(Point2(ii[0], ii[1]))
 
             p.layerSid = self.__project.scontext.sid_for(i_poly.layer)
             p.netSid = self.__project.scontext.sid_for(i_poly.net)
