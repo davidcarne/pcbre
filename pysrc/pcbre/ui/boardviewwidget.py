@@ -15,7 +15,7 @@ from pcbre.model.stackup import Layer, ViaPair
 from pcbre.ui.gl.glshared import GLShared
 from pcbre.ui.tool_action import MoveEvent, ToolActionEvent, EventID, Modifier
 from pcbre.util import Timer
-from pcbre.view.cachedpolygonrenderer import CachedPolygonRenderer
+from pcbre.view.cachedpolygonrenderer import PolygonRenderer
 from pcbre.view.cad_cache import CADCache, StackupRenderCommands, SelectionHighlightCache
 from pcbre.view.debugrender import DebugRender
 from pcbre.view.hairlinerenderer import HairlineRenderer
@@ -423,8 +423,7 @@ class BoardViewWidget(BaseViewWidget):
         self.__cad_cache = CADCache(self.project)
         self.__sel_cache = SelectionHighlightCache(self.project)
 
-        # TODO, currently broken
-        self.poly_renderer = CachedPolygonRenderer(self)
+        self.poly_renderer = PolygonRenderer(self)
 
         # Initial view is a normalized 1-1-1 area.
         # Shift to be 10cm max
@@ -614,35 +613,33 @@ class BoardViewWidget(BaseViewWidget):
         # Update Selection cache
         self.__sel_cache.update_if_necessary(self.selectionList)
 
-        self.poly_renderer.restart()
-        for p in self.project.artwork.polygons:
-            self.poly_renderer.deferred(p, 0)
-
+        # Render all artwork that renders to an individual layer
+        # Component pads are rendered into either traces or polygons
         for k, v in self.render_commands.layers.items():
             GL.glPushDebugGroup(GL.GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Layer %r" % k)
             with self.compositor.get(k):
                 self.trace_renderer.render_va(v.va_traces, self.viewState.glMatrix, COL_LAYER_MAIN)
-                # Now, for all polygons
-                self.poly_renderer.render(self.viewState.glMatrix, k, COL_LAYER_MAIN)
+                self.poly_renderer.render_prepare(self.__cad_cache.polygon_cache_for_layer(k))
+                self.poly_renderer.render_solid(self.viewState.glMatrix, COL_LAYER_MAIN)
             GL.glPopDebugGroup()
 
                 # TODO: Render Text
 
-        # Draw all the viapairs
+        # Render all viapairs into via layers
         for k, v in self.render_commands.vias.items():
             GL.glPushDebugGroup(GL.GL_DEBUG_SOURCE_APPLICATION, 0, -1, "ViaPair %r" % k)
             with self.compositor.get(k):
                 self.via_renderer.render_filled(self.viewState.glMatrix, v.va_vias)
             GL.glPopDebugGroup()
 
-        # Draw the multilayer components
+        # Render multilayer components onto the MULTI layer
         GL.glPushDebugGroup(GL.GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Multi Cmp")
         with self.compositor.get("MULTI"):
             self.via_renderer.render_filled(self.viewState.glMatrix, self.render_commands.multi.va_vias)
             # TODO: Render text
         GL.glPopDebugGroup()
 
-        # Draw the front and back sides
+        # Draw the front and back sides to the side art
         for k, v in self.render_commands.sides.items():
             GL.glPushDebugGroup(GL.GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Cmp %r" % k)
             with self.compositor.get(("LINEART", k)):
@@ -650,15 +647,20 @@ class BoardViewWidget(BaseViewWidget):
                 # TODO: Render text
             GL.glPopDebugGroup()
 
-        # Just create (don't actually bind) the overlay layer
+        # Just create (don't actually bind) the overlay/selection layer
+        # TODO - All selection logic should probably move to the Select tool
         GL.glPushDebugGroup(GL.GL_DEBUG_SOURCE_APPLICATION, 1, -1, "Overlay")
         with self.compositor.get("OVERLAY"):
             self.hairline_renderer.render_va(self.viewState.glMatrix, self.__cad_cache.airwire_va, COL_SEL)
             self.hairline_renderer.render_va(self.viewState.glMatrix, self.__sel_cache.thinline_va, COL_SEL)
             self.trace_renderer.render_va(self.__sel_cache.thickline_va, self.viewState.glMatrix, COL_SEL)
             self.via_renderer.render_filled(self.viewState.glMatrix, self.__sel_cache.via_va, COL_SEL)
+
+            self.poly_renderer.render_prepare(self.__sel_cache.polygon_cache)
+            self.poly_renderer.render_solid(self.viewState.glMatrix, COL_SEL)
         GL.glPopDebugGroup()
 
+        # Render the tool layer
         GL.glPushDebugGroup(GL.GL_DEBUG_SOURCE_APPLICATION, 1, -1, "Tool")
         self.render_tool()
         GL.glPopDebugGroup()
@@ -772,7 +774,6 @@ class BoardViewWidget(BaseViewWidget):
 
             # zero accuum buffers for restarts
             self.trace_renderer.restart()
-            self.poly_renderer.restart()
 
             # Update the Compositor
             self.compositor.restart()

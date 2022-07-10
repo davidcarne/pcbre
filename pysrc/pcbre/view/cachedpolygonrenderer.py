@@ -16,79 +16,38 @@ if TYPE_CHECKING:
 
 __author__ = 'davidc'
 
-
-class PolygonVBOPair:
-    """Per-layer VBO that stores polygon geometry"""
+class PolygonLayerCache:
+    """Per-layer VA that stores polygon geometry"""
 
     # Sentinel value for the Index used to indicate a new primitive
-    __RESTART_INDEX = 2 ** 32 - 1
+    RESTART_INDEX = 2 ** 32 - 1
 
-    def __init__(self, view: 'BoardViewWidget') -> None:
-        """
-        :type gls: pcbre.ui.gl.glshared.GLShared
-        :param gls:
-        :return:
-        """
-        self.__view = view
-        self.__gls = view.gls
-
+    def __init__(self) -> None:
+        # Ordered sequence of polygon points
         self.__position_list : List[Point2] = []
+
+        # Lookup (point->index) for deduping points
         self.__position_lookup : dict[Point2, int] = {}
 
+        # Mapping from polygon -> tuple (start, count) for drawing a polygon's triangles
+        # or outlines
         self.__tri_draw_ranges = {}
         self.__outline_draw_ranges = {}
 
         self.__tri_index_list = []
         self.__outline_index_list = []
 
-        self.__vert_vbo_current = False
-        self.__index_vbo_current = False
+    @property
+    def position_list(self):
+        return self.__position_list
 
-        self.restart()
+    @property
+    def tri_index_list(self):
+        return self.__tri_index_list
 
-    def restart(self) -> None:
-        self.__deferred_tri_render_ranges = defaultdict(list)
-        self.__deferred_line_render_ranges = defaultdict(list)
-
-    def initializeGL(self) -> None:
-        self.__vao = VAO()
-
-        # Lookup for vertex positions
-        self.__vert_vbo_dtype = numpy.dtype([("vertex", numpy.float32, 2)])
-        self.__vert_vbo = VBO(numpy.zeros((0,), dtype=self.__vert_vbo_dtype),
-                              GL.GL_DYNAMIC_DRAW)
-        self.__vert_vbo_current = False
-
-        self.__index_vbo_dtype = numpy.uint32
-        self.__index_vbo = VBO(numpy.zeros((0,), dtype=self.__index_vbo_dtype), GL.GL_DYNAMIC_DRAW, GL.GL_ELEMENT_ARRAY_BUFFER)
-        GL.glObjectLabel(GL.GL_BUFFER, int(self.__index_vbo), -1, "Polygon Index VBO")
-
-        self.__index_vbo_current = False
-
-        self.__shader = self.__gls.shader_cache.get("basic_fill_vert", "basic_fill_frag")
-
-        with self.__vao, self.__vert_vbo:
-            VBOBind(self.__shader.program, self.__vert_vbo_dtype, "vertex").assign()
-            self.__index_vbo.bind()
-
-    def __update_vert_vbo(self) -> None:
-        if self.__vert_vbo_current or not len(self.__position_list):
-            return
-
-        ar = numpy.zeros(len(self.__position_list), dtype=self.__vert_vbo_dtype)
-        ar["vertex"] = self.__position_list
-
-        self.__vert_vbo.set_array(ar)
-        self.__vert_vbo_current = True
-
-    def __update_index_vbo(self) -> None:
-        if self.__index_vbo_current or not len(self.__tri_index_list):
-            return
-
-        self.__outline_index_offset = len(self.__tri_index_list)
-        data = numpy.array(self.__tri_index_list + self.__outline_index_list, dtype=self.__index_vbo_dtype)
-        self.__index_vbo.set_array(data)
-        self.__index_vbo_current = True
+    @property
+    def outline_index_list(self):
+        return self.__outline_index_list
 
     def __get_position_index(self, point: Point2) -> int:
         """
@@ -104,11 +63,10 @@ class PolygonVBOPair:
         except KeyError:
             self.__position_lookup[norm_pos] = len(self.__position_list)
             self.__position_list.append(norm_pos)
-            self.__vert_vbo_current = False
 
         return self.__position_lookup[norm_pos]
 
-    def __add(self, polygon):
+    def add(self, polygon):
         tris = polygon.get_tris_repr()
         tri_index_first = len(self.__tri_index_list)
 
@@ -124,73 +82,84 @@ class PolygonVBOPair:
         for edge in [poly_repr.exterior] + list(poly_repr.interiors):
             for pt in edge.coords:
                 self.__outline_index_list.append(self.__get_position_index(Point2(pt[0], pt[1])))
-            self.__outline_index_list.append(self.__RESTART_INDEX)
+            self.__outline_index_list.append(self.RESTART_INDEX)
 
         lr = (outline_index_first, len(self.__outline_index_list))
         self.__outline_draw_ranges[polygon] = lr
 
-        self.__index_vbo_current = False
 
         return tr, lr
 
-    def deferred(self, polygon, render_settings=RENDER_STANDARD):
-        if polygon in self.__tri_draw_ranges:
-            trange, lrange = self.__tri_draw_ranges[polygon], self.__outline_draw_ranges[polygon]
-        else:
-            trange, lrange = self.__add(polygon)
+class PolygonRenderer:
+    def __init__(self, view):
+        self.__gls = view.gls
 
-        #if render_settings & RENDER_OUTLINES:
-        self.__deferred_line_render_ranges[render_settings].append(lrange)
-        #else:
-        self.__deferred_tri_render_ranges[render_settings].append(trange)
+    def initializeGL(self) -> None:
+        self.__vao = VAO()
 
-    def render(self, matrix, col, is_outline = False):
-        self.__update_vert_vbo()
-        self.__update_index_vbo()
+        # Lookup for vertex positions
+        self.__vert_vbo_dtype = numpy.dtype([("vertex", numpy.float32, 2)])
+        self.__vert_vbo = VBO(numpy.zeros((0,), dtype=self.__vert_vbo_dtype),
+                              GL.GL_DYNAMIC_DRAW)
+
+        self.__index_vbo_dtype = numpy.uint32
+        self.__index_vbo = VBO(numpy.zeros((0,), dtype=self.__index_vbo_dtype), GL.GL_DYNAMIC_DRAW, GL.GL_ELEMENT_ARRAY_BUFFER)
+        GL.glObjectLabel(GL.GL_BUFFER, int(self.__index_vbo), -1, "Polygon Index VBO")
+
+        self.__shader = self.__gls.shader_cache.get("basic_fill_vert", "basic_fill_frag")
+
+        with self.__vao, self.__vert_vbo:
+            VBOBind(self.__shader.program, self.__vert_vbo_dtype, "vertex").assign()
+            self.__index_vbo.bind()
+
+        self.__data_to_render = False
+
+    def render_prepare(self, cache):
+        self.__data_to_render = False
+
+        if len(cache.position_list) == 0:
+            return
+
+        if len(cache.tri_index_list) == 0:
+            return
+
+        # Update VBOs
+        ar = numpy.zeros(len(cache.position_list), dtype=self.__vert_vbo_dtype)
+        ar["vertex"] = cache.position_list
+        self.__vert_vbo.set_array(ar)
+
+        self.__tri_count = self.__outline_index_offset = len(cache.tri_index_list)
+        self.__outline_count = len(cache.outline_index_list)
+
+        data = numpy.array(cache.tri_index_list + cache.outline_index_list, dtype=self.__index_vbo_dtype)
+        self.__index_vbo.set_array(data)
+
+        self.__data_to_render = True
+        self.__restart_index = cache.RESTART_INDEX
+
+    def render_solid(self, matrix, col):
+        if not self.__data_to_render:
+            return
 
         with self.__shader.program, self.__vao, self.__index_vbo, self.__vert_vbo:
+            # Draw the polygons
             GL.glUniformMatrix3fv(self.__shader.uniforms.mat, 1, True, matrix.astype(numpy.float32))
             GL.glUniform4ui(self.__shader.uniforms.layer_info, 255, col, 0, 0)
+            GL.glDrawElements(GL.GL_TRIANGLES, self.__tri_count, GL.GL_UNSIGNED_INT, ctypes.c_void_p(0))
 
-            for rs, ranges in self.__deferred_tri_render_ranges.items():
-                tri_draw_list = get_consolidated_draws(ranges)
-                for first, last in tri_draw_list:
-                    GL.glDrawElements(GL.GL_TRIANGLES, last - first, GL.GL_UNSIGNED_INT, ctypes.c_void_p(first * 4))
+    def render_outline(self, matrix, col):
+        if not self.__data_to_render:
+            return
 
+        with self.__shader.program, self.__vao, self.__index_vbo, self.__vert_vbo:
             GL.glEnable(GL.GL_PRIMITIVE_RESTART)
-            GL.glPrimitiveRestartIndex(self.__RESTART_INDEX)
-            for rs, ranges in self.__deferred_line_render_ranges.items():
-                line_draw_list = get_consolidated_draws(ranges)
-                for first, last in line_draw_list:
-                    GL.glDrawElements(
-                        GL.GL_LINE_STRIP,
-                        last - first,
-                        GL.GL_UNSIGNED_INT,
-                        ctypes.c_void_p((first + self.__outline_index_offset) * 4))
-
+            GL.glPrimitiveRestartIndex(self.__restart_index)
+            GL.glDrawElements(
+                GL.GL_LINE_STRIP,
+                self.__outline_count,
+                GL.GL_UNSIGNED_INT,
+                ctypes.c_void_p((self.__outline_index_offset) * 4))
+            
             GL.glDisable(GL.GL_PRIMITIVE_RESTART)
 
 
-class CachedPolygonRenderer:
-    def __init__(self, view):
-        self.__per_layer_vbos = {}
-        self.__view = view
-
-    def initializeGL(self):
-        for v in self.__per_layer_vbos.values():
-            v.initializeGL()
-
-    def restart(self):
-        for v in self.__per_layer_vbos.values():
-            v.restart()
-
-    def deferred(self, polygon, rendersettings, render_hint=RENDER_HINT_NORMAL):
-        if polygon.layer not in self.__per_layer_vbos:
-            self.__per_layer_vbos[polygon.layer] = PolygonVBOPair(self.__view)
-            self.__per_layer_vbos[polygon.layer].initializeGL()
-
-        self.__per_layer_vbos[polygon.layer].deferred(polygon, rendersettings)
-
-    def render(self, matrix, layer, col):
-        if layer in self.__per_layer_vbos:
-            self.__per_layer_vbos[layer].render(matrix, col)

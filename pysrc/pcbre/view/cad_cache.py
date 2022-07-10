@@ -1,11 +1,12 @@
 from collections import defaultdict
 from pcbre.accel.vert_array import VA_xy, VA_via, VA_tex, VA_thickline
-from pcbre.model.artwork_geom import Trace, Via
+from pcbre.model.artwork_geom import Trace, Via, Polygon
 from pcbre.model.component import Component
 from pcbre.model.const import SIDE
 from pcbre.model.pad import Pad
 
 from pcbre.view.componentview import cmp_border_va
+from pcbre.view.cachedpolygonrenderer import PolygonLayerCache
 
 from typing import TYPE_CHECKING, List, Optional, Any, Set
 if TYPE_CHECKING:
@@ -106,12 +107,19 @@ class CADCache:
         self.__vias_cache = StackupRenderCommands()
         self.__cmp_cache = StackupRenderCommands()
 
+        # Map of polygon layer -> cached triangulation lists
+        self.__polygon_cache = defaultdict(PolygonLayerCache)
+
         self.__trace_generation : 'Optional[int]' = None
         self.__vias_generation : 'Optional[int]' = None
         self.__cmp_generation : 'Optional[int]' = None
         self.__airwires_generation : 'Optional[int]' = None
+        self.__polygon_generation: 'Optional[int]' = None
 
         self.airwire_va = VA_xy(1024)
+
+    def polygon_cache_for_layer(self, ly):
+        return self.__polygon_cache[ly]
 
     def update_if_necessary(self) -> None:
 
@@ -145,6 +153,16 @@ class CADCache:
                     else:
                         self.__cmp_cache.layers[self.__project.stackup.layer_for_side(pad.side)].va_traces.add_trace(pad.trace_repr)
 
+        if self.__polygon_generation != self.__project.artwork.polygons_generation:
+            self.__polygon_generation = self.__project.artwork.polygons_generation
+
+            # Reinit the cache. TODO, can we only update only different polys?
+            self.__polygon_cache = defaultdict(PolygonLayerCache)
+
+            for p in self.__project.artwork.polygons:
+                self.__polygon_cache[p.layer].add(p)
+
+
         if self.__airwires_generation != self.__project.artwork.airwires_generation:
             self.airwire_va.clear()
             for aw in self.__project.artwork.airwires:
@@ -168,35 +186,46 @@ class SelectionHighlightCache:
 
         self.__via_generation : 'Optional[int]' = None
         self.__traces_generation : 'Optional[int]' = None
+        self.__polygon_generation: 'Optional[int]' = None
         self.__component_generation : 'Optional[int]' = None
         self.__last_selection : 'Optional[List[Any]]' = None
 
+        self.__polygon_cache = PolygonLayerCache()
         self.thickline_va = VA_thickline(1024)
         self.thinline_va = VA_xy(1024)
         self.via_va = VA_via(1024)
+
+    @property
+    def polygon_cache(self):
+        return self.__polygon_cache
 
     def update_if_necessary(self, selection_list: 'Set[Any]') -> None:
         if (self.__last_selection == selection_list and
                 self.__project.artwork.components_generation == self.__component_generation and
                 self.__project.artwork.traces_generation == self.__traces_generation and
+                self.__project.artwork.polygons_generation == self.__polygon_generation and
                 self.__project.artwork.vias_generation == self.__via_generation):
             return
 
         self.__via_generation = self.__project.artwork.vias_generation
         self.__traces_generation = self.__project.artwork.traces_generation
         self.__component_generation = self.__project.artwork.components_generation
+        self.__polygon_generation = self.__project.artwork.polygons_generation
 
         self.__last_selection = selection_list
 
         self.thickline_va.clear()
         self.thinline_va.clear()
         self.via_va.clear()
+        self.__polygon_cache = PolygonLayerCache()
 
         for i in selection_list:
             if isinstance(i, Trace):
                 self.thickline_va.add_trace(i)
             elif isinstance(i, Via):
                 self.via_va.add_via(i)
+            elif isinstance(i, Polygon):
+                self.__polygon_cache.add(i)
             elif isinstance(i, Pad):
                 if i.is_through():
                     self.via_va.add_th_pad(i)
