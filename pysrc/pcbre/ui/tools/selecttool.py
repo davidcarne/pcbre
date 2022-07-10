@@ -196,8 +196,8 @@ class SelectToolController(BaseToolController):
                 continue
             del_list.append(v)
 
-
-        self.submit(UndoDelete(self.project, del_list, "Delete %d geom items" % len(del_list)))
+        if len(del_list) != 0:
+            self.submit(UndoDelete(self.project, del_list, "Delete %d geom items" % len(del_list)))
 
         self.view.selectionList.clear()
 

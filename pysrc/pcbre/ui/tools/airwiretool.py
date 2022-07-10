@@ -62,7 +62,6 @@ class AirwireToolController(BaseToolController):
 
     def mouseMoveEvent(self, evt):
         self.mouse = evt.world_pos
-        self.changed.emit()
 
     def event_place(self, event):
         pt = event.world_pos
@@ -70,12 +69,12 @@ class AirwireToolController(BaseToolController):
         # Find artwork
         aw = self.view.query_point(pt)
 
-        # layer for the artwork
-        aw_l = layer_for(aw)
-
         # No layer (no artwork)
         if aw is None:
             return
+
+        # layer for the artwork
+        aw_l = layer_for(aw)
 
         if self.state == self.STATE_IDLE:
             self.pt0 = pt
@@ -87,8 +86,6 @@ class AirwireToolController(BaseToolController):
             self.submit(UndoMerge(self.project, aw, "Add Airwire"))
 
             self.state = self.STATE_IDLE
-
-        self.changed.emit()
 
     def tool_event(self, event):
         if event.code == EventCode.Place:
