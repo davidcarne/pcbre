@@ -1,5 +1,6 @@
 import math
 import time
+from collections import defaultdict
 from typing import List, Set, Any, Optional, TYPE_CHECKING, Sequence, cast, Callable
 
 import OpenGL.GL as GL  # type: ignore
@@ -280,10 +281,7 @@ class BaseViewWidget(QtOpenGL.QGLWidget):
                 else:
                     code = EventID.Mouse_WheelUp
 
-                w_pt = self.viewState.tfV2W(cpt)
-
-                tool_event = ToolActionEvent(code, cpt, w_pt, step)
-                self.interactionDelegate.tool_event(tool_event)
+                self.dispatchActionEvent(event.pos(), code, Modifier.from_qevent(event), step)
 
 
         self.update()
@@ -347,10 +345,12 @@ class BoardViewState(QtCore.QObject):
         self.__render_mode = MODE_CAD
         self.__show_images = True
         self.__show_trace_mode_geom = True
-        self.layer_permute = 0
+        self.per_layer_permute = defaultdict(lambda: 0)
 
     def permute_layer_order(self) -> None:
-        self.layer_permute += 1
+        if self.__current_layer is not None:
+            self.per_layer_permute[self.__current_layer] += 1
+
         self.changed.emit()
 
     @property
@@ -743,7 +743,7 @@ class BoardViewWidget(BaseViewWidget):
 
         if stackup_layer is not None and self.boardViewState.show_images and (len(stackup_layer.imagelayers) > 0):
             images = list(stackup_layer.imagelayers)
-            i = self.boardViewState.layer_permute % len(images)
+            i = self.boardViewState.per_layer_permute[self.boardViewState.current_layer] % len(images)
             images_cycled = images[i:] + images[:i]
             for l in images_cycled:
                 self.image_view_cache_load(l).render(self.viewState.glMatrix)

@@ -14,6 +14,9 @@ class PCBMenu(QtWidgets.QMenu):
 
         self.addAction(pw.pcbre_actions.pcb_stackup_setup_dialog)
         self.addAction(pw.pcbre_actions.pcb_layer_view_setup_dialog)
-        self.addMenu(ImageSelectionMenu(pw))
+        self.addSeparator()
+
+        self.ism = ImageSelectionMenu(pw)
+        self.addMenu(self.ism)
         self.addSeparator()
         self.addAction(pw.pcbre_actions.pcb_rebuild_connectivity)

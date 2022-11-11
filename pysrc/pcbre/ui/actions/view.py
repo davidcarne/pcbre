@@ -219,7 +219,7 @@ class ShowConsoleAction(QtWidgets.QAction):
 
     def toggle(self) -> None:
         if self.docked is None:
-            self.dock = new_dock = ConsoleWidget(self.project)
+            self.dock = new_dock = ConsoleWidget(self.project, self.mw.viewArea)
             self.mw.addDockWidget(QtCore.Qt.BottomDockWidgetArea, new_dock)
 
         self.update_from_prop()

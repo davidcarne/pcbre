@@ -5,21 +5,23 @@ from typing import cast, Type, TYPE_CHECKING, Optional, Callable, Any, Union, Li
 
 if TYPE_CHECKING:
     from pcbre.model.project import Project
+    from pcbre.ui.boardviewwidget import BoardViewWidget
 
 # ipython kernel-based console for tab completion and all the goodies
 class JupyterConsoleDockWidget(QtWidgets.QDockWidget):
-    def __init__(self, project: 'Project') -> None:
+    def __init__(self, project: 'Project', view: 'BoardViewWidget') -> None:
         super(JupyterConsoleDockWidget, self).__init__("Console")
         self.setAllowedAreas(QtCore.Qt.BottomDockWidgetArea)
 
         self.project = project
+        self.view = view
 
         # Create an in-process kernel
         kernel_manager = QtInProcessKernelManager()
         kernel_manager.start_kernel(show_banner=False)
         kernel = kernel_manager.kernel
 
-        kernel.shell.push({'project': project})
+        kernel.shell.push({'project': project, 'view': view})
 
         kernel_client = kernel_manager.client()
         kernel_client.start_channels()
@@ -139,12 +141,13 @@ class ConsoleEditWidget(QtWidgets.QLineEdit):
 
 
 class BasicConsoleWidget(QtWidgets.QWidget):
-    def __init__(self, project: 'Project') -> None:
+    def __init__(self, project: 'Project', view: 'BoardViewWidget') -> None:
         super(BasicConsoleWidget, self).__init__()
         self.project = project
+        self.view = view
 
         import code
-        self.console = code.InteractiveConsole(locals={'project': project})
+        self.console = code.InteractiveConsole(locals={'project': project, 'view': view})
 
         self.output = QtWidgets.QPlainTextEdit(self)
         self.output.setReadOnly(True)
@@ -174,11 +177,11 @@ class BasicConsoleWidget(QtWidgets.QWidget):
 
 # Basic console if no ipython
 class BasicConsoleDockWidget(QtWidgets.QDockWidget):
-    def __init__(self, project: 'Project') -> None:
+    def __init__(self, project: 'Project', view: 'BoardViewWidget') -> None:
         super(BasicConsoleDockWidget, self).__init__("Console")
         self.setAllowedAreas(QtCore.Qt.BottomDockWidgetArea)
 
-        self.w = BasicConsoleWidget(project)
+        self.w = BasicConsoleWidget(project, view)
         self.setWidget(self.w)
 
 

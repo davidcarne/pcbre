@@ -1,4 +1,5 @@
 from typing import Union, List, Callable, Tuple, TYPE_CHECKING, Any, Optional, Sequence
+from pcbre.ui.tool_action  import Modifier
 
 from qtpy import QtCore, QtWidgets
 
@@ -81,11 +82,11 @@ class ToolActionDispatchModel(QtCore.QAbstractTableModel):
         self.layoutAboutToBeChanged.emit()
         self._data = []
         for (evtid, modifier), action in self.boardview.local_actions_map.items():
-            self._data.append(("%r %r" % (evtid, modifier), "local", "%r" % action, ""))
+            self._data.append(("%s %r" % (evtid.name, modifier), "local", "%r" % action, ""))
 
         for (evtid, modifier), actiondesc in self.boardview.id_actions_map.items():
             self._data.append(
-                ("%r %r" % (evtid, modifier), "delegate", "%r" % actiondesc.event_code, actiondesc.description))
+                ("%s %r" % (evtid.name, modifier), "delegate", "%r" % actiondesc.event_code.name, actiondesc.description))
         self.layoutChanged.emit()
 
 

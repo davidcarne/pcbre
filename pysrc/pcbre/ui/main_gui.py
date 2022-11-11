@@ -159,7 +159,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
         self._view_menu.subWindowMenu.addAction(dock.toggleViewAction())
 
-        dock = ConsoleWidget(self.project)
+        dock = ConsoleWidget(self.project, self.viewArea)
         dock.hide()
         self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, dock)
         self._view_menu.subWindowMenu.addAction(dock.toggleViewAction())
@@ -204,7 +204,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # TODO: Only show menu if started in debug mode
         self.menuBar().addMenu(DebugMenu(self))
-
 
 def main() -> None:
     import sys
