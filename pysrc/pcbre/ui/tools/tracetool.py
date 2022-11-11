@@ -26,6 +26,7 @@ class RoutingMode(enum.Enum):
     STRAIGHT = 0
     _45 = 1
     _90 = 2
+    # Last entry, used for mod operator in carousel
     MOD = 3
 
 
@@ -94,8 +95,8 @@ class TraceToolController(BaseToolController):
         self.toolsettings = toolsettings
 
         self.cur_pt = Vec2(0, 0)
-        self.last_pt = None
-        self.last_layer = None
+        self.__last_pt = None
+        self.__last_layer = None
 
         self.overlay = TraceToolOverlay(self)
 
@@ -113,41 +114,43 @@ class TraceToolController(BaseToolController):
         layer = self.view.current_layer_hack()
 
         # If no last-point is set, we return a trace stub 'circle' to visualize where the trace will go
-        if self.last_pt is None:
+        if self.__last_pt is None:
             return None, [Trace(self.cur_pt, self.cur_pt, self.toolsettings.thickness, layer, None)]
 
         initial_via = None
 
         # If previous layer and current layer are the same, no via needed
-        if self.last_layer != layer:
+        if self.__last_layer != layer:
             # Look for a viapair between the layer @ self.last_layer
-            vp = self.project.stackup.via_pair_for_layers([self.last_layer, layer])
+            vp = self.project.stackup.via_pair_for_layers([self.__last_layer, layer])
 
             if vp is not None:
-                initial_via = Via(self.last_pt, vp, self.toolsettings.via_radius)
+                initial_via = Via(self.__last_pt, vp, self.toolsettings.via_radius)
 
         # Single straight trace
         if self.routing_mode == RoutingMode.STRAIGHT:
-            return initial_via, [Trace(self.last_pt, self.cur_pt, self.toolsettings.thickness, layer, None)]
+            return initial_via, [Trace(self.__last_pt, self.cur_pt, self.toolsettings.thickness, layer, None)]
 
         # 90 degree bend
         elif self.routing_mode == RoutingMode._90:
 
             # position of bend point
             if self.routing_dir:
-                pa = Vec2(self.last_pt.x, self.cur_pt.y)
+                pa = Vec2(self.__last_pt.x, self.cur_pt.y)
             else:
-                pa = Vec2(self.cur_pt.x, self.last_pt.y)
+                pa = Vec2(self.cur_pt.x, self.__last_pt.y)
 
             return initial_via, [
-                Trace(self.last_pt, pa, self.toolsettings.thickness, layer, None),
+                Trace(self.__last_pt, pa, self.toolsettings.thickness, layer, None),
                 Trace(pa, self.cur_pt, self.toolsettings.thickness, layer, None)
             ]
 
+        # Straight with 45
         elif self.routing_mode == RoutingMode._45:
+            # Vector for the total line
+            d_v = self.cur_pt - self.__last_pt
 
-            d_v = self.cur_pt - self.last_pt
-
+            # Calculate vector of the diagonal section
             d_nv = d_v.dup()
 
             if abs(d_v.y) < abs(d_v.x):
@@ -161,35 +164,37 @@ class TraceToolController(BaseToolController):
                 else:
                     d_nv.y = -abs(d_v.x)
 
+            # Vector for the rectilinear section
             d_vh = d_v - d_nv
 
+            # Diagonal or Rectilinear first
             if self.routing_dir:
-                pa = self.last_pt + d_nv
+                pa = self.__last_pt + d_nv
             else:
-                pa = self.last_pt + d_vh
+                pa = self.__last_pt + d_vh
 
             return initial_via, [
-                Trace(self.last_pt, pa, self.toolsettings.thickness, layer, None),
+                Trace(self.__last_pt, pa, self.toolsettings.thickness, layer, None),
                 Trace(pa, self.cur_pt, self.toolsettings.thickness, layer, None)
             ]
 
-    def cycle_routing_modes(self) -> None:
+    def __cycle_routing_modes(self) -> None:
         self.routing_mode = RoutingMode((self.routing_mode.value + 1) % RoutingMode.MOD.value)
 
-    def cycle_routing_dir(self) -> None:
+    def __cycle_routing_dir(self) -> None:
         self.routing_dir = not self.routing_dir
 
     def showSettingsDialog(self) -> None:
         pass
 
-    def traceEnterPoint(self, evt: 'ToolActionEvent', multi_seg=True) -> None:
+    def __trace_enter_point(self, evt: 'ToolActionEvent', multi_seg=True) -> None:
         self.cur_pt = evt.world_pos
 
         layer = self.view.current_layer_hack()
         if layer is None:
             return
 
-        if self.last_pt is not None:
+        if self.__last_pt is not None:
             via, traces = self.get_artwork()
             if not traces:
                 return
@@ -203,24 +208,24 @@ class TraceToolController(BaseToolController):
                 total_list += v_list
                 total_list += list(traces)
                 self.submit(UndoMerge(self.project, total_list, "Routing"))
-                self.last_pt = self.cur_pt
-                self.last_layer = layer
+                self.__last_pt = self.cur_pt
+                self.__last_layer = layer
             else:
                 total_list: List[Any] = []
                 total_list += v_list
                 total_list.append(traces[0])
                 self.submit(UndoMerge(self.project, total_list, "Routing"))
-                self.last_pt = traces[0].p1
-                self.last_layer = layer
-                self.cycle_routing_dir()
+                self.__last_pt = traces[0].p1
+                self.__last_layer = layer
+                self.__cycle_routing_dir()
         else:
-            self.last_pt = self.cur_pt
-            self.last_layer = layer
+            self.__last_pt = self.cur_pt
+            self.__last_layer = layer
 
     def mouseMoveEvent(self, evt: MoveEvent) -> None:
         self.cur_pt = evt.world_pos
 
-    def eventThickness(self, step: int) -> None:
+    def __event_thickness(self, step: float) -> None:
         step = step * 0.050 * units.MM
         self.toolsettings.thickness += step
         if self.toolsettings.thickness <= 100:
@@ -228,22 +233,22 @@ class TraceToolController(BaseToolController):
 
     def tool_event(self, event: ToolActionEvent) -> None:
         if event.code == TraceEventCode.DecreaseThickness:
-            self.event_thickness(-1 * event.amount)
+            self.__event_thickness(-1 * event.amount)
         elif event.code == TraceEventCode.IncreaseThickness:
-            self.event_thickness(event.amount)
+            self.__event_thickness(event.amount)
         elif event.code == TraceEventCode.AbortPlace:
-            self.last_pt = None
-            self.last_layer = None
+            self.__last_pt = None
+            self.__last_layer = None
         elif event.code == TraceEventCode.PlaceSegment:
-            self.traceEnterPoint(event, False)
+            self.__trace_enter_point(event, False)
         elif event.code == TraceEventCode.PlaceAll:
-            self.traceEnterPoint(event, True)
+            self.__trace_enter_point(event, True)
         elif event.code == TraceEventCode.CycleRouteMode:
-            self.cycle_routing_modes()
+            self.__cycle_routing_modes()
         elif event.code == TraceEventCode.CycleRouteDir:
-            self.cycle_routing_dir()
+            self.__cycle_routing_dir()
         else:
-            raise ValueError("Trace tool received unknown event: %s" % event)
+            print("Trace tool received unknown event:", event)
 
 
 g_ACTIONS = [
