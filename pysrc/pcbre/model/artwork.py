@@ -676,7 +676,7 @@ class Artwork:
 
         for n, i_comp in enumerate(self.components):
             t = _aw.components[n]
-            i_comp._serializeTo(t)
+            i_comp.serializeTo(t)
 
         for n, i_poly in enumerate(self.polygons):
             p = _aw.polygons[n]

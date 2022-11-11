@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+import weakref
 
 import OpenGL.GL as GL  # type: ignore
 
@@ -320,10 +321,14 @@ class LayerAlignmentDialog(QtWidgets.QDialog):
         self.undoStack.setup_actions(self)
 
         # Any time we handle a command, redraw the view
-        self.undoStack.indexChanged.connect(lambda _: self.view.update())
+        weak_self = weakref.ref(self)
+        def undostack_changed(arg):
+            ref = weak_self()
+            if ref is not None:
+                ref.view.update()
 
+        self.undoStack.indexChanged.connect(undostack_changed)
         self.update_controls()
-
 
     def visMakeLeaf(self, il: ImageLayer) -> VisibilityModelLeaf:
         l = VisibilityModelLeaf(il.name, obj=il)
@@ -399,10 +404,11 @@ class LayerAlignmentDialog(QtWidgets.QDialog):
 
     def save_restore_transform(self) -> None:
         if self._selected_view is not None:
-            self._saved_transforms[self._selected_view] = self.view.viewState.get_state()
+            self._saved_transforms[self._selected_view] = old = self.view.viewState.get_state()
 
         self._selected_view = idx = self.model.view_mode.value
-        self.view.viewState.set_state(self._saved_transforms[idx])
+        new = self._saved_transforms[idx]
+        self.view.viewState.set_state(new)
 
     def update_controls(self) -> None:
 

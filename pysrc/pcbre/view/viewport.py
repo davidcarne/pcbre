@@ -69,6 +69,7 @@ class ViewPort(QtCore.QObject):
     def set_state(self, state):
         # restores an opaque object retrieved from get_state to the current view state
         self.__center_point, self.__scale, self.__rotate_flip = state
+        self.__update()
 
     # Directly set aspects of the viewport
     def set_center(self, center: Point2) -> None:

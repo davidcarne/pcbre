@@ -321,6 +321,10 @@ class Project:
 
     def save_fd(self, fd: BinaryIO) -> None:
         fd.write(MAGIC + VERSION_MAGIC)
+        # This appears to be necessary for some IO types
+        # CAPNP may not reflect already buffer contents
+        # (see when writing to a named temp file)
+        fd.flush()
 
         message = self._serialize()
         message.write(fd)

@@ -157,6 +157,9 @@ class TraceRender:
                                              count)
 
     def render_va(self, va: 'VA_thickline', mat: 'npt.NDArray[numpy.float64]', col: int, is_outline: bool=False, first:int=0, count: 'Optional[int]'=None) -> None:
+        if len(va.buffer()) == 0:
+            return
+
         GL.glPushDebugGroup(GL.GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Thickline Draw")
         assert self.instance_dtype.itemsize == va.stride
 

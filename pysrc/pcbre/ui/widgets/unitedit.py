@@ -117,7 +117,11 @@ class UnitLineEdit(QtWidgets.QWidget):
         if v == "":
             newvalue = None
         else:
-            newvalue = float(v) * scale
+            try:
+                newvalue = float(v) * scale
+            except ValueError:
+                # TODO indicate an error?
+                return 
 
         if newvalue != self._value:
             self._value = newvalue

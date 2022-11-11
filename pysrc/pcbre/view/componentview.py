@@ -140,6 +140,6 @@ def cmp_border_va(dest: 'VA_xy', component: 'Component') -> None:
 def cmp_pad_periph_va(va_xy: "VA_xy", va_trace: 'VA_thickline', component: 'Component'):
     for i in component.get_pads():
         if i.is_through():
-            va_xy.add_circle(i.center.x, i.center.y, i.w/2)
+            va_xy.add_circle(i.center.x, i.center.y, i.width/2)
         else:
             va_trace.add_trace(i.trace_repr)

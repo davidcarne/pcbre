@@ -589,6 +589,11 @@ class BoardViewWidget(BaseViewWidget):
 
     def query_point_multiple(self, pt: Point2) -> Sequence[Geom]:
         all_aw = set(self.project.artwork.query_point_multiple(pt))
+
+        l_vis_aw = self.getVisible()
+        if l_vis_aw is None:
+            return
+
         vis_aw = set(self.getVisible())
         return vis_aw.intersection(all_aw)
 

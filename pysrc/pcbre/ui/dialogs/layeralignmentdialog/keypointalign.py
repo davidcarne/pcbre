@@ -680,7 +680,8 @@ class KeypointAlignmentControllerView(BaseToolController):
             # Pixel coords of event
             im_px = self._parent.il.n2p(im_norm)
         else:
-            raise NotImplementedError("Cannot add keypoint in unaligned")
+            print("Cannot add keypoint in unaligned")
+            return
 
         # Do all ops as a single macro
         self._parent.undoStack.beginMacro("Add/Set Keypoint")
