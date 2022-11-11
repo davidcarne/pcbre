@@ -4,6 +4,7 @@ from enum import Enum
 
 from pcbre.accel.vert_array import VA_xy
 from pcbre.matrix import Point2, Vec2, clip_point_to_rect, Rect
+from pcbre.ui.tool_action import MoveEvent
 from pcbre.view.rendersettings import RENDER_HINT_ONCE
 from pcbre.view.target_const import COL_SEL, COL_SET_MARK, COL_UNSET_MARK
 
@@ -104,7 +105,7 @@ class MultipointEditRenderer:
         va_set= VA_xy(1024)
         va_current = VA_xy(1024)
 
-        corners = list(map(Point2, [(-N,-N), (N, -N), (N, N), (-N, N)]))
+        corners = list(map(lambda p: Point2(p[0], p[1]), [(-N,-N), (N, -N), (N, N), (-N, N)]))
 
         for p in self.flow.points:
             if not self.show_fn(p):
@@ -139,7 +140,8 @@ class MultipointEditRenderer:
 
 class MultipointEditFlow:
     def __init__(self, view, points, can_shortcut=False):
-        self.view = view
+        from pcbre.ui.boardviewwidget import BoardViewWidget
+        self.view: BoardViewWidget = view
         self.__points = points
         self.__current_point_index = 0
         self.__point_active = False
@@ -148,7 +150,6 @@ class MultipointEditFlow:
         self.can_shortcut = can_shortcut
 
         self.__done = DONE_REASON.NOT_DONE
-
 
         self.__grab_delta = Vec2(0,0)
 
@@ -176,8 +177,8 @@ class MultipointEditFlow:
 
             QtGui.QCursor.setPos(screen_pt)
         else:
-            rect_pt = Point2(self.view.mapFromGlobal(QtGui.QCursor.pos()))
-            world_pt = self.view.viewState.tfV2W(rect_pt)
+            rect_qpt = self.view.mapFromGlobal(QtGui.QCursor.pos())
+            world_pt = self.view.viewState.tfV2W(Point2(rect_qpt.x(), rect_qpt.y()))
             self.current_point.set(world_pt)
 
         self.__point_active = True
@@ -191,8 +192,8 @@ class MultipointEditFlow:
             self.__point_active = False
             self.current_point.restore(self.__saved_point)
 
-    def commit_entry(self, shift_pressed):
-        if self.simple_entry and not shift_pressed:
+    def commit_entry(self, re_edit):
+        if self.simple_entry and not re_edit:
             self.__done = DONE_REASON.ACCEPT
             self.__point_active = False
         else:
@@ -206,6 +207,9 @@ class MultipointEditFlow:
                         self.make_active()
                 else:
                     self.is_initial_active = False
+            else:
+                self.__done = DONE_REASON.ACCEPT
+
 
 
     def __step_point(self, step):
@@ -222,64 +226,16 @@ class MultipointEditFlow:
     def prev_point(self):
         self.__step_point(-1)
 
-    def mouseMoveEvent(self, evt):
+    def mouse_move(self, evt: MoveEvent):
         if self.__point_active:
-            point_pos = self.view.viewState.tfV2W(Point2(evt.pos()) + self.__grab_delta)
+            point_pos = self.view.viewState.tfV2W(evt.cursor_pos + self.__grab_delta)
             self.current_point.set(point_pos)
             self.updated(self.current_point)
-
-    def mousePressEvent(self, evt):
-        if self.__point_active:
-            self.commit_entry(evt.modifiers() & QtCore.Qt.ShiftModifier)
-
-    def mouseReleaseEvent(self, evt):
-        pass
 
     def do_jog(self, vec):
         p = self.view.viewState.tfW2V(self.current_point.get())
         self.current_point.set(self.view.viewState.tfV2W(p + vec))
         self.updated(self.current_point)
-
-    def keyReleaseEvent(self, evt):
-        if evt.key() in [QtCore.Qt.Key_Q, QtCore.Qt.Key_W, QtCore.Qt.Key_E, QtCore.Qt.Key_R,
-                         QtCore.Qt.Key_Left, QtCore.Qt.Key_Right, QtCore.Qt.Key_Up, QtCore.Qt.Key_Down,
-                         QtCore.Qt.Key_Enter, QtCore.Qt.Key_Return, QtCore.Qt.Key_Escape]:
-            return True
-
-        return False
-
-    def keyPressEvent(self, evt):
-        keycode = evt.key()
-
-        jog_keys = {
-            QtCore.Qt.Key_Left: Vec2(-1, 0),
-            QtCore.Qt.Key_Right: Vec2(1, 0),
-            QtCore.Qt.Key_Up: Vec2(0, 1),
-            QtCore.Qt.Key_Down: Vec2(0, -1)
-        }
-
-        if keycode == QtCore.Qt.Key_Escape:
-            self.abort_entry()
-        elif keycode in (QtCore.Qt.Key_Enter, QtCore.Qt.Key_Return):
-            if self.__point_active:
-                self.commit_entry(evt.modifiers() & QtCore.Qt.ShiftModifier)
-            else:
-                self.__done = DONE_REASON.ACCEPT
-
-        elif keycode in jog_keys:
-            self.do_jog(jog_keys[keycode])
-        elif keycode == QtCore.Qt.Key_Q:
-            self.prev_point()
-        elif keycode == QtCore.Qt.Key_W:
-            self.next_point()
-        elif keycode == QtCore.Qt.Key_E:
-            self.make_active()
-        elif keycode == QtCore.Qt.Key_R:
-            self.next_option()
-        else:
-            return False
-
-        return True
 
     def updated(self, ep):
         pass

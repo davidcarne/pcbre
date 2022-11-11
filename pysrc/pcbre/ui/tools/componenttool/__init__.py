@@ -1,12 +1,13 @@
+import enum
+import math
 from collections import namedtuple
+from typing import List
+
 from pcbre.accel.vert_array import VA_xy, VA_thickline
-from pcbre.model.const import SIDE
-from pcbre.ui.tools.multipoint import MultipointEditRenderer, DONE_REASON
+from pcbre.ui.tools.multipoint import MultipointEditRenderer, DONE_REASON, MultipointEditFlow
 from pcbre.ui.widgets.unitedit import UNIT_GROUP_MM
-from pcbre.util import Timer
 from pcbre.ui.undo import UndoMerge
 from pcbre.view.componentview import cmp_border_va, cmp_pad_periph_va
-from pcbre.view.rendersettings import RENDER_OUTLINES, RENDER_HINT_ONCE
 from pcbre.view.target_const import COL_SEL
 from qtpy import QtCore, QtGui, QtWidgets
 from pcbre.ui.tools.basetool import BaseToolController, BaseTool
@@ -20,9 +21,32 @@ from pcbre.ui.tools.componenttool.sip import SIPModel, SIPEditWidget, SIP_getCom
 from pcbre.ui.dialogs.settingsdialog import MultiAutoSettingsDialog, UnitEditable, FloatTrait, LineEditable, \
     DegreeEditable
 from .basicsmd import BasicSMDICEditWidget
-from pcbre.matrix import translate, rotate, Point2
+from pcbre.matrix import translate, rotate, Point2, Vec2
+import pcbre.model.project
 
 __author__ = 'davidc'
+
+from ..tracetool import TraceEventCode
+
+from ...tool_action import ToolActionDescription, ToolActionShortcut, EventID, Modifier, MoveEvent, ToolActionEvent
+from typing import Optional
+
+class ComponentEventCode(enum.Enum):
+    CommitPoint = 0
+    CommitComponent = 1
+    Abort = 2
+    JogUp = 3
+    JogDown = 4
+    JogLeft = 5
+    JogRight = 6
+    PrevPoint = 7
+    NextPoint = 8
+    MakeActive = 9
+    NextOption = 10
+    Rotate = 11
+
+
+
 
 
 MDL_TYPE_BASICSMD = 0
@@ -33,11 +57,14 @@ MDL_TYPE_SIP = 3
 
 mdl_meta_t = namedtuple("mdl_meta", ["cons", "widget_cons", "flow_cons", "get_comp", "text"])
 mdl_meta = {
-    MDL_TYPE_BASICSMD: mdl_meta_t(BasicSMDICModel, BasicSMDICEditWidget, BasicSMDFlow, BasicSMD_getComponent, "Basic 4-sided SMT"),
+    MDL_TYPE_BASICSMD: mdl_meta_t(BasicSMDICModel, BasicSMDICEditWidget, BasicSMDFlow, BasicSMD_getComponent,
+                                  "Basic 4-sided SMT"),
     MDL_TYPE_DIP: mdl_meta_t(DIPModel, DIPEditWidget, DIPEditFlow, DIP_getComponent, "DIP Component"),
-    MDL_TYPE_PASSIVE: mdl_meta_t(PassiveModel, PassiveEditWidget, PassiveEditFlow, Passive_getComponent, "2-lead passive"),
+    MDL_TYPE_PASSIVE: mdl_meta_t(PassiveModel, PassiveEditWidget, PassiveEditFlow, Passive_getComponent,
+                                 "2-lead passive"),
     MDL_TYPE_SIP: mdl_meta_t(SIPModel, SIPEditWidget, SIPEditFlow, SIP_getComponent, "SIP Component"),
 }
+
 
 class ComponentSettings(MultiAutoSettingsDialog):
     def __init__(self, mdl, ctrl):
@@ -55,7 +82,6 @@ class ComponentSettings(MultiAutoSettingsDialog):
         ct_cmb.currentIndexChanged.connect(self.changeTab)
 
         hfl.addRow("Component Type", ct_cmb)
-
 
         self.w_x = UnitEditable(ctrl.mdl, "center.x", UNIT_GROUP_MM)
         hfl.addRow("Position X:", self.w_x.widget)
@@ -94,7 +120,7 @@ class ComponentModel(GenModel):
         self.model_instances = {}
         for t, meta in mdl_meta.items():
             i = self.model_instances[t] = meta.cons()
-            i.changed.connect(self.changed)
+            i.changed.connect(self.changed.emit)
 
     cmptype = mdlacc(MDL_TYPE_BASICSMD)
     center = mdlacc(Point2(0,0))
@@ -152,7 +178,6 @@ class ComponentOverlay:
             pr.render()
 
 
-
 class ComponentController(BaseToolController):
     def __init__(self, mdl, project, view, submit):
         """
@@ -164,15 +189,19 @@ class ComponentController(BaseToolController):
         :return:
         """
         super(ComponentController, self).__init__()
+        self.flow: Optional[MultipointEditFlow] = None
         self.project = project
         self.view = view
         self.submit = submit
         self.mdl = mdl
-        self.mdl.changed.connect(self.changed)
 
         self.overlay = ComponentOverlay(self)
 
         self.restartFlow()
+
+    @property
+    def tool_actions(self) -> List[ToolActionDescription]:
+        return g_ACTIONS
 
     def get_component(self):
         if self.view.current_side() is None:
@@ -184,27 +213,38 @@ class ComponentController(BaseToolController):
         dlg = ComponentSettings(self.mdl, self)
         dlg.exec_()
 
-    def mouseMoveEvent(self, evt):
-        self.flow.mouseMoveEvent(evt)
-        self.changed.emit()
+    def mouseMoveEvent(self, evt: MoveEvent):
+        self.flow.mouse_move(evt)
 
-    def mousePressEvent(self, evt):
-        self.flow.mousePressEvent(evt)
-        self.checkDone()
+    def tool_event(self, event: ToolActionEvent) -> None:
+        if event.code == ComponentEventCode.CommitComponent:
+            self.flow.commit_entry(False)
+        elif event.code == ComponentEventCode.CommitPoint:
+            self.flow.commit_entry(True)
+        elif event.code == ComponentEventCode.Abort:
+            self.flow.abort_entry()
+        elif event.code == ComponentEventCode.JogUp:
+            self.flow.do_jog(Vec2(0, 1))
+        elif event.code == ComponentEventCode.JogDown:
+            self.flow.do_jog(Vec2(0, -1))
+        elif event.code == ComponentEventCode.JogLeft:
+            self.flow.do_jog(Vec2(-1, 0))
+        elif event.code == ComponentEventCode.JogRight:
+            self.flow.do_jog(Vec2(1, 0))
+        elif event.code == ComponentEventCode.PrevPoint:
+            self.flow.prev_point()
+        elif event.code == ComponentEventCode.NextPoint:
+            self.flow.next_point()
+        elif event.code == ComponentEventCode.MakeActive:
+            self.flow.make_active()
+        elif event.code == ComponentEventCode.NextOption:
+            self.flow.next_option()
+        elif event.code == ComponentEventCode.Rotate:
+            self.mdl.theta += math.pi / 2
+        else:
+            print("Unexpected event to component tool: %s" % event)
 
-    def mouseReleaseEvent(self, evt):
-        self.flow.mouseReleaseEvent(evt)
         self.checkDone()
-
-    def keyPressEvent(self, evt):
-        filter = self.flow.keyPressEvent(evt)
-        self.checkDone()
-        return filter
-
-    def keyReleaseEvent(self, evt):
-        filter_val = self.flow.keyReleaseEvent(evt)
-        self.checkDone()
-        return filter_val
 
     def checkDone(self):
         if self.flow.done == DONE_REASON.NOT_DONE:
@@ -225,13 +265,70 @@ class ComponentController(BaseToolController):
         self.flow.make_active(True)
 
 
+g_ACTIONS = [
+    ToolActionDescription([
+        ToolActionShortcut(EventID.Key_Enter),
+        ToolActionShortcut(EventID.Key_Return),
+        ToolActionShortcut(EventID.Mouse_B1)
+    ],
+        ComponentEventCode.CommitComponent,
+        "Place Component"),
+    ToolActionDescription([
+        ToolActionShortcut(EventID.Key_Enter, Modifier.Shift),
+        ToolActionShortcut(EventID.Key_Return, Modifier.Shift),
+        ToolActionShortcut(EventID.Mouse_B1, Modifier.Shift)
+    ],
+        ComponentEventCode.CommitPoint,
+        "Place Point"),
+
+    ToolActionDescription(ToolActionShortcut(EventID.Key_Escape),
+                          ComponentEventCode.Abort,
+                          "Cancel placement"),
+
+    ToolActionDescription(ToolActionShortcut(EventID.Key_Up),
+                          ComponentEventCode.JogUp,
+                          "Nudge selected point up"),
+
+    ToolActionDescription(ToolActionShortcut(EventID.Key_Down),
+                          ComponentEventCode.JogDown,
+                          "Nudge selected point down"),
+
+    ToolActionDescription(ToolActionShortcut(EventID.Key_Right),
+                          ComponentEventCode.JogRight,
+                          "Nudge selected point right"),
+
+    ToolActionDescription(ToolActionShortcut(EventID.Key_Left),
+                          ComponentEventCode.JogLeft,
+                          "Nudge selected point left"),
+
+    ToolActionDescription(ToolActionShortcut(EventID.Key_Q),
+                          ComponentEventCode.PrevPoint,
+                          "Select previous point"),
+
+    ToolActionDescription(ToolActionShortcut(EventID.Key_W),
+                          ComponentEventCode.NextPoint,
+                          "Select next point"),
+
+    ToolActionDescription(ToolActionShortcut(EventID.Key_E),
+                          ComponentEventCode.MakeActive,
+                          "Make current point active"),
+
+    ToolActionDescription(ToolActionShortcut(EventID.Key_R),
+                          ComponentEventCode.NextOption,
+                          "Next placement option"),
+
+    ToolActionDescription(ToolActionShortcut(EventID.Key_Space),
+                          ComponentEventCode.Rotate,
+                          "Rotate 90deg"),
+]
+
 class ComponentTool(BaseTool):
     NAME = 'Component'
     ICON_NAME = 'component'
     SHORTCUT = 'c'
     TOOLTIP = 'Component (c)'
 
-    def __init__(self, project):
+    def __init__(self, project: 'pcbre.model.project.Project'):
         super(ComponentTool, self).__init__(project)
         self.mdl = ComponentModel()
 

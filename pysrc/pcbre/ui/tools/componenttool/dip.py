@@ -154,5 +154,5 @@ class DIPEditWidget(AutoSettingsWidget):
 
 def DIP_getComponent(mdl, ctrl, flow):
     ctrl.flow.update_matrix()
-    return DIPComponent(flow.center, flow.theta, ctrl.view.current_side(), ctrl.project,
+    return DIPComponent(ctrl.project, flow.center, flow.theta, ctrl.view.current_side(), ctrl.project,
                         mdl.pin_count, mdl.pin_space, mdl.pin_width, mdl.pad_diameter)

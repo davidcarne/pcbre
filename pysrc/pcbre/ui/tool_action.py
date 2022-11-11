@@ -47,6 +47,11 @@ class EventID(enum.Enum):
     Key_Backspace = 0x103
     Key_Delete = 0x104
 
+    Key_Up = 0x105
+    Key_Down = 0x106
+    Key_Left = 0x107
+    Key_Right = 0x108
+
     Mouse_B1 = 0x211  # Typically left button
     Mouse_B2 = 0x212  # Typically right button
     Mouse_B3 = 0x213  # Typically middle button

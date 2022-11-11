@@ -6,4 +6,4 @@ from .tracetool import TraceTool
 from .nametool import NameTool
 
 #TOOLS = [ComponentTool, NameTool]
-TOOLS = [SelectTool, TraceTool, ViaTool, AirwireTool]
+TOOLS = [SelectTool, TraceTool, ViaTool, AirwireTool, ComponentTool]

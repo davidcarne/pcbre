@@ -49,17 +49,26 @@ well_known_chip = [
 class PassiveModel(GenModel):
     def __init__(self):
         super(PassiveModel, self).__init__()
-        self.well_known = None
+        self.well_known: _well_known_t = None
         self.__pin_d = 0.3 * units.IN
         self.__body_corner = Point2(0.15 * units.IN, 0.05 * units.IN)
+        self.__body_type = Passive2BodyType.TH_AXIAL
         self.__pin_corner = Point2(0.05 * units.IN, 0.05 * units.IN)
 
 
     snap_well = mdlacc(True)
     
     sym_type = mdlacc(PassiveSymType.TYPE_RES)
-    body_type = mdlacc(Passive2BodyType.TH_AXIAL)
 
+    @property
+    def body_type(self):
+        if self.well_known:
+            return self.well_known.body_type
+        return self.__body_type
+
+    @body_type.setter
+    def body_type(self, v):
+        self.__body_type = v
 
     @property
     def pin_d(self):
@@ -131,7 +140,7 @@ class PassiveEditWidget(AutoSettingsWidget):
         self.__idx_to_wk[idx] = wk
         self.__wk_to_idx[wk] = idx
 
-    def __init__(self, model):
+    def __init__(self, model: PassiveModel):
         super(PassiveEditWidget, self).__init__()
         self.__model = model
 
@@ -175,6 +184,7 @@ class PassiveEditWidget(AutoSettingsWidget):
         self.pad_type_select.addItem("T/H Axial", Passive2BodyType.TH_AXIAL)
         self.pad_type_select.addItem("T/H Radial", Passive2BodyType.TH_RADIAL)
         self.pad_type_select.addItem("T/H Radial side", Passive2BodyType.TH_FLIPPED_CAP)
+        self.pad_type_select.currentIndexChanged.connect(self.pad_type_changed)
 
         self.layout.addRow("Body Type", self.pad_type_select)
 
@@ -182,6 +192,9 @@ class PassiveEditWidget(AutoSettingsWidget):
 
     def snap_ui_changed(self):
         en = not self.cb_snap.isChecked()
+
+    def pad_type_changed(self, _):
+        self.__model.body_type = self.pad_type_select.currentData()
 
     def update_ui(self):
         idx = self.cb_well_known.currentIndex()
@@ -194,6 +207,9 @@ class PassiveEditWidget(AutoSettingsWidget):
         for i in self.gs:
             i.widget.setEnabled(en)
         self.pad_type_select.setEnabled(en)
+
+        idx = self.pad_type_select.findData(self.__model.body_type)
+        self.pad_type_select.setCurrentIndex(idx)
 
         #if self.well_known is not None:
         #    pkg_type
