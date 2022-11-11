@@ -1,5 +1,7 @@
+# I _really_ don't know what I'm doing with NIX flakes
+# This definitely shouldn't be an example
 {
-  description = "A flake for building Hello World";
+  description = "PCBRE reverse engineering software package";
 
   inputs.nixpkgs.url = github:NixOS/nixpkgs;
   inputs.flake-utils.url = github:numtide/flake-utils;
@@ -13,8 +15,8 @@
       rec {
         packages = rec {
           # Local version to support pycapnp
-          # Nixos has updated to capnproto 0.9, but pycapnp does not yet support
-          # Local rule to build old capnp
+          # Nixos has updated to capnproto 0.9, but pycapnp does not yet support 0.9
+          # Local rule to build old capnp for pycapnpk
           capnproto8 = pkgs.stdenv.mkDerivation rec {
             pname = "capnproto8";
             version = "0.8.0";
@@ -39,6 +41,7 @@
             };
           };
 
+          # Pycapnp built against capnproto 8
           pycapnp8 = pkgs.python3Packages.buildPythonPackage rec {
             pname = "pycapnp";
             version = "1.1.0";
@@ -61,6 +64,7 @@
           };
           
 
+          # Customized poly2tri package, used for triangulation for rendering
           p2t = pkgs.python3Packages.buildPythonPackage rec {
             pname = "p2t";
             version = "0.0.1";
@@ -78,21 +82,51 @@
             buildInputs = [ pkgs.python3Packages.cython ];
           };
 
+          # POtrace library used for vectorizatio
+          pypotrace = pkgs.python3Packages.buildPythonPackage rec {
+            pname = "pypotrace";
+            version = "0.0.1";
+            src = pkgs.fetchFromGitHub {
+              owner = "flupke";
+              repo = "pypotrace";
+              rev = "76c76be2458eb2b56fcbd3bec79b1b4077e35d9e";
+              sha256 = "sha256-BjI4Svs/pb38IQk3XWh8t6dlsl83t9y4D3V8Y9/P/1Y=";
+
+            };
+            projectDir = src;
+
+
+            # This was tedious to get to build right. The buildInputs/nativeBuildInputs have been
+            # cargo-culted to allow the build to succeed. At some point this could probably
+            # be made a lot smaller
+            nativeBuildInputs = [ 
+              pkgs.agg pkgs.python3Packages.pkgconfig pkgs.python3Packages.cython 
+              pkgs.potrace pkgs.python3Packages.numpy pkgs.pkg-config];
+            buildInputs = [
+                pkgs.agg pkgs.python3Packages.pkgconfig 
+                pkgs.python3Packages.cython pkgs.potrace pkgs.python3Packages.numpy];
+
+            doCheck = false;
+          };
+
           pcbre = pkgs.python3Packages.buildPythonPackage rec {
             name = "pcbre";
             src = self;
             propagatedBuildInputs = with pkgs.python3Packages; [
-              opencv4 qtpy numpy scipy freetype-py shapely Rtree pyopengl cython pyqt5 pip setuptools cffi mypy setuptools-rust typed-ast psutil mypy-extensions typing-extensions p2t pycapnp8 qtconsole
+              opencv4 qtpy numpy scipy freetype-py shapely Rtree pyopengl cython pyqt5 pip setuptools cffi mypy setuptools-rust typed-ast psutil mypy-extensions typing-extensions p2t pycapnp8 qtconsole matplotlib pypotrace
             ];
             doCheck = false;
 
-            nativeBuildInputs = [ pkgs.qt5.wrapQtAppsHook ];
+            nativeBuildInputs = [ pkgs.qt5.wrapQtAppsHook  pkgs.cargo ];
             dontWrapQtApps = true;
 
+            # We must manually wrap the QT apps, for some reason I don't remember
             preFixup = ''
                   wrapQtApp "$out/bin/pcbre-app"
                   wrapQtApp "$out/bin/pcbre-launcher"
               '';
+
+            # Also fix QT apps if we enter a shell
             postShellHook = ''
                   wrapQtApp "$tmp_path/bin/pcbre-app"
                   wrapQtApp "$tmp_path/bin/pcbre-launcher"
