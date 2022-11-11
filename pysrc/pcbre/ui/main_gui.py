@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 from typing import Dict, Optional
+import tempfile
 
 from qtpy import QtCore, QtGui, QtWidgets
 
@@ -234,6 +235,40 @@ def main() -> None:
         else:
             print("File not found")
             exit()
+
+    old_excepthook = sys.excepthook
+    def excepthook(type, value, traceback):
+        print("Crashing. Attempting emergency save")
+        emerge_save_path = None
+        if p.filepath is not None:
+            # Create an emergency save filepath based on existing path
+            emerge_save_path = p.filepath
+            if emerge_save_path.endswith(".pcbre"):
+                emerge_save_path = emerge_save_path[:-6]
+            emerge_save_path += ".emergency.pcbre"
+
+            # If it doesn't exist, try and open it
+            if not os.path.exists(emerge_save_path):
+                try:
+                    emerge_save_fd = open(emerge_save_path, "wb")
+                except IOError:
+                    emerge_save_path = None
+            else:
+                emerge_save_path = None
+
+        # If none of the above worked, create a tempfile
+        if emerge_save_path is None:
+            emerge_save_fd = tempfile.NamedTemporaryFile("wb",
+                suffix=".pcbre", prefix="pcbre_unnamed_emergency_save", delete=False)
+            emerge_save_path = emerge_save_fd.name
+
+        p.save_fd(emerge_save_fd)
+        emerge_save_fd.close()
+        print("Saved emergency save to %s" % emerge_save_path)
+        old_excepthook(type, value, traceback)
+        exit(1)
+
+    sys.excepthook = excepthook
 
     app = QtWidgets.QApplication(sys.argv)
 
