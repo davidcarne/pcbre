@@ -254,9 +254,9 @@ class RectAlignmentModel:
         assert len(ra.handles) == 12
 
         # Handles
-        self.__dim_handles = ra.dim_handles
-        self.__corner_handles = ra.handles[:4]
-        self.__line_handles = ra.handles[4:12]
+        self.__dim_handles = tuple(ra.dim_handles)
+        self.__corner_handles = tuple(ra.handles[:4])
+        self.__line_handles = tuple(ra.handles[4:12])
 
         # Dims
         self.dims_locked = ra.dims_locked
@@ -689,8 +689,8 @@ class RectAlignmentControllerView(BaseToolController):
         self.vbo_per_dim.set_array(self.vbo_per_dim_ar)
 
         # Ugh..... PyOpenGL isn't smart enough to bind the data when it needs to be copied
-        with self.vbo_per_dim:
-            self.vbo_per_dim.copy_data()
+        #with self.vbo_per_dim:
+        #    self.vbo_per_dim.copy_data()
 
         GL.glDisable(GL.GL_BLEND)
 

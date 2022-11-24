@@ -2,6 +2,7 @@ from pcbre.accel.vert_array import VA_xy
 from pcbre.algo.geom import layer_for
 from pcbre.matrix import Point2
 from pcbre.model.artwork_geom import Airwire
+from pcbre.model.const import IntersectionClass
 from pcbre.ui.tools.basetool import BaseTool, BaseToolController
 from qtpy import QtGui, QtCore
 from pcbre.ui.undo import UndoMerge
@@ -67,11 +68,15 @@ class AirwireToolController(BaseToolController):
         pt = event.world_pos
 
         # Find artwork
-        aw = self.view.query_point(pt)
+        aw_list = self.view.query_point_multiple(pt)
 
-        # No layer (no artwork)
-        if aw is None:
+        # Filter out components
+        aw_list = {i for i in aw_list if i.ISC != IntersectionClass.NONE}
+
+        if len(aw_list) == 0:
             return
+
+        aw = aw_list.pop()
 
         # layer for the artwork
         aw_l = layer_for(aw)

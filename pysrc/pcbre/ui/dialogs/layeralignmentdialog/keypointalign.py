@@ -766,6 +766,14 @@ class KeypointAlignmentControllerView(BaseToolController):
             self.event_add_keypoint(event)
         elif event.code == Event.Remove:
             self.event_remove_keypoint(event)
+        elif event.code == Event.NudgeUp:
+            self.nudge(Vec2(0, 1))
+        elif event.code == Event.NudgeDown:
+            self.nudge(Vec2(0, -1))
+        elif event.code == Event.NudgeLeft:
+            self.nudge(Vec2(-1, 0))
+        elif event.code == Event.NudgeRight:
+            self.nudge(Vec2(1, 0))
 
     @property
     def tool_actions(self) -> List[ToolActionDescription]:
@@ -779,6 +787,10 @@ class Event(enum.Enum):
     Remove = 3
     Deselect = 4
     Delete = 5
+    NudgeUp = 6
+    NudgeDown = 7
+    NudgeLeft = 8
+    NudgeRight = 9
 
 
 g_ACTIONS = [
@@ -806,6 +818,22 @@ g_ACTIONS = [
         ToolActionShortcut(EventID.Key_Backspace),
         Event.Delete,
         "Delete"),
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Key_Up),
+        Event.NudgeUp,
+        "Nudge Up"),
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Key_Down),
+        Event.NudgeDown,
+        "Nudge Down"),
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Key_Left),
+        Event.NudgeLeft,
+        "Nudge Left"),
+    ToolActionDescription(
+        ToolActionShortcut(EventID.Key_Right),
+        Event.NudgeRight,
+        "Nudge Right")
 ]
 
 
