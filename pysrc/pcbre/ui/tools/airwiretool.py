@@ -10,9 +10,10 @@ from pcbre.view.rendersettings import RENDER_HINT_ONCE
 from pcbre.view.target_const import COL_AIRWIRE
 from pcbre.ui.tool_action import ToolActionDescription, \
     ToolActionShortcut, EventID
+import enum
 
 
-class EventCode:
+class EventCode(enum.Enum):
     Place = 0
 
 AIRWIRE_COLOR = (0.7, 0.7, 0)

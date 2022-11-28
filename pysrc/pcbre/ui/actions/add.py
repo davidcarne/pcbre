@@ -39,7 +39,7 @@ class AddImageDialogAction(QtWidgets.QAction):
         if not fname:
             return
 
-        il = ImageLayer.fromFile(self.window.project, fname)
+        il = ImageLayer.from_file(self.window.project, fname)
 
         # Allow the user to align the image
         dlg = LayerAlignmentDialog(self.window, self.window.project, il)

@@ -79,16 +79,18 @@ class DebugRender:
             # TODO: HACK
             # PyOpenGL doesn't know how to deal with a cffi buffer
             buf_r = buf.buffer()[:] + buf_sel.buffer()[:]
-            self.vbo.set_array(buf_r, None)
 
-            # Now render the two buffers
-            with self.shader.program, self.vao, self.vbo:
-                GL.glUniformMatrix3fv(self.shader.uniforms.mat, 1, True, self.parent.viewState.glMatrix.astype(numpy.float32))
+            if len(buf_r) != 0:
+                self.vbo.set_array(buf_r, None)
 
-                GL.glUniform4f(self.shader.uniforms.color, 255, 0, 255, 255)
-                GL.glDrawArrays(GL.GL_LINES, 0, buf.count())
+                # Now render the two buffers
+                with self.shader.program, self.vao, self.vbo:
+                    GL.glUniformMatrix3fv(self.shader.uniforms.mat, 1, True, self.parent.viewState.glMatrix.astype(numpy.float32))
 
-                GL.glUniform4f(self.shader.uniforms.color, 255, 255, 255, 255)
-                GL.glDrawArrays(GL.GL_LINES, buf.count(), buf_sel.count())
+                    GL.glUniform4f(self.shader.uniforms.color, 255, 0, 255, 255)
+                    GL.glDrawArrays(GL.GL_LINES, 0, buf.count())
+
+                    GL.glUniform4f(self.shader.uniforms.color, 255, 255, 255, 255)
+                    GL.glDrawArrays(GL.GL_LINES, buf.count(), buf_sel.count())
 
         print("debug draw time: %f(%f) %f" % (t_debug_bbox.interval, t_debug_bbox_add.interval, t_debug_draw.interval))

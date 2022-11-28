@@ -689,13 +689,10 @@ class RectAlignmentControllerView(BaseToolController):
         self.vbo_per_dim.set_array(self.vbo_per_dim_ar)
 
         # Ugh..... PyOpenGL isn't smart enough to bind the data when it needs to be copied
-        #with self.vbo_per_dim:
-        #    self.vbo_per_dim.copy_data()
-
         GL.glDisable(GL.GL_BLEND)
 
         # ... and draw the perimeter
-        with self.vao_per_dim, self.prog.program:
+        with self.vbo_per_dim, self.vao_per_dim, self.prog.program:
             GL.glUniformMatrix3fv(self.mat_loc, 1, True, self.viewPort.glWMatrix.astype(numpy.float32))
 
             # Draw the outer perimeter

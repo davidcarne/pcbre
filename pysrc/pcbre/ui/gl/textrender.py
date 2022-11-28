@@ -61,6 +61,9 @@ class TextBatch:
         self.__strs.append(TextBatch.__tag(mat, str_info))
 
     def prepare(self) -> None:
+        if not self._va.count():
+            return
+
         self.__text_render.updateTexture()
 
 
@@ -94,11 +97,17 @@ class TextBatcher:
         self.restart()
 
     def restart(self) -> None:
+        # TODO: text rendering is broken
+        return
+
         self.__render_tags :Dict[Any, List['TextBatcher._render_tag']] = defaultdict(list)
         self._va.clear()
 
 
     def initializeGL(self) -> None:
+        # TODO: text rendering is broken
+        return
+
         # Working VBO that will contain glyph data
         self.vbo = VBO(numpy.ndarray([], dtype=self.text_render.buffer_dtype), GL.GL_DYNAMIC_DRAW, GL.GL_ARRAY_BUFFER)
         self.vao = VAO()
@@ -111,7 +120,12 @@ class TextBatcher:
 
 
     def render(self, key:Any=None) -> None:
+        # TODO - text rendering is broken
         return
+
+        if not self._va.count():
+            return
+
         if self.__vbo_needs_update:
 
             self.vbo.data = self._va.buffer()[:]
@@ -130,9 +144,15 @@ class TextBatcher:
                 GL.glDrawArrays(GL.GL_TRIANGLES, tag.textinfo.start, tag.textinfo.count)
 
     def submit(self, ts: '_StringMetrics', mat: 'npt.NDArray[numpy.float64]', color:Any, k: Any=None) -> None:
+        # TODO: text rendering is broken
+        return
+
         self.__render_tags[k].append(self._render_tag(ts, mat, color))
 
     def submit_text_box(self, premat: 'npt.NDArray[numpy.float64]', text: str, box: Rect, color: Any, k: Any=None) -> None:
+        # TODO: text rendering is broken
+        return
+
         ts = self.get_string(text)
         mat = premat.dot(ts.get_render_to_mat(box))
         self.submit(ts, mat, color, k)

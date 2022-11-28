@@ -214,17 +214,17 @@ class ImageLayer:
         self.name = name
         self.__data = data
         self.transform_matrix = numpy.array(transform_matrix)
-        self.__alignment : Optional[Union[RectAlignment,KeyPointAlignment]] = None
+        self.__alignment: Optional[Union[RectAlignment, KeyPointAlignment]] = None
         self.__updated_transform = True
 
         self.__cached_p2norm = numpy.identity(3)
         self.__cached_norm2p = numpy.identity(3)
 
     @property
-    def alignment(self) -> Optional[Union[RectAlignment,KeyPointAlignment]]:
+    def alignment(self) -> Optional[Union[RectAlignment, KeyPointAlignment]]:
         return self.__alignment
 
-    def set_alignment(self, align: Optional[Union[RectAlignment,KeyPointAlignment]]) -> None:
+    def set_alignment(self, align: Optional[Union[RectAlignment, KeyPointAlignment]]) -> None:
         """
         Sets information on how the imagelayer was aligned. The transformmatrix is still the precise transform
         that was calculated from the alignment data, but this info is kept around to allow for re-alignment
@@ -245,7 +245,7 @@ class ImageLayer:
     # TODO: image decoded type
     def decoded_image(self) -> 'numpy.typing.NDArray[numpy.uint8]':
         if self.__cached_decode is None:
-            buf = numpy.frombuffer(self.data, dtype=numpy.uint8) # type: ignore
+            buf = numpy.frombuffer(self.data, dtype=numpy.uint8)  # type: ignore
             im = cv2.imdecode(buf, 1)
             im.flags.writeable = False
             self.__cached_decode = im
@@ -276,7 +276,6 @@ class ImageLayer:
 
         return corners_norm
 
-
     def __calculate_transform_matrix(self) -> None:
         if self.__updated_transform:
             return
@@ -293,7 +292,7 @@ class ImageLayer:
                                [0,  0, 1]], dtype=numpy.float64)
         self.__cached_p2norm = tmat
 
-        self.__cached_norm2p = numpy.linalg.inv(tmat) # type: ignore
+        self.__cached_norm2p = numpy.linalg.inv(tmat)  # type: ignore
         self.__updated_transform = True
 
     """ Transform matricies from pixel-space to normalized image space (-1..1) """
@@ -314,7 +313,7 @@ class ImageLayer:
         return project_point(self.normalized_to_pixel, pt)
 
     @staticmethod
-    def fromFile(project: 'Project', filename: str) -> 'ImageLayer':
+    def from_file(project: 'Project', filename: str) -> 'ImageLayer':
         assert os.path.exists(filename)
 
         basename = os.path.basename(filename)

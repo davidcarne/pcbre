@@ -31,7 +31,7 @@ class HairlineRenderer:
             VBOBind(self.__shader.program, self.__dtype, "vertex").assign()
 
     def render_va(self, mat: 'npt.NDArray[numpy.float64]', va: 'VA_xy', col: int) -> None:
-        if len(va.buffer()) == 0:
+        if va.count() == 0:
             return
 
         self._va_batch_vbo.set_array(va.buffer()[:])

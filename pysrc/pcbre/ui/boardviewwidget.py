@@ -432,6 +432,21 @@ class BoardViewWidget(BaseViewWidget):
         self.boardViewState = BoardViewState()
         self.boardViewState.changed.connect(self.update)
 
+        self.__check_current_layer()
+        self.project.stackup.changed.connect(self.__check_current_layer)
+
+    def __check_current_layer(self):
+        current_layer = self.boardViewState.current_layer
+
+        # If currently selected layer has been deleted
+        if current_layer is not None and current_layer not in self.project.stackup.layers:
+                current_layer = None
+
+        # Force select the first layer if the project has more than one layer
+        if current_layer is None and len(self.project.stackup.layers) != 0:
+            current_layer = self.project.stackup.top_layer
+
+        self.boardViewState.current_layer = current_layer
 
     def resizeGL(self, width: int, height: int) -> None:
         super(BoardViewWidget, self).resizeGL(width, height)

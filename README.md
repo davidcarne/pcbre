@@ -21,7 +21,7 @@ PCBRE requires the following dependencies. Some will probably need to come from 
 **System Packages**
 
 <!-- begin list -->
-- python3.4
+- python3 (anything 3.4 or later should work)
 - python3-pip (for installing python packages)
 - qtpy
 	- PySide **or** PyQt5

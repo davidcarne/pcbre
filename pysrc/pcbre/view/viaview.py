@@ -94,7 +94,7 @@ class THRenderer:
             VBOBind(self._outline_shader.program, self.__dtype, "r", div=1).assign()
 
     def render_filled(self, mat: 'npt.NDArray[numpy.float64]' , va: 'VA_xy', color: Tuple[float, float, float]=COL_VIA) -> None:
-        if len(va.buffer()[:]) == 0:
+        if not va.count():
             return
 
         self.filled_instance_vbo.set_array(va.buffer()[:])

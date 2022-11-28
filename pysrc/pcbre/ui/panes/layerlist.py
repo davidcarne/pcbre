@@ -11,11 +11,10 @@ class LayerListModel(QtCore.QAbstractListModel):
         QtCore.QAbstractListModel.__init__(self, parent)
         self.p = project
 
-        # TODO: Figure out story for changed stackup detection
-        #project.stackup.changed.connect(self._changed)
+        project.stackup.changed.connect(self._changed)
 
-    #def _changed(self, reason):
-    #    self.layoutChanged.emit()
+    def _changed(self):
+        self.layoutChanged.emit()
 
     def rowCount(self, parent:QtCore.QModelIndex=QtCore.QModelIndex()) -> int:
         b = len(self.p.stackup.layers)
@@ -53,6 +52,9 @@ class LayerListWidget(QtWidgets.QDockWidget):
         self.setWidget(self.layer_list)
 
         self.suppress_sel_change = False
+        self.changeSelection()
+
+        project.stackup.changed.connect(self.changeSelection)
 
     def changeSelection(self) -> None:
         layer = self.layerState.current_layer

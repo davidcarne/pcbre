@@ -9,6 +9,7 @@ from pcbre.model.net import Net
 from pcbre.model.serialization import SContext
 from pcbre.model.stackup import Layer, ViaPair
 from pcbre.model.util import ImmutableListProxy
+from pcbre.ui.uimodel import TinySignal
 
 MAGIC = b"PCBRE\x00"
 VERSION_MAGIC = b"\x01\x00"
@@ -33,17 +34,29 @@ class Stackup:
         self.layers = ImmutableListProxy(self.__layers)
         self.via_pairs = ImmutableListProxy(self.__via_pairs)
 
+        self.changed = TinySignal()
+
     def add_via_pair(self, via_pair: ViaPair) -> None:
         self.__via_pairs.append(via_pair)
+        self.changed.emit()
 
     def remove_via_pair(self, via_pair: ViaPair) -> None:
-        raise NotImplementedError("Via Pair removal not finished")
-        # TODO, check for vias
+        to_remove = []
+        for i in self.__project.artwork.vias:
+            if i.viapair == via_pair:
+                to_remove.append(i)
 
-        self.__via_pairs.erase(via_pair)
+        for i in to_remove:
+            self.__project.artwork.remove(i)
+
+        self.__via_pairs.remove(via_pair)
+        self.changed.emit()
 
     def via_pair_has_geom(self, via_pair: ViaPair) -> None:
-        raise NotImplementedError("Via Pair geom check not finished")
+        for i in self.__project.artwork.vias:
+            if i.viapair == via_pair:
+                return True
+        return False
 
     def via_pair_for_layers(self, layers: Sequence[Layer]) -> Optional[ViaPair]:
         for vp in self.via_pairs:
@@ -59,13 +72,19 @@ class Stackup:
     def add_layer(self, layer: Layer) -> None:
         self.__layers.append(layer)
         self.__renumber_layers()
+        self.changed.emit()
 
     def remove_layer(self, layer: Layer) -> None:
         self.__layers.remove(layer)
         self.__renumber_layers()
+        self.changed.emit()
 
     def check_layer_has_geom(self, layer: Layer) -> None:
-        raise NotImplementedError("Check Layer Geom not finished")
+        for i in self.__project.artwork.get_all_artwork():
+            if i.layer == layer:
+                return True
+
+        return False
 
     def _order_for_layer(self, layer: Layer) -> int:
         return self.__layers.index(layer)
@@ -73,6 +92,7 @@ class Stackup:
     def set_layer_order(self, layer: Layer, n: int) -> None:
         self.__layers.remove(layer)
         self.__layers.insert(n, layer)
+        self.changed.emit()
 
     @property
     def top_layer(self) -> Layer:
@@ -93,6 +113,9 @@ class Stackup:
             return self.top_layer
 
     def side_for_layer(self, layer: Layer) -> Optional[SIDE]:
+        if len(self.__layers) == 0:
+            return None
+
         if layer == self.bottom_layer:
             return SIDE.Bottom
         elif layer == self.top_layer:

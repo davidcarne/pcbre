@@ -64,7 +64,7 @@ class Passive2Component(Component):
             return
 
         v = Vec2.from_polar(0, self.pin_d)
-        td = 1 if self.body_type in (Passive2BodyType.TH_AXIAL, Passive2BodyType.TH_RADIAL) else 0
+        td = 0.1 if self.body_type in (Passive2BodyType.TH_AXIAL, Passive2BodyType.TH_RADIAL) else 0
 
         if td:
             y = x = self.pin_corner_vec.x * 2
