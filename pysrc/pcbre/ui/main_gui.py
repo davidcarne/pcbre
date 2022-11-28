@@ -9,7 +9,7 @@ import pcbre.model.project as P
 from pcbre.model.project import Project
 from pcbre.model.stackup import Layer
 from pcbre.ui.actions.add import AddImageDialogAction
-from pcbre.ui.actions.debug import ToggleDrawBBoxAction, ToggleDrawDebugAction, ToggleActionInformation
+from pcbre.ui.actions.debug import ToggleDrawBBoxAction, ToggleDrawDebugAction, ToggleActionInformation, ThrowException
 from pcbre.ui.actions.misc import NudgeUpAction, NudgeLeftAction, NudgeDownAction, NudgeRightAction, \
     ShowToolSettingsAction
 from pcbre.ui.actions.pcb import RebuildConnectivityAction, LayerViewSetupDialogAction, StackupSetupDialogAction
@@ -28,14 +28,15 @@ from pcbre.ui.widgets.glprobe import probe
 
 
 class DebugActions:
-    def __init__(self, window: BoardViewWidget) -> None:
+    def __init__(self, window: 'MainWindow') -> None:
         self.debug_draw = ToggleDrawDebugAction(window, window.viewArea)
         self.debug_draw_bbox = ToggleDrawBBoxAction(window, window.viewArea)
         self.debug_log_action_history = ToggleActionInformation(window, window.viewArea)
+        self.debug_throw_exception = ThrowException(window)
 
 
 class MainWindowActions:
-    def __init__(self, window: BoardViewWidget) -> None:
+    def __init__(self, window: 'MainWindow') -> None:
         # File actions
         self.file_add_image = AddImageDialogAction(window)
         self.file_save = SaveAction(window)

@@ -73,3 +73,12 @@ class ToggleDrawDebugAction(QtWidgets.QAction):
 
     def update_from_prop(self) -> None:
         self.setChecked(self.va.debug_renderer.debug_draw)
+
+class ThrowException(QtWidgets.QAction):
+    def __init__(self, mw: QtWidgets.QMainWindow) -> None:
+        QtWidgets.QAction.__init__(self, "Throw Exception (trigger emergency save)", mw)
+
+        self.triggered.connect(self.trigger_die)
+
+    def trigger_die(self):
+        raise RuntimeError("Manually triggrered debug exception")
