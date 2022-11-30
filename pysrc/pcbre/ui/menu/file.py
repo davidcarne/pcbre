@@ -29,7 +29,7 @@ class FileMenu(QtWidgets.QMenu):
         # the "save" option is disabled if a) the project hasn't changed
         # or b) the save location isn't defined
         def updateCanSave() -> None:
-            mw.pcbre_actions.file_save.setEnabled(mw.project.can_save)
+            mw.pcbre_actions.file_save.setEnabled(mw.can_save)
 
         # So update the "greyed" state immediately before rendering
         self.aboutToShow.connect(updateCanSave)

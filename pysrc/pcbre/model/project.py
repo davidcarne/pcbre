@@ -1,15 +1,23 @@
 import os
 from typing import List, Tuple, Sequence, Optional, BinaryIO
 
-import pcbre.model.serialization as ser
+import pcbre.model.serialization_capnp as ser_capnp
 from pcbre.model.artwork import Artwork
 from pcbre.model.const import SIDE
 from pcbre.model.imagelayer import ImageLayer, KeyPoint
 from pcbre.model.net import Net
-from pcbre.model.serialization import SContext
 from pcbre.model.stackup import Layer, ViaPair
 from pcbre.model.util import ImmutableListProxy
+from enum import Enum
+
 from pcbre.ui.uimodel import TinySignal
+
+
+class StorageType(Enum):
+    Packed = 0
+    Dir = 1
+    AutoDetect = 2
+
 
 MAGIC = b"PCBRE\x00"
 VERSION_MAGIC = b"\x01\x00"
@@ -24,36 +32,41 @@ class ProjectIsBadException(Exception):
 
 
 class Stackup:
+
     def __init__(self, project: 'Project') -> None:
         super(Stackup, self).__init__()
 
-        self.__project = project
-        self.__layers: List[Layer] = []
-        self.__via_pairs: List[ViaPair] = []
+        # the serialization code needs to interact with
+        # the class internals, so they aren't scoped completely internally
+        self._project = project
 
-        self.layers = ImmutableListProxy(self.__layers)
-        self.via_pairs = ImmutableListProxy(self.__via_pairs)
+        # All la
+        self._layers: List[Layer] = []
+        self._via_pairs: List[ViaPair] = []
+
+        self.layers = ImmutableListProxy(self._layers)
+        self.via_pairs = ImmutableListProxy(self._via_pairs)
 
         self.changed = TinySignal()
 
     def add_via_pair(self, via_pair: ViaPair) -> None:
-        self.__via_pairs.append(via_pair)
+        self._via_pairs.append(via_pair)
         self.changed.emit()
 
     def remove_via_pair(self, via_pair: ViaPair) -> None:
         to_remove = []
-        for i in self.__project.artwork.vias:
+        for i in self._project.artwork.vias:
             if i.viapair == via_pair:
                 to_remove.append(i)
 
         for i in to_remove:
-            self.__project.artwork.remove(i)
+            self._project.artwork.remove(i)
 
-        self.__via_pairs.remove(via_pair)
+        self._via_pairs.remove(via_pair)
         self.changed.emit()
 
-    def via_pair_has_geom(self, via_pair: ViaPair) -> None:
-        for i in self.__project.artwork.vias:
+    def via_pair_has_geom(self, via_pair: ViaPair) -> bool:
+        for i in self._project.artwork.vias:
             if i.viapair == via_pair:
                 return True
         return False
@@ -61,50 +74,50 @@ class Stackup:
     def via_pair_for_layers(self, layers: Sequence[Layer]) -> Optional[ViaPair]:
         for vp in self.via_pairs:
             first_layer, second_layer = vp.layers
-            if all(first_layer.order <= l.order <= second_layer.order for l in layers):
+            if all(first_layer.order <= layer.order <= second_layer.order for layer in layers):
                 return vp
         return None
 
-    def __renumber_layers(self) -> None:
-        for n, i in enumerate(self.__layers):
+    def _renumber_layers(self) -> None:
+        for n, i in enumerate(self._layers):
             i.number = n
 
     def add_layer(self, layer: Layer) -> None:
-        self.__layers.append(layer)
-        self.__renumber_layers()
+        self._layers.append(layer)
+        self._renumber_layers()
         self.changed.emit()
 
     def remove_layer(self, layer: Layer) -> None:
-        self.__layers.remove(layer)
-        self.__renumber_layers()
+        self._layers.remove(layer)
+        self._renumber_layers()
         self.changed.emit()
 
-    def check_layer_has_geom(self, layer: Layer) -> None:
-        for i in self.__project.artwork.get_all_artwork():
+    def check_layer_has_geom(self, layer: Layer) -> bool:
+        for i in self._project.artwork.get_all_artwork():
             if i.layer == layer:
                 return True
 
         return False
 
     def _order_for_layer(self, layer: Layer) -> int:
-        return self.__layers.index(layer)
+        return self._layers.index(layer)
 
     def set_layer_order(self, layer: Layer, n: int) -> None:
-        self.__layers.remove(layer)
-        self.__layers.insert(n, layer)
+        self._layers.remove(layer)
+        self._layers.insert(n, layer)
         self.changed.emit()
 
     @property
     def top_layer(self) -> Layer:
-        return self.__layers[0]
+        return self._layers[0]
 
     @property
     def bottom_layer(self) -> Layer:
-        return self.__layers[-1]
+        return self._layers[-1]
 
     @property
     def both_sides(self) -> Tuple[Layer, Layer]:
-        return self.__layers[0], self.__layers[-1]
+        return self._layers[0], self._layers[-1]
 
     def layer_for_side(self, side: SIDE) -> Layer:
         if side == SIDE.Bottom:
@@ -113,7 +126,7 @@ class Stackup:
             return self.top_layer
 
     def side_for_layer(self, layer: Layer) -> Optional[SIDE]:
-        if len(self.__layers) == 0:
+        if len(self._layers) == 0:
             return None
 
         if layer == self.bottom_layer:
@@ -123,61 +136,37 @@ class Stackup:
 
         return None
 
-    def serialize(self) -> ser.Stackup:
-        _stackup = ser.Stackup.new_message()
-        _stackup.init("layers", len(self.__layers))
-
-        for n, i_l in enumerate(self.__layers):
-            _stackup.layers[n] = i_l.serialize()
-
-        _stackup.init("viapairs", len(self.__via_pairs))
-        for n, i_vp in enumerate(self.__via_pairs):
-            _stackup.viapairs[n] = i_vp.serialize()
-
-        return _stackup
-
-    def deserialize(self, msg: ser.Stackup) -> None:
-        self.__layers.clear()
-        for i in msg.layers:
-            self.__layers.append(Layer.deserialize(self.__project, i))
-
-        self.__via_pairs.clear()
-        for i in msg.viapairs:
-            self.__via_pairs.append(ViaPair.deserialize(self.__project, i))
-
-        self.__renumber_layers()
-
 
 class Imagery:
     def __init__(self, project: 'Project') -> None:
-        self.__project = project
+        self._project = project
 
-        self.__imagelayers: List[ImageLayer] = []
-        self.__keypoints: List[KeyPoint] = []
+        self._imagelayers: List[ImageLayer] = []
+        self._keypoints: List[KeyPoint] = []
 
-        self.imagelayers = ImmutableListProxy(self.__imagelayers)
-        self.keypoints = ImmutableListProxy(self.__keypoints)
+        self.imagelayers = ImmutableListProxy(self._imagelayers)
+        self.keypoints = ImmutableListProxy(self._keypoints)
 
     def add_imagelayer(self, imagelayer: ImageLayer) -> None:
-        assert imagelayer._project is None or imagelayer._project is self.__project
-        imagelayer._project = self.__project
+        assert imagelayer._project is None or imagelayer._project is self._project
+        imagelayer._project = self._project
 
         if imagelayer.alignment is not None:
-            imagelayer.alignment._project = self.__project
+            imagelayer.alignment._project = self._project
 
-        self.__imagelayers.append(imagelayer)
+        self._imagelayers.append(imagelayer)
 
     def _order_for_layer(self, imagelayer: ImageLayer) -> int:
-        return self.__imagelayers.index(imagelayer)
+        return self._imagelayers.index(imagelayer)
 
     def _set_layer_order(self, imagelayer: ImageLayer, n: int) -> None:
-        self.__imagelayers.remove(imagelayer)
-        self.__imagelayers.insert(n, imagelayer)
+        self._imagelayers.remove(imagelayer)
+        self._imagelayers.insert(n, imagelayer)
 
     def add_keypoint(self, kp: KeyPoint) -> None:
-        assert kp._project is None or kp._project is self.__project
-        kp._project = self.__project
-        self.__keypoints.append(kp)
+        assert kp._project is None or kp._project is self._project
+        kp._project = self._project
+        self._keypoints.append(kp)
 
     def del_keypoint(self, kp: KeyPoint) -> None:
         """
@@ -187,51 +176,28 @@ class Imagery:
         :return:
         """
 
-        assert kp._project is self.__project
+        assert kp._project is self._project
         # Verify that no layers use the keypoint
         assert len(kp.layer_positions) == 0
 
         kp._project = None
 
-        self.__keypoints.remove(kp)
+        self._keypoints.remove(kp)
 
     def get_keypoint_index(self, kp: KeyPoint) -> int:
         return self.keypoints.index(kp)
-
-    def serialize(self) -> ser.Imagery:
-        imagery = ser.Imagery.new_message()
-
-        imagery.init("imagelayers", len(self.imagelayers))
-        for n, i in enumerate(self.imagelayers):
-            imagery.imagelayers[n] = i.serialize()
-
-        imagery.init("keypoints", len(self.keypoints))
-
-        for n, i_ in enumerate(self.keypoints):
-            imagery.keypoints[n] = i_.serialize()
-
-        return imagery
-
-    def deserialize(self, msg: ser.Imagery) -> None:
-        # Keypoints may be used by the imagelayers during deserialize
-        # Deserialize first to avoid a finalizer
-        for i in msg.keypoints:
-            self.__keypoints.append(KeyPoint.deserialize(self.__project, i))
-
-        for i in msg.imagelayers:
-            self.__imagelayers.append(ImageLayer.deserialize(self.__project, i))
 
 
 class Nets:
     def __init__(self, project: 'Project') -> None:
         super(Nets, self).__init__()
 
-        self.__project: Optional[Project] = project
+        self._project: Optional[Project] = project
 
-        self.__nets: List[Net] = list()
+        self._nets: List[Net] = list()
         self.__max_id = 0
 
-        self.nets = ImmutableListProxy(self.__nets)
+        self.nets = ImmutableListProxy(self._nets)
 
     def new(self) -> Net:
         n = Net()
@@ -244,47 +210,25 @@ class Nets:
         :param net: net to be added
         :return:
         """
-        assert net._project is None or net._project is self.__project
+        assert net._project is None or net._project is self._project
 
-        net._project = self.__project
+        net._project = self._project
         self.__max_id += 1
         net._id = self.__max_id
 
-        self.__nets.append(net)
+        self._nets.append(net)
 
     def remove_net(self, net: Net) -> None:
-        assert net._project == self.__project
+        assert net._project == self._project
 
         # TODO, strip net from all artwork that has it / verify
-        self.__nets.remove(net)
-
-    def serialize(self) -> ser.Nets:
-        assert self.__project is not None
-
-        _nets = ser.Nets.new_message()
-        _nets.init("netList", len(self.nets))
-        for n, i in enumerate(self.nets):
-            _nets.netList[n].sid = self.__project.scontext.sid_for(i)
-            _nets.netList[n].name = i.name
-            _nets.netList[n].nclass = i.net_class
-
-        return _nets
-
-    def deserialize(self, msg: ser.Nets) -> None:
-        assert self.__project is not None
-
-        for i in msg.netList:
-            n = Net(name=i.name, net_class=i.nclass)
-            self.__project.scontext.set_sid(i.sid, n)
-            self.add_net(n)
+        self._nets.remove(net)
 
 
 class Project:
 
     def __init__(self) -> None:
-        self.scontext = SContext()
-
-        self.filepath: Optional[str] = None
+        self.scontext = ser_capnp.SContext()
 
         self.imagery = Imagery(self)
 
@@ -293,43 +237,36 @@ class Project:
 
         self.nets = Nets(self)
 
-    @property
-    def can_save(self) -> bool:
-        return self.filepath is not None
-
     @staticmethod
     def create() -> 'Project':
         return Project()
 
-    def _serialize(self) -> ser.Project:
-        project = ser.Project.new_message()
-        project.stackup = self.stackup.serialize()
-        project.imagery = self.imagery.serialize()
-        project.nets = self.nets.serialize()
-        project.artwork = self.artwork.serialize()
-
-        return project
-
     @staticmethod
-    def _deserialize(msg: ser.Project) -> 'Project':
-        p = Project()
-        with p.scontext.restoring():
-            p.stackup.deserialize(msg.stackup)
-            p.imagery.deserialize(msg.imagery)
-            p.nets.deserialize(msg.nets)
-            p.artwork.deserialize(msg.artwork)
-        return p
+    def open(path: str, filetype: StorageType = StorageType.AutoDetect) -> 'Optional[Project]':
+        if filetype == StorageType.AutoDetect:
+            if not os.path.exists(path):
+                return None
+            if os.path.isdir(path):
+                filetype = StorageType.Dir
+            else:
+                filetype = StorageType.Packed
 
-    @staticmethod
-    def open(path: str) -> 'Project':
-        f = open(path, "rb", buffering=0)
-        self = Project.open_fd(f)
-        self.filepath = path
+        if filetype == StorageType.Packed:
+            f = open(path, "rb", buffering=0)
+            self = Project.open_fd_capnp(f)
+        elif filetype == StorageType.Dir:
+            self = Project.open_dir(path)
+        else:
+            raise ValueError("Unknown serialization file type %s" % repr(filetype))
 
         return self
 
     @staticmethod
-    def open_fd(fd: BinaryIO) -> 'Project':
+    def open_dir(path: str) -> 'Optional[Project]':
+        raise NotImplementedError()
+
+    @staticmethod
+    def open_fd_capnp(fd: BinaryIO) -> 'Project':
         magic = fd.read(8)
         if magic[:6] != MAGIC:
             raise ValueError("Unknown File Type")
@@ -338,28 +275,25 @@ class Project:
         if vers != VERSION_MAGIC:
             raise ValueError("Unknown File Version")
 
-        _project = ser.Project.read(fd)
-        self = Project._deserialize(_project)
+        _project = ser_capnp.Project.read(fd)
+        self = ser_capnp.deserialize_project(_project)
         return self
 
-    def save_fd(self, fd: BinaryIO) -> None:
-        fd.write(MAGIC + VERSION_MAGIC)
-        # This appears to be necessary for some IO types
-        # CAPNP may not reflect already buffer contents
-        # (see when writing to a named temp file)
-        fd.flush()
-
-        message = self._serialize()
-        message.write(fd)
-
-    def save(self, path: Optional[str] = None, update_path: bool = False) -> None:
-        if path is None:
-            path = self.filepath
-
+    def save(self, path: str, filetype: StorageType) -> None:
         if path is None:
             raise ValueError("Must have either a filename, or a save-as path")
 
-        bakname = path + ".bak"
+        if filetype == StorageType.Packed:
+            self.save_capnp(path)
+        elif filetype == StorageType.Dir:
+            self.save_dir(path)
+        else:
+            raise ValueError("Storage Type must be specified")
+
+    def save_dir(self, path: str) -> None:
+        raise NotImplementedError("Dir serialization not implemented")
+
+    def save_capnp(self, path):
         try:
             bakname = path + ".bak"
 
@@ -373,17 +307,25 @@ class Project:
 
         f = open(path, "w+b", buffering=0)
         try:
-            self.save_fd(f)
+            self.save_fd_capnp(f)
         except Exception as e:
             os.unlink(path)
             os.rename(bakname, path)
             raise e
 
-        if update_path:
-            self.filepath = path
-
-        f.flush()
         f.close()
+
+    def save_fd_capnp(self, fd: BinaryIO) -> None:
+        fd.write(MAGIC + VERSION_MAGIC)
+        # This appears to be necessary for some IO types
+        # CAPNP may not reflect already buffer contents
+        # (see when writing to a named temp file)
+        fd.flush()
+
+        message = ser_capnp.serialize_project(self)
+        message.write(fd)
+
+        fd.flush()
 
     def close(self) -> None:
         pass

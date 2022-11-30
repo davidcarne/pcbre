@@ -84,7 +84,7 @@ class MainWindowActions:
 class MainWindow(QtWidgets.QMainWindow):
     # Emitted when something changes the currently selected layer
 
-    def __init__(self, p: Project) -> None:
+    def __init__(self, filepath: Optional[str], p: Project) -> None:
         super(MainWindow, self).__init__()
 
         self.project: Project = p
@@ -109,6 +109,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.current_tool: Optional[BaseTool] = None
         self.current_controller: Optional[BaseToolController] = None
+
+        self.filepath = filepath
+
+    @property
+    def can_save(self) -> bool:
+        return self.filepath is not None
 
     @QtCore.Slot(object)
     def changeViewLayer(self, layer: Layer) -> None:
@@ -226,23 +232,31 @@ def main() -> None:
 
     if args.project is None:
         p = P.Project.create()
+        filepath = None
     else:
+        filepath = args.project
         if os.path.exists(args.project):
             p = P.Project.open(args.project)
         elif args.create_if_not_exists:
             p = P.Project.create()
-            p.filepath = args.project
         else:
             print("File not found")
             exit()
+
+    app = QtWidgets.QApplication(sys.argv)
+
+    f = app.font()
+    gl_version = probe()
+
+    window = MainWindow(filepath, p)
 
     old_excepthook = sys.excepthook
     def excepthook(type, value, traceback):
         print("Crashing. Attempting emergency save")
         emerge_save_path = None
-        if p.filepath is not None:
+        if window.filepath is not None:
             # Create an emergency save filepath based on existing path
-            emerge_save_path = p.filepath
+            emerge_save_path = window.filepath
             if emerge_save_path.endswith(".pcbre"):
                 emerge_save_path = emerge_save_path[:-6]
             emerge_save_path += ".emergency.pcbre"
@@ -262,7 +276,7 @@ def main() -> None:
                 suffix=".pcbre", prefix="pcbre_unnamed_emergency_save", delete=False)
             emerge_save_path = emerge_save_fd.name
 
-        p.save_fd(emerge_save_fd)
+        p.save_fd_capnp(emerge_save_fd)
         emerge_save_fd.close()
         print("Saved emergency save to %s" % emerge_save_path)
         old_excepthook(type, value, traceback)
@@ -270,13 +284,6 @@ def main() -> None:
 
     sys.excepthook = excepthook
 
-    app = QtWidgets.QApplication(sys.argv)
-
-    f = app.font()
-
-    gl_version = probe()
-
-    window = MainWindow(p)
     window.show()
     sys.exit(app.exec_())
 

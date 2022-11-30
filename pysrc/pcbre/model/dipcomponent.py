@@ -9,7 +9,6 @@ from typing import List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pcbre.model.project import Project
-    import pcbre.model.serialization as ser
 
 __author__ = 'davidc'
 
@@ -25,9 +24,9 @@ class SIPComponent(Component):
 
         Component.__init__(self, project, center, theta, side,
                            side_layer_oracle=side_layer_oracle)
-        self.__my_init(pin_count, pin_space, pad_size)
+        self._my_init(pin_count, pin_space, pad_size)
 
-    def __my_init(self, pin_count: int, pin_space: float, pad_size: float) -> None:
+    def _my_init(self, pin_count: int, pin_space: float, pad_size: float) -> None:
         self.__pin_count = pin_count
         self.__pin_space = pin_space
         self.__pad_size = pad_size
@@ -82,23 +81,6 @@ class SIPComponent(Component):
     def theta_bbox(self) -> Rect:
         return Rect.from_center_size(Point2(0, 0), self.body_width(), self.body_length())
 
-    def serializeTo(self, sip_msg: 'ser.Component.Builder') -> None:
-        self._serializeTo(sip_msg.common)
-        sip_msg.init("sip")
-
-        m = sip_msg.sip
-
-        m.pinCount = self.pin_count
-        m.pinSpace = self.pin_space
-        m.padSize = self.pad_size
-
-    @staticmethod
-    def deserialize(project: 'Project', sip_msg: 'ser.Component.Reader') -> Component:
-        m = sip_msg.sip
-        cmp : SIPComponent = SIPComponent.__new__(SIPComponent)
-        Component.deserializeTo(project, sip_msg.common, cmp)
-        cmp.__my_init(m.pinCount, m.pinSpace, m.padSize)
-        return cmp
 
 
 class DIPComponent(Component):
@@ -110,9 +92,9 @@ class DIPComponent(Component):
         pin_space: float, pin_width:float, pad_size: float=units.MM):
 
         Component.__init__(self, project, center, theta, side, side_layer_oracle=side_layer_oracle)
-        self.__my_init(pin_count, pin_space, pin_width, pad_size, side_layer_oracle)
+        self._my_init(pin_count, pin_space, pin_width, pad_size, side_layer_oracle)
 
-    def __my_init(self, pin_count: int, pin_space: float,
+    def _my_init(self, pin_count: int, pin_space: float,
         pin_width: float, pad_size: float, side_layer_oracle: 'Project') -> None:
 
         # Center and theta don't affect the pin settings
@@ -203,21 +185,3 @@ class DIPComponent(Component):
     def theta_bbox(self) -> Rect:
         return Rect.from_center_size(Point2(0, 0), self.body_width(), self.body_length())
 
-    def serializeTo(self, dip_msg: 'ser.Component.Builder') -> None:
-        self._serializeTo(dip_msg.common)
-        dip_msg.init("dip")
-
-        m = dip_msg.dip
-
-        m.pinCount = self.pin_count
-        m.pinSpace = self.pin_space
-        m.pinWidth = self.pin_width
-        m.padSize = self.pad_size
-
-    @staticmethod
-    def deserialize(project: 'Project', dip_msg: 'ser.Component.Reader') -> Component:
-        m = dip_msg.dip
-        cmp : DIPComponent = DIPComponent.__new__(DIPComponent)
-        Component.deserializeTo(project, dip_msg.common, cmp)
-        cmp.__my_init(m.pinCount, m.pinSpace, m.pinWidth, m.padSize, project)
-        return cmp

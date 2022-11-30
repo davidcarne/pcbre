@@ -2,10 +2,8 @@ from enum import Enum
 from typing import Optional, List, TYPE_CHECKING
 
 from pcbre.matrix import Vec2, Rect, Point2
-from pcbre.model import serialization as ser
 from pcbre.model.const import OnSide, IntersectionClass
 from pcbre.model.pad import Pad
-from pcbre.model.serialization import serialize_point2, deserialize_point2
 
 if TYPE_CHECKING:
     from pcbre.model.project import Project
@@ -57,10 +55,10 @@ class Passive2Component(Component):
         self.body_corner_vec: Vec2 = body_corner_vec
         self.pin_corner_vec: Vec2 = pin_corner_vec
 
-        self.__pads: List[Pad] = []
+        self._pads: List[Pad] = []
 
     def __update_pads(self) -> None:
-        if self.__pads:
+        if self._pads:
             return
 
         v = Vec2.from_polar(0, self.pin_d)
@@ -72,14 +70,14 @@ class Passive2Component(Component):
             y = self.pin_corner_vec.y * 2
             x = self.pin_corner_vec.x * 2
 
-        self.__pads = [
+        self._pads = [
             Pad(self, "1", v, 0, y, x, td, self.side),
             Pad(self, "2", -v, 0, y, x, td, self.side),
         ]
 
     def get_pads(self) -> List[Pad]:
         self.__update_pads()
-        return self.__pads
+        return self._pads
 
     def on_sides(self) -> OnSide:
         return OnSide.One if self.body_type == Passive2BodyType.CHIP else OnSide.Both
@@ -89,33 +87,3 @@ class Passive2Component(Component):
         length = max(self.pin_d + self.pin_corner_vec.x, self.body_corner_vec.x)
         width = max(self.pin_corner_vec.y, self.body_corner_vec.y)
         return Rect.from_center_size(Point2(0, 0), length * 2, width * 2)
-
-    def serializeTo(self, pasv_msg: 'ser.Component.Builder') -> None:
-        self._serializeTo(pasv_msg.common)
-        pasv_msg.init("passive2")
-
-        m = pasv_msg.passive2
-
-        m.symType = self.sym_type.value
-        m.bodyType = self.body_type.value
-        m.pinD = int(self.pin_d)
-        m.bodyCornerVec = serialize_point2(self.body_corner_vec)
-        m.pinCornerVec = serialize_point2(self.pin_corner_vec)
-
-    @staticmethod
-    def deserialize(project: 'Project', pasv_msg: 'ser.Component.Reader') -> 'Passive2Component':
-        m = pasv_msg.passive2
-        cmp: Passive2Component = Passive2Component.__new__(Passive2Component)
-        Component.deserializeTo(project, pasv_msg.common, cmp)
-
-        cmp.sym_type = PassiveSymType(m.symType.raw)
-        cmp.body_type = Passive2BodyType(m.bodyType.raw)
-
-        # Distance from center to pin
-        cmp.pin_d = m.pinD
-
-        cmp.body_corner_vec = deserialize_point2(m.bodyCornerVec)
-        cmp.pin_corner_vec = deserialize_point2(m.pinCornerVec)
-        cmp.__pads = []
-
-        return cmp

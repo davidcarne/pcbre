@@ -6,7 +6,7 @@ from pcbre.model.artwork_geom import Trace, Via, Polygon, Airwire
 from pcbre.model.imagelayer import ImageLayer, KeyPoint, KeyPointAlignment, RectAlignment
 from pcbre.model.net import Net
 from pcbre.model.project import Project
-from pcbre.model.serialization import serialize_matrix, deserialize_matrix, serialize_point2, \
+from pcbre.model.serialization_capnp import serialize_matrix, deserialize_matrix, serialize_point2, \
     deserialize_point2, serialize_point2f, deserialize_point2f
 from pcbre.model.stackup import Layer, ViaPair
 import random
@@ -19,10 +19,10 @@ class test_save_restore(unittest.TestCase):
     def __saverestore(self, p):
         with TemporaryFile(buffering=0) as fd:
 
-            p.save_fd(fd)
+            p.save_fd_capnp(fd)
             fd.seek(0)
 
-            p_new = Project.open_fd(fd)
+            p_new = Project.open_fd_capnp(fd)
         return p_new
 
     def test_basic_save_restore(self):

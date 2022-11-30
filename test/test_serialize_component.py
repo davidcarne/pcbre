@@ -16,10 +16,10 @@ class test_ser_cmp_restore(unittest.TestCase):
     def __saverestore(self, p):
         with TemporaryFile(buffering=0) as fd:
 
-            p.save_fd(fd)
+            p.save_fd_capnp(fd)
             fd.seek(0)
 
-            p_new = Project.open_fd(fd)
+            p_new = Project.open_fd_capnp(fd)
 
 
         return p_new

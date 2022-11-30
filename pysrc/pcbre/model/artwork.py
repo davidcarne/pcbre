@@ -11,16 +11,11 @@ from pcbre.algo.geom import dist_via_via, dist_via_trace, dist_trace_trace, \
     dist_via_pad, dist_trace_pad, dist_pad_pad, distance, point_inside, can_self_intersect, intersect
 from pcbre.matrix import Point2
 from pcbre.matrix import Rect
-from pcbre.model import serialization as ser
 from pcbre.model.artwork_geom import Trace, Via, Polygon, Airwire, Geom
 from pcbre.model.component import Component
 from pcbre.model.const import IntersectionClass
-from pcbre.model.dipcomponent import DIPComponent, SIPComponent
 from pcbre.model.net import Net
 from pcbre.model.pad import Pad
-from pcbre.model.passivecomponent import Passive2Component
-from pcbre.model.serialization import serialize_point2, deserialize_point2
-from pcbre.model.smd4component import SMD4Component
 from pcbre.model.util import ImmutableSetProxy
 
 QueryableGeom = Union[Via, Trace, Pad, Polygon, Airwire]
@@ -33,8 +28,8 @@ GeomPad = Union[Geom, Pad]
 
 #   Once an item is added to artwork, it should be considered geometrically and electrically immutable
 #
-#   changing an object in a way that alters the geometry or connectivity requires removing it before applying the changes, then readding it
-#   this of course can be hidden in the UI.
+#   changing an object in a way that alters the geometry or connectivity requires removing it before
+#   applying the changes, then reading it. This of course can be hidden in the UI.
 #
 #   The point of this step is to ensure that net connectivity is recalculated as necessary
 class ArtworkIndex:
@@ -69,7 +64,7 @@ class ArtworkIndex:
 
     @staticmethod
     def __rect_index_order(rect: Rect) -> Tuple[float, float, float, float]:
-        return (rect.left, rect.bottom, rect.right, rect.top)
+        return rect.left, rect.bottom, rect.right, rect.top
 
     def insert(self, geom: Any) -> None:
         self.__index.insert(self.__get_idx(geom), self.__rect_index_order(geom.bbox))
@@ -92,7 +87,7 @@ class ArtworkIndex:
 
 class Artwork:
     def __init__(self, project: 'pcbre.model.project.Project') -> None:
-        self.__project = project
+        self._project = project
         self.__index = ArtworkIndex()
 
         self.__vias: Set[Via] = set()
@@ -125,7 +120,7 @@ class Artwork:
         assert aw is not None
         assert aw._project is None
         assert aw.net is not None
-        assert aw.net._project is self.__project
+        assert aw.net._project is self._project
 
         if isinstance(aw, Trace):
             self.__traces.add(aw)
@@ -148,7 +143,7 @@ class Artwork:
 
         self.__index.insert(aw)
 
-        aw._project = self.__project
+        aw._project = self._project
 
     def add_component(self, cmp: Component) -> None:
         """
@@ -156,7 +151,7 @@ class Artwork:
         :return:
         """
         self.__components.add(cmp)
-        cmp._project = self.__project
+        cmp._project = self._project
 
         self.__index.insert(cmp)
         for pad in cmp.get_pads():
@@ -185,7 +180,7 @@ class Artwork:
         self.components_generation += 1
 
     def remove_artwork(self, aw: InsertableGeom) -> None:
-        assert aw._project is self.__project
+        assert aw._project is self._project
         assert aw.net is not None
 
         # Strip
@@ -226,7 +221,7 @@ class Artwork:
         n = self.get_geom_for_net(aw_net)
 
         if len(n) == 0:
-            self.__project.nets.remove_net(aw_net)
+            self._project.nets.remove_net(aw_net)
 
         aw._project = None
 
@@ -272,7 +267,7 @@ class Artwork:
             if aw.net == net2:
                 aw.net = net1
 
-        self.__project.nets.remove_net(net2)
+        self._project.nets.remove_net(net2)
 
     def merge_nets_many(self, nets: Iterable[Net]) -> Net:
         queue = list(nets)
@@ -340,7 +335,7 @@ class Artwork:
             new_net = list(nets)[0]
         else:
             new_net = Net()
-            self.__project.nets.add_net(new_net)
+            self._project.nets.add_net(new_net)
 
         new_geom.net = new_net
 
@@ -381,7 +376,7 @@ class Artwork:
             yield geom.net
 
             newnet = Net()
-            self.__project.nets.add_net(newnet)
+            self._project.nets.add_net(newnet)
             yield newnet
 
         for group, net in zip(subgroups, net_gen()):
@@ -442,7 +437,7 @@ class Artwork:
 
         # First, for each existing net, we identify which groups are owned by the net
         # and remove the groups having the smaller amounts of geometry (by count)
-        nets_to_groups = defaultdict(list)
+        nets_to_groups: Dict[Net, List[Set[Geom]]] = defaultdict(list)
         for g in connectivity:
             for i in g:
                 nets_to_groups[i.net].append(g)
@@ -460,7 +455,7 @@ class Artwork:
             nets = set(i.net for i in group if i.net is not None)
             # TODO: Prioritize net
             if len(nets) == 0:
-                n0 = self.__project.nets.new()
+                n0 = self._project.nets.new()
             else:
                 n0 = nets.pop()
 
@@ -469,12 +464,12 @@ class Artwork:
 
         assigned_nets = set(i.net for i in self.get_all_artwork())
 
-        existing_nets = set(self.__project.nets.nets)
+        existing_nets = set(self._project.nets.nets)
 
         to_remove_nets = existing_nets - assigned_nets
 
         for net in to_remove_nets:
-            self.__project.nets.remove_net(net)
+            self._project.nets.remove_net(net)
 
     def merge_artwork(self, geom: InsertableGeom) -> None:
         """
@@ -535,7 +530,7 @@ class Artwork:
             vps_ok = {}
             my_layerset = set(id(i) for i in geom.viapair.all_layers)
 
-            for v in self.__project.stackup.via_pairs:
+            for v in self._project.stackup.via_pairs:
                 v_layerset = set(id(i) for i in v.all_layers)
                 vps_ok[id(v)] = len(v_layerset.intersection(my_layerset))
 
@@ -587,7 +582,7 @@ class Artwork:
 
             # Build lookup to check viapair
             vps_ok = {}
-            for v in self.__project.stackup.via_pairs:
+            for v in self._project.stackup.via_pairs:
                 v_layerset = set(id(i) for i in v.all_layers)
                 vps_ok[id(v)] = id(geom.layer) in v_layerset
 
@@ -649,125 +644,3 @@ class Artwork:
 
         return sorted(results, key=operator.itemgetter(0))
 
-    def serialize(self) -> ser.Artwork.Builder:
-        _aw = ser.Artwork.new_message()
-        _aw.init("vias", len(self.vias))
-        _aw.init("traces", len(self.traces))
-        _aw.init("polygons", len(self.polygons))
-        _aw.init("components", len(self.components))
-        _aw.init("airwires", len(self.airwires))
-
-        # Serialization done here to reduce instance size
-        for n, i_via in enumerate(self.vias):
-            v = _aw.vias[n]
-            v.point = serialize_point2(i_via.pt)
-            v.r = i_via.r
-            v.viapairSid = self.__project.scontext.sid_for(i_via.viapair)
-            v.netSid = self.__project.scontext.sid_for(i_via.net)
-
-        #
-        for n, i_trace in enumerate(self.traces):
-            t = _aw.traces[n]
-            t.p0 = serialize_point2(i_trace.p0)
-            t.p1 = serialize_point2(i_trace.p1)
-            t.thickness = int(i_trace.thickness)
-            t.netSid = self.__project.scontext.sid_for(i_trace.net)
-            t.layerSid = self.__project.scontext.sid_for(i_trace.layer)
-
-        for n, i_comp in enumerate(self.components):
-            t = _aw.components[n]
-            i_comp.serializeTo(t)
-
-        for n, i_poly in enumerate(self.polygons):
-            p = _aw.polygons[n]
-
-            p_repr = i_poly.get_poly_repr()
-            p.init("exterior", len(p_repr.exterior.coords))
-            for nn, ii in enumerate(p_repr.exterior.coords):
-                p.exterior[nn] = serialize_point2(Point2(ii[0], ii[1]))
-
-            p.init("interiors", len(p_repr.interiors))
-            for n_interior, interior in enumerate(p_repr.interiors):
-                p.interiors.init(n_interior, len(interior.coords))
-                for nn, ii in enumerate(interior.coords):
-                    p.interiors[n_interior][nn] = serialize_point2(Point2(ii[0], ii[1]))
-
-            p.layerSid = self.__project.scontext.sid_for(i_poly.layer)
-            p.netSid = self.__project.scontext.sid_for(i_poly.net)
-
-        for n, i_ in enumerate(self.airwires):
-            t = _aw.airwires[n]
-            t.p0 = serialize_point2(i_.p0)
-            t.p1 = serialize_point2(i_.p1)
-            t.netSid = self.__project.scontext.sid_for(i_.net)
-            t.p0LayerSid = self.__project.scontext.sid_for(i_.p0_layer)
-            t.p1LayerSid = self.__project.scontext.sid_for(i_.p1_layer)
-
-        return _aw
-
-    def __lookup_net_helper(self, sid: int) -> Net:
-        try:
-            a = self.__project.scontext.get(sid)
-            assert isinstance(a, Net)
-            return a
-        except KeyError:
-            print("WARNING: invalid SID %d for net lookup, replacing with empty net", sid)
-            return self.__project.nets.new()
-
-    def deserialize(self, msg: ser.Artwork) -> None:
-        for i_via in msg.vias:
-            v = Via(deserialize_point2(i_via.point),
-                    self.__project.scontext.get(i_via.viapairSid),
-                    i_via.r,
-                    self.__lookup_net_helper(i_via.netSid)
-                    )
-
-            self.add_artwork(v)
-
-        for i_trace in msg.traces:
-            t = Trace(
-                deserialize_point2(i_trace.p0),
-                deserialize_point2(i_trace.p1),
-                i_trace.thickness,
-                self.__project.scontext.get(i_trace.layerSid),
-                self.__lookup_net_helper(i_trace.netSid)
-            )
-            self.add_artwork(t)
-
-        for i_poly in msg.polygons:
-            exterior = [deserialize_point2(j) for j in i_poly.exterior]
-            interiors = [[deserialize_point2(k) for k in j] for j in i_poly.interiors]
-
-            p = Polygon(
-                self.__project.scontext.get(i_poly.layerSid),
-                exterior,
-                interiors,
-                self.__lookup_net_helper(i_poly.netSid)
-            )
-
-            self.add_artwork(p)
-
-        for i_airwire in msg.airwires:
-            aw = Airwire(
-                deserialize_point2(i_airwire.p0),
-                deserialize_point2(i_airwire.p1),
-                self.__project.scontext.get(i_airwire.p0LayerSid),
-                self.__project.scontext.get(i_airwire.p1LayerSid),
-                self.__project.scontext.get(i_airwire.netSid)
-            )
-            self.add_artwork(aw)
-
-        for i_cmp in msg.components:
-            if i_cmp.which() == "dip":
-                cmp = DIPComponent.deserialize(self.__project, i_cmp)
-            elif i_cmp.which() == "sip":
-                cmp = SIPComponent.deserialize(self.__project, i_cmp)
-
-            elif i_cmp.which() == "smd4":
-                cmp = SMD4Component.deserialize(self.__project, i_cmp)
-            elif i_cmp.which() == "passive2":
-                cmp = Passive2Component.deserialize(self.__project, i_cmp)
-            else:
-                raise NotImplementedError()
-
-            self.add_component(cmp)

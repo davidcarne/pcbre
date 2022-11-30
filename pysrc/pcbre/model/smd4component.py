@@ -3,7 +3,6 @@ from pcbre.matrix import rotate, Vec2, Point2, Rect, project_point
 from pcbre.model.component import Component
 from pcbre.model.const import OnSide, IntersectionClass
 from pcbre.model.pad import Pad
-import pcbre.model.serialization as ser
 
 from pcbre.model.const import SIDE
 from typing import Sequence, TYPE_CHECKING, List
@@ -18,17 +17,17 @@ __author__ = 'davidc'
 class SMD4Component(Component):
     ISC = IntersectionClass.NONE
 
-    def __init__(self, 
-            project: 'Project',
-            center: Vec2, 
-            theta: float, side: 'SIDE', 
-            side_layer_oracle: 'Project',
-            side1_pins: int, side2_pins: int,
-            side3_pins: int, side4_pins: int,
-            dim_1_body: float, dim_1_pincenter: float,
-            dim_2_body: float, dim_2_pincenter: float,
-            pin_contact_length: float, pin_contact_width: float,
-            pin_spacing: float) -> None:
+    def __init__(self,
+                 project: 'Project',
+                 center: Vec2,
+                 theta: float, side: 'SIDE',
+                 side_layer_oracle: 'Project',
+                 side1_pins: int, side2_pins: int,
+                 side3_pins: int, side4_pins: int,
+                 dim_1_body: float, dim_1_pincenter: float,
+                 dim_2_body: float, dim_2_pincenter: float,
+                 pin_contact_length: float, pin_contact_width: float,
+                 pin_spacing: float) -> None:
 
         Component.__init__(self, project, center, theta,
                            side, side_layer_oracle=side_layer_oracle)
@@ -46,7 +45,7 @@ class SMD4Component(Component):
         self.pin_contact_width = pin_contact_width
         self.pin_spacing = pin_spacing
 
-        self.__pins_cache : List[Pad] = []
+        self.__pins_cache: List[Pad] = []
 
     @property
     def on_sides(self) -> OnSide:
@@ -87,7 +86,9 @@ class SMD4Component(Component):
             for pin_no in range(side_pin_count):
                 pin_center = start + step * pin_no
                 pads.append(
-                    Pad(self, "%s" % (overall_pin_no + 1), pin_center, pad_theta, self.pin_spacing / 2, self.pin_contact_length,
+                    Pad(self, "%s" % (overall_pin_no + 1),
+                        pin_center, pad_theta,
+                        self.pin_spacing / 2, self.pin_contact_length,
                         side=self.side))
                 overall_pin_no += 1
 
@@ -115,36 +116,3 @@ class SMD4Component(Component):
     def get_pads(self) -> Sequence[Pad]:
         self.__update()
         return self.__pins_cache
-
-    def serializeTo(self, cmp_msg: ser.Component.Builder) -> None:
-        self._serializeTo(cmp_msg.common)
-        cmp_msg.init("smd4")
-        t = cmp_msg.smd4
-        t.dim1Body = int(self.dim_1_body)
-        t.dim1PinEdge = int(self.dim_1_pincenter)
-
-        t.dim2Body = int(self.dim_2_body)
-        t.dim2PinEdge = int(self.dim_2_pincenter)
-
-        t.pinContactLength = int(self.pin_contact_length)
-        t.pinContactWidth = int(self.pin_contact_width)
-        t.pinSpacing = int(self.pin_spacing)
-
-        t.side1Pins = self.side_pins[0]
-        t.side2Pins = self.side_pins[1]
-        t.side3Pins = self.side_pins[2]
-        t.side4Pins = self.side_pins[3]
-
-    @staticmethod
-    def deserialize(project: 'Project', msg: ser.Component.Reader) -> Component:
-        t = msg.smd4
-        cmp = SMD4Component(
-                project,
-                Vec2(0,0), 0,  SIDE.Top,   # Placeholder values
-                project,
-                t.side1Pins, t.side2Pins, t.side3Pins, t.side4Pins,
-                t.dim1Body, t.dim1PinEdge, t.dim2Body, t.dim2PinEdge,
-                t.pinContactLength, t.pinContactWidth, t.pinSpacing)
-
-        Component.deserializeTo(project, msg.common, cmp)
-        return cmp
