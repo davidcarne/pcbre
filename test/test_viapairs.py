@@ -8,57 +8,38 @@ import pcbre.model.stackup as S
 import pcbre.model.artwork as A
 import unittest
 
-class via_sanity(unittest.TestCase):
+
+class ViaSanity(unittest.TestCase):
     def setUp(self):
         self.p = P.Project.create()
 
     def test_via_sanity(self):
         p = self.p
 
-        color = (1,1,1,0)
-        l1 = S.Layer(p, name="Top", color=color)
-        l2 = S.Layer(p, name="L2", color=color)
-        l3 = S.Layer(p, name="L3", color=color)
-        l4 = S.Layer(p, name="L4", color=color)
-        l5 = S.Layer(p, name="L5", color=color)
-        l6 = S.Layer(p, name="Bottom", color = color)
+        color = (1, 1, 1)
+        l1 = p.stackup.add_layer(name="Top", color=color)
+        l2 = p.stackup.add_layer(name="L2", color=color)
+        l3 = p.stackup.add_layer(name="L3", color=color)
+        l4 = p.stackup.add_layer(name="L4", color=color)
+        l5 = p.stackup.add_layer(name="L5", color=color)
+        l6 = p.stackup.add_layer(name="Bottom", color=color)
 
-        p.stackup.add_layer(l1)
-        p.stackup.add_layer(l2)
-        p.stackup.add_layer(l3)
-        p.stackup.add_layer(l4)
-        p.stackup.add_layer(l5)
-        p.stackup.add_layer(l6)
-
-        vp1 = S.ViaPair(p, l1, l6)
-        vp2 = S.ViaPair(p, l5, l2)
-
-        p.stackup.add_via_pair(vp1)
-        p.stackup.add_via_pair(vp2)
+        vp1 = p.stackup.add_via_pair(l1, l6)
+        vp2 = p.stackup.add_via_pair(l5, l2)
 
         self.assertEqual(vp1.layers, (l1, l6))
         self.assertEqual(vp2.layers, (l2, l5))
 
-
-        self.assertEqual(vp1.all_layers, [l1,l2,l3,l4,l5,l6])
-        self.assertEqual(vp2.all_layers, [l2,l3,l4,l5])
+        self.assertEqual(vp1.all_layers, [l1, l2, l3, l4, l5, l6])
+        self.assertEqual(vp2.all_layers, [l2, l3, l4, l5])
 
     def test_add_via(self):
         p = self.p
-        l1 = S.Layer(self.p, name="Top", color=(1,1,1))
-        l2 = S.Layer(self.p, name="Bot", color=(1,1,1))
+        l1 = p.stackup.add_layer("Top", (1, 1, 1))
+        l2 = p.stackup.add_layer("Bot", (1, 1, 1))
 
-        vp = S.ViaPair(p, l1, l2)
+        vp = p.stackup.add_via_pair(l1, l2)
 
-        p.stackup.add_layer(l1)
-        p.stackup.add_layer(l2)
-
-        p.stackup.add_via_pair(vp)
-
-        n = Net()
-        p.nets.add_net(n)
-        via = Via(Point2(0,0), vp, 1, net=n)
+        n = p.nets.new()
+        via = Via(Point2(0, 0), vp, 1, net=n)
         p.artwork.add_artwork(via)
-
-
-

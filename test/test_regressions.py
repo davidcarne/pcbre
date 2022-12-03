@@ -13,9 +13,7 @@ class test_regressions(unittest.TestCase):
         # Attempt to
         p = Project()
 
-        l = Layer(p, "t1", (1,1,1))
-
-        p.stackup.add_layer(l)
+        l = p.stackup.add_layer("t1", (1, 1, 1))
 
         cx = Point2(30000, 30000)
         ts = []
@@ -43,24 +41,20 @@ class test_regressions(unittest.TestCase):
     def test_fixup_broken_nets(self):
         p = Project()
 
-        l = Layer(p, "t1", (1,1,1))
-
-        p.stackup.add_layer(l)
+        l = p.stackup.add_layer("1", (1, 1, 1))
 
         n1 = p.nets.new()
         n2 = p.nets.new()
         n3 = p.nets.new()
 
-
         # T1 and T2 should be joined
         # T2 and T3 should be split
         # T4 should stay the same
 
-        t1 = Trace(Point2(0,0), Point2(100, 100), 10, l, n1)
+        t1 = Trace(Point2(0, 0), Point2(100, 100), 10, l, n1)
         t2 = Trace(Point2(200, 200), Point2(100, 100), 10, l, n2)
         t3 = Trace(Point2(400, 400), Point2(500, 500), 10, l, n2)
         t4 = Trace(Point2(600, 600), Point2(700, 700), 10, l, n3)
-
 
         p.artwork.add_artwork(t1)
         p.artwork.add_artwork(t2)

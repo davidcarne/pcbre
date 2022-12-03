@@ -42,7 +42,7 @@ class Passive2Component(Component):
                  center: Vec2, theta: float, side: 'SIDE',
                  sym_type: PassiveSymType,
                  body_type: Passive2BodyType,
-                 pin_d: float, body_corner_vec: Vec2, pin_corner_vec: Vec2,
+                 pin_d: int, body_corner_vec: Vec2, pin_corner_vec: Vec2,
                  side_layer_oracle: Optional['Project'] = None):
         super(Passive2Component, self).__init__(project, center, theta, side, side_layer_oracle=side_layer_oracle)
 
@@ -50,7 +50,7 @@ class Passive2Component(Component):
         self.body_type: Passive2BodyType = body_type
 
         # Distance from center to pin
-        self.pin_d: float = pin_d
+        self.pin_d: int = pin_d
 
         self.body_corner_vec: Vec2 = body_corner_vec
         self.pin_corner_vec: Vec2 = pin_corner_vec

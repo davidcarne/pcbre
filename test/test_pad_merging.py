@@ -19,8 +19,7 @@ import unittest
 class TestMerges(unittest.TestCase):
     def setUp(self):
         self.p = p = Project()
-        l = Layer(p, "foo", [])
-        p.stackup.add_layer(l)
+        l = p.stackup.add_layer("foo", (0, 0, 1))
 
         self.l1 = Trace(Point2(-5, 0), Point2(-1, 0), thickness=1, layer=l)
         self.l2 = Trace(Point2(1, 0), Point2(5, 0), thickness=1, layer=l)

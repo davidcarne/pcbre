@@ -4,10 +4,13 @@ import pcbre.model.project
 
 from typing import Tuple, List, Sequence
 
+from pcbre.model.serialization import PersistentID
+
 
 class Layer:
     def __init__(self, project: 'pcbre.model.project.Project',
-                 name: str, color: Tuple[float, float, float]):
+                 unique_id: PersistentID, name: str, color: Tuple[float, float, float]):
+        self.__unique_id = unique_id
         self.project = project
         self.name = name
         self.color = color
@@ -16,6 +19,10 @@ class Layer:
         # Non-persistent layer number. All layers are renumbered by project
         # Varies unpredictably with database mutations
         self.number = 0
+
+    @property
+    def unique_id(self) -> PersistentID:
+        return self.__unique_id
 
     def __repr__(self) -> str:
         return "<Layer name:'%s' order:%s color:%s>" % (self.name,
@@ -32,12 +39,20 @@ class Layer:
 
 
 class ViaPair:
-    def __init__(self, project: 'pcbre.model.project.Project', first_layer: Layer, second_layer: Layer) -> None:
+    def __init__(self, project: 'pcbre.model.project.Project',
+                 unique_id: PersistentID,
+                 first_layer: Layer, second_layer: Layer) -> None:
         if first_layer == second_layer:
             raise ValueError("Can't have single layer layerpair")
 
+        self.__unique_id = unique_id
+
         self.__layers: Tuple[Layer, Layer] = (first_layer, second_layer)
         self.project = project
+
+    @property
+    def unique_id(self) -> PersistentID:
+        return self.__unique_id
 
     @property
     def layers(self) -> Sequence[Layer]:

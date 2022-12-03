@@ -11,6 +11,7 @@ from qtpy import QtCore, QtWidgets, QtGui
 from pcbre.matrix import translate, scale, Vec2, \
     Rect, project_point
 from pcbre.model.imagelayer import KeyPointAlignment, KeyPoint, ImageLayer
+from pcbre.model.serialization import PersistentIDClass
 from pcbre.ui.gl import VAO, VBOBind
 from pcbre.ui.tool_action import ToolActionDescription, ToolActionShortcut, Modifier, EventID, ToolActionEvent, \
     MoveEvent

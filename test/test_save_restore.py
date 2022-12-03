@@ -1,14 +1,11 @@
 import numpy
 from tempfile import TemporaryFile
 from pcbre.matrix import Point2
-from pcbre.model.artwork import Via
 from pcbre.model.artwork_geom import Trace, Via, Polygon, Airwire
 from pcbre.model.imagelayer import ImageLayer, KeyPoint, KeyPointAlignment, RectAlignment
-from pcbre.model.net import Net
 from pcbre.model.project import Project
-from pcbre.model.serialization_capnp import serialize_matrix, deserialize_matrix, serialize_point2, \
-    deserialize_point2, serialize_point2f, deserialize_point2f
-from pcbre.model.stackup import Layer, ViaPair
+from pcbre.model.serialization import PersistentIDClass
+from pcbre.model.serialization_capnp import CapnpIO
 import random
 __author__ = 'davidc'
 
@@ -39,8 +36,7 @@ class test_save_restore(unittest.TestCase):
         p = Project.create()
         for i, name in zip(range(n), names):
             color = (random.random(), random.random(), random.random())
-            l0 = Layer(p, name, color)
-            p.stackup.add_layer(l0)
+            p.stackup.add_layer(name, color)
 
         return p
 
@@ -69,11 +65,8 @@ class test_save_restore(unittest.TestCase):
 
         l0, l1, l2, l3 = p.stackup.layers
 
-        vp1 = ViaPair(p, l0, l3)
-        vp2 = ViaPair(p, l1, l2)
-
-        p.stackup.add_via_pair(vp1)
-        p.stackup.add_via_pair(vp2)
+        vp1 = p.stackup.add_via_pair(l0, l3)
+        vp2 = p.stackup.add_via_pair(l1, l2)
 
         return p
 
@@ -95,9 +88,9 @@ class test_save_restore(unittest.TestCase):
 
     def setup_i3(self):
         p = self.__setup_via_pairs_layers()
-        il1 = ImageLayer(p, "foo", bytes(b"12344"))
-        il2 = ImageLayer(p, "bar", bytes(b"12345"))
-        il3 = ImageLayer(p, "quux", bytes(b"12346"))
+        il1 = ImageLayer(p, p.unique_id_registry.generate(PersistentIDClass.KeyPoint), "foo", bytes(b"12344"))
+        il2 = ImageLayer(p, p.unique_id_registry.generate(PersistentIDClass.KeyPoint), "bar", bytes(b"12345"))
+        il3 = ImageLayer(p, p.unique_id_registry.generate(PersistentIDClass.KeyPoint), "quux", bytes(b"12346"))
         p.imagery.add_imagelayer(il1)
         p.imagery.add_imagelayer(il2)
         p.imagery.add_imagelayer(il3)
@@ -124,8 +117,8 @@ class test_save_restore(unittest.TestCase):
 
     def test_keypoints(self):
         p = self.setup_i3()
-        kp1 = KeyPoint(p, Point2(3,6))
-        kp2 = KeyPoint(p, Point2(5,5))
+        kp1 = KeyPoint(p, Point2(3, 6))
+        kp2 = KeyPoint(p, Point2(5, 5))
         p.imagery.add_keypoint(kp1)
         p.imagery.add_keypoint(kp2)
 
@@ -198,11 +191,8 @@ class test_save_restore(unittest.TestCase):
     def test_vias(self):
         p = self.__setup_via_pairs_layers()
 
-        n1 = Net()
-        p.nets.add_net(n1)
-
-        n2 = Net()
-        p.nets.add_net(n2)
+        n1 = p.nets.new()
+        n2 = p.nets.new()
 
         v = Via(Point2(3700, 2100), p.stackup.via_pairs[0], 31337, n1)
         v2 = Via(Point2(1234, 5678), p.stackup.via_pairs[1], 31339, n2)
@@ -227,8 +217,7 @@ class test_save_restore(unittest.TestCase):
     def test_airwires(self):
         p = self.__setup_via_pairs_layers()
 
-        n1 = Net()
-        p.nets.add_net(n1)
+        n1 = p.nets.new()
 
         v = Via(Point2(3700, 2100), p.stackup.via_pairs[0], 31337, n1)
         v2 = Via(Point2(1234, 5678), p.stackup.via_pairs[1], 31339, n1)
@@ -255,10 +244,8 @@ class test_save_restore(unittest.TestCase):
 
     def test_polyons(self):
         p = self.__setup_via_pairs_layers()
-        n1 = Net()
-        p.nets.add_net(n1)
-        n2 = Net()
-        p.nets.add_net(n2)
+        n1 = p.nets.new()
+        n2 = p.nets.new()
 
         ext = [Point2(0,0), Point2(10,0), Point2(10,10), Point2(0, 10)]
         int1 = [Point2(1,1), Point2(2,1), Point2(2,2), Point2(1,2)]
@@ -294,11 +281,8 @@ class test_save_restore(unittest.TestCase):
     def test_trace(self):
         p = self.__setup_via_pairs_layers()
 
-        n1 = Net()
-        p.nets.add_net(n1)
-
-        n2 = Net()
-        p.nets.add_net(n2)
+        n1 = p.nets.new()
+        n2 = p.nets.new()
 
         t1 = Trace(Point2(61, -300), Point2(848, 1300), 775, p.stackup.layers[0], n1)
         t2 = Trace(Point2(1234, 5678), Point2(90210, 84863), 775, p.stackup.layers[0], n2)
@@ -331,9 +315,9 @@ class test_save_mats(unittest.TestCase):
 
         mat = numpy.random.rand(n,n)
 
-        msg = serialize_matrix(mat)
+        msg = CapnpIO.serialize_matrix(mat)
 
-        mat2 = deserialize_matrix(msg)
+        mat2 = CapnpIO.deserialize_matrix(msg)
 
         eps = numpy.absolute(mat2 - mat).max()
         self.assertLess(eps, 0.00001)
@@ -348,18 +332,18 @@ class test_save_point2(unittest.TestCase):
     def test_point2(self):
         # Point2 class is floating (for now), but serialized form is integral units
         pt = Point2(54.3, 72.9)
-        msg = serialize_point2(pt)
+        msg = CapnpIO.serialize_point2(pt)
 
-        pt2 = deserialize_point2(msg)
+        pt2 = CapnpIO.deserialize_point2(msg)
 
         self.assertAlmostEqual(pt2.x, round(pt.x))
         self.assertAlmostEqual(pt2.y, round(pt.y))
 
     def test_point2f(self):
         pt = Point2(54.3, 72.9)
-        msg = serialize_point2f(pt)
+        msg = CapnpIO.serialize_point2f(pt)
 
-        pt2 = deserialize_point2f(msg)
+        pt2 = CapnpIO.deserialize_point2f(msg)
 
         self.assertAlmostEqual(pt2.x, pt.x)
         self.assertAlmostEqual(pt2.y, pt.y)

@@ -20,7 +20,7 @@ class SIPComponent(Component):
                  center: Vec2, theta: float, side: SIDE, 
                  side_layer_oracle: 'Project',
                  pin_count: int, 
-                 pin_space: float, pad_size: float) -> None:
+                 pin_space: int, pad_size: int) -> None:
 
         Component.__init__(self, project, center, theta, side,
                            side_layer_oracle=side_layer_oracle)

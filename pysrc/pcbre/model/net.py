@@ -1,5 +1,6 @@
 import re
 from typing import Optional
+from pcbre.model.serialization import PersistentID, PersistentIDClass
 
 import pcbre.model.project
 
@@ -7,13 +8,18 @@ import pcbre.model.project
 class Net:
     __net_class_match = re.compile(r"N\$\d+")
 
-    def __init__(self, name: Optional[str] = None, net_class: str = "") -> None:
+    def __init__(self, unique_id: PersistentID, name: Optional[str] = None, net_class: str = "")  -> None:
         self._name = name
+        self.__unique_id : PersistentID = unique_id
         self.net_class = net_class
 
         # Assigned during add
         self._id = -1
         self._project: Optional['pcbre.model.project.Project'] = None
+
+    @property
+    def unique_id(self) -> PersistentID:
+        return self.__unique_id
 
     @property
     def name(self) -> str:

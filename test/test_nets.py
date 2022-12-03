@@ -7,6 +7,7 @@ import unittest
 from pcbre.model.project import Project
 from pcbre.model.artwork import Via
 from pcbre.model.artwork_geom import Airwire, Via
+from pcbre.model.serialization import PersistentIDClass
 from pcbre.model.stackup import Layer, ViaPair
 from pcbre.model.net import Net
 
@@ -14,24 +15,16 @@ class test_nets(unittest.TestCase):
     def setUp(self):
         self.p = Project.create()
 
-        l1 = Layer(self.p, name="Top", color=(0,0,0))
-        l2 = Layer(self.p, name="Bot", color=(0,0,1))
-        vp = ViaPair(self.p, l1,l2)
+        l1 = self.p.stackup.add_layer("Top", (0, 0, 0))
+        l2 = self.p.stackup.add_layer("Bot", (0, 0, 1))
 
-        self.net0 = Net()
-        self.net1 = Net()
+        vp = self.p.stackup.add_via_pair(l1, l2)
+
+        self.net0 = self.p.nets.new()
+        self.net1 = self.p.nets.new()
 
         self.v1 = Via(Point2(0, 0), r=1, viapair=vp, net=self.net0)
         self.v2 = Via(Point2(0, 0), r=1, viapair=vp, net=self.net1)
-
-
-        self.p.stackup.add_layer(l1)
-        self.p.stackup.add_layer(l2)
-
-        self.p.stackup.add_via_pair(vp)
-
-        self.p.nets.add_net(self.net0)
-        self.p.nets.add_net(self.net1)
 
         self.p.artwork.add_artwork(self.v1)
         self.p.artwork.add_artwork(self.v2)

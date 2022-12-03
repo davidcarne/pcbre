@@ -16,6 +16,7 @@ from pcbre.model.component import Component
 from pcbre.model.const import IntersectionClass
 from pcbre.model.net import Net
 from pcbre.model.pad import Pad
+from pcbre.model.serialization import PersistentIDClass
 from pcbre.model.util import ImmutableSetProxy
 
 QueryableGeom = Union[Via, Trace, Pad, Polygon, Airwire]
@@ -334,8 +335,7 @@ class Artwork:
         elif len(nets) == 1:
             new_net = list(nets)[0]
         else:
-            new_net = Net()
-            self._project.nets.add_net(new_net)
+            new_net = self._project.nets.new()
 
         new_geom.net = new_net
 
@@ -372,14 +372,12 @@ class Artwork:
             for gg in g:
                 assert gg.net == geom.net
 
-        def net_gen() -> Generator[Optional[Net], None, None]:
-            yield geom.net
+        for n, group in enumerate(subgroups):
+            if n == 0:
+                net = geom.net
+            else:
+                net = self._project.nets.new()
 
-            newnet = Net()
-            self._project.nets.add_net(newnet)
-            yield newnet
-
-        for group, net in zip(subgroups, net_gen()):
             for g_ in group:
                 g_.net = net
 

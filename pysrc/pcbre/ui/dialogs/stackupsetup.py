@@ -323,8 +323,7 @@ class StackupAdapter(QtCore.QAbstractTableModel):
                 to_remove.remove(i.ref)
             else:
                 # Otherwise add a new layer
-                i.ref = Layer(self.p, name=i.name, color=i.color)
-                self.p.stackup.add_layer(i.ref)
+                i.ref = self.p.stackup.add_layer(name=i.name, color=i.color)
 
             i.ref.name = i.name
             i.ref.color = i.color
@@ -345,8 +344,7 @@ class StackupAdapter(QtCore.QAbstractTableModel):
             if vp.ref is None:
                 assert vp.startLayer.ref is not None
                 assert vp.endLayer.ref is not None
-                new_layer = ViaPair(self.p, vp.startLayer.ref, vp.endLayer.ref)
-                self.p.stackup.add_via_pair(new_layer)
+                self.p.stackup.add_via_pair(vp.startLayer.ref, vp.endLayer.ref)
             else:
                 assert vp.startLayer.ref is not None
                 assert vp.endLayer.ref is not None

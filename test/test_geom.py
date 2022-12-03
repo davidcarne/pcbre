@@ -1,6 +1,7 @@
 from pcbre.matrix import Point2
 from pcbre.model.net import Net
 from pcbre.model.project import Project
+from pcbre.model.serialization import PersistentIDClass
 from pcbre.model.stackup import Layer, ViaPair
 
 __author__ = 'davidc'
@@ -37,12 +38,12 @@ class test_aw_queries(unittest.TestCase):
         world = Project()
 
         for i in range(4):
-            world.stackup.add_layer(Layer(world, "l%d" % i, (0.2*i,0,0)))
+            world.stackup.add_layer("l%d" % i, (0.2 * i, 0, 0))
 
-        world.stackup.add_via_pair(ViaPair(world, world.stackup.layers[0], world.stackup.layers[1]))
-        world.stackup.add_via_pair(ViaPair(world, world.stackup.layers[2], world.stackup.layers[3]))
-        world.stackup.add_via_pair(ViaPair(world, world.stackup.layers[0], world.stackup.layers[3]))
-        world.stackup.add_via_pair(ViaPair(world, world.stackup.layers[1], world.stackup.layers[2]))
+        world.stackup.add_via_pair(world.stackup.layers[0], world.stackup.layers[1])
+        world.stackup.add_via_pair(world.stackup.layers[2], world.stackup.layers[3])
+        world.stackup.add_via_pair(world.stackup.layers[0], world.stackup.layers[3])
+        world.stackup.add_via_pair(world.stackup.layers[1], world.stackup.layers[2])
 
         #   0 1 2 3
         # 0 x   x x
@@ -50,10 +51,9 @@ class test_aw_queries(unittest.TestCase):
         # 2 x x x x
         # 3 x x x x
 
-        n1 = Net()
-        n2 = Net()
-        world.nets.add_net(n1)
-        world.nets.add_net(n2)
+        n1 = world.nets.new()
+        n2 = world.nets.new()
+
         self.v1 = Via(Point2(3,3),  world.stackup.via_pairs[0], 2, n1)
         world.artwork.add_artwork(self.v1)
         self.v2 = Via(Point2(11,11), world.stackup.via_pairs[1], 2, n2)
@@ -103,12 +103,9 @@ class test_aw_queries(unittest.TestCase):
 class test_sequence(unittest.TestCase):
     def test_point_insert(self):
         p = Project()
-        l1 = Layer(p, "l1", None)
-        l2 = Layer(p, "l2", None)
-        p.stackup.add_layer(l1)
-        p.stackup.add_layer(l2)
-        vp = ViaPair(p, l1, l2)
-        p.stackup.add_via_pair(vp)
+        l1 = p.stackup.add_layer("l1", (0, 0, 1))
+        l2 = p.stackup.add_layer("l2", (1, 0, 0))
+        vp = p.stackup.add_via_pair(l1, l2)
 
         t1 = Trace(Point2(200,1000), Point2(2000, 1000), 10, l1)
         p.artwork.merge_artwork(t1)

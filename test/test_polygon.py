@@ -11,11 +11,9 @@ import unittest
 class test_polygon_basic_intersect(unittest.TestCase):
     def setUp(self):
         self.p = Project()
-        self.l1 = Layer(self.p, "l1", None)
-        self.l2 = Layer(self.p, "l2", None)
 
-        self.p.stackup.add_layer(self.l1)
-        self.p.stackup.add_layer(self.l2)
+        self.l1 = self.p.stackup.add_layer("l1", (1, 0, 0))
+        self.l2 = self.p.stackup.add_layer("l2", (0, 0, 1))
 
         self.ext1 = [Point2(0, 0), Point2(1, 0), Point2(1, 1), Point2(0, 1)]
         self.ext2 = [Point2(1, 0), Point2(2, 0), Point2(2, 1), Point2(1, 1)]
@@ -58,9 +56,6 @@ class test_polygon_basic_intersect(unittest.TestCase):
 class test_p2t_exc(unittest.TestCase):
     def setUp(self):
         self.p = Project()
-        self.l1 = Layer(self.p, "l1", None)
-        self.l2 = Layer(self.p, "l2", None)
-
-        self.p.stackup.add_layer(self.l1)
-        self.p.stackup.add_layer(self.l2)
+        self.l1 = self.p.stackup.add_layer("l1", (0, 0, 1))
+        self.l2 = self.p.stackup.add_layer("l2", (1, 0, 0))
 

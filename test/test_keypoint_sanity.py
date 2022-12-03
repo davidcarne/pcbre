@@ -6,6 +6,9 @@ import pcbre.model.imagelayer as IL
 
 import unittest
 
+from pcbre.model.serialization import PersistentIDClass
+
+
 class keypoint_sanity(unittest.TestCase):
     def setUp(self):
         self.p = P.Project.create()
@@ -13,13 +16,13 @@ class keypoint_sanity(unittest.TestCase):
     def test_keyPointCreation(self):
         p = self.p
 
-        il1 = IL.ImageLayer(p, name="foo", data=bytes())
-        il2 = IL.ImageLayer(p, name="bar", data=bytes())
+        il1 = IL.ImageLayer(p, p.unique_id_registry.generate(PersistentIDClass.KeyPoint), name="foo", data=bytes())
+        il2 = IL.ImageLayer(p, p.unique_id_registry.generate(PersistentIDClass.KeyPoint), name="bar", data=bytes())
         p.imagery.add_imagelayer(il1)
         p.imagery.add_imagelayer(il2)
 
-        kp1 = IL.KeyPoint(p, Point2(5,5))
-        kp2 = IL.KeyPoint(p, Point2(10,20))
+        kp1 = IL.KeyPoint(p, Point2(5, 5))
+        kp2 = IL.KeyPoint(p, Point2(10, 20))
         p.imagery.add_keypoint(kp1)
         p.imagery.add_keypoint(kp2)
 
@@ -47,13 +50,13 @@ class keypoint_sanity(unittest.TestCase):
         p = self.p
 
 
-        il1 = IL.ImageLayer(p, name="foo", data=bytes())
-        il2 = IL.ImageLayer(p, name="bar", data=bytes())
+        il1 = IL.ImageLayer(p, p.unique_id_registry.generate(PersistentIDClass.KeyPoint), name="foo", data=bytes())
+        il2 = IL.ImageLayer(p, p.unique_id_registry.generate(PersistentIDClass.KeyPoint), name="bar", data=bytes())
         p.imagery.add_imagelayer(il1)
         p.imagery.add_imagelayer(il2)
 
-        kp1 = IL.KeyPoint(p, Point2(5,5))
-        kp2 = IL.KeyPoint(p, Point2(10,20))
+        kp1 = IL.KeyPoint(p, Point2(5, 5))
+        kp2 = IL.KeyPoint(p, Point2(10, 20))
         p.imagery.add_keypoint(kp1)
         p.imagery.add_keypoint(kp2)
 

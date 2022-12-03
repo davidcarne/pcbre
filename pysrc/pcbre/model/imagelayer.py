@@ -1,7 +1,9 @@
 import cv2  # type: ignore
 import os.path
+
 from pcbre.model.util import ImmutableSetProxy
 from pcbre.matrix import project_point, Vec2
+from pcbre.model.serialization import PersistentID, PersistentIDClass
 import numpy
 
 from typing import List, Tuple, Set, Optional, Union, TYPE_CHECKING, Iterable
@@ -12,13 +14,22 @@ if TYPE_CHECKING:
 
 
 class KeyPoint:
-    def __init__(self, project: 'Project', world_position: Vec2) -> None:
+    def __init__(self, project: 'Project', world_position: Vec2, unique_id: 'Optional[PersistentID]' = None) -> None:
+        if unique_id is not None:
+            self.__unique_id : PersistentID = unique_id
+        else:
+            self.__unique_id = project.unique_id_registry.generate(PersistentIDClass.KeyPoint)
+
         self.world_position = world_position
         self._project: Optional['Project'] = project
 
     @property
     def name(self) -> str:
         return "Keypoint %d" % (self.index + 1)
+
+    @property
+    def unique_id(self) -> 'PersistentID':
+        return self.__unique_id
 
     @property
     def index(self) -> int:
@@ -108,8 +119,10 @@ class RectAlignment:
 
 class ImageLayer:
     def __init__(self, project: 'Project',
+                 unique_id: PersistentID,
                  name: str, data: bytes, transform_matrix: 'numpy.typing.ArrayLike' = numpy.identity(3)):
 
+        self.__unique_id = unique_id
         self.__cached_decode: Optional['numpy.typing.NDArray[numpy.uint8]'] = None
         self._project = project
         self.name = name
@@ -120,6 +133,10 @@ class ImageLayer:
 
         self.__cached_p2norm = numpy.identity(3)
         self.__cached_norm2p = numpy.identity(3)
+
+    @property
+    def unique_id(self) -> PersistentID:
+        return self.__unique_id
 
     @property
     def alignment(self) -> Optional[Union[RectAlignment, KeyPointAlignment]]:
@@ -218,7 +235,8 @@ class ImageLayer:
         assert os.path.exists(filename)
 
         basename = os.path.basename(filename)
-        return ImageLayer(project, name=basename, data=open(filename, "rb").read())
+        unique_id = project.unique_id_registry.generate(PersistentIDClass.ImageLayer)
+        return ImageLayer(project, unique_id, name=basename, data=open(filename, "rb").read())
 
     def __repr__(self) -> str:
         return "<ImageLayer: %s>" % self.name

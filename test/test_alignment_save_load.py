@@ -1,6 +1,7 @@
 from pcbre.matrix import Point2
 from pcbre.model.imagelayer import KeyPointAlignment, ImageLayer, KeyPoint, RectAlignment
 from pcbre.model.project import Project
+from pcbre.model.serialization import PersistentIDClass
 from pcbre.ui.dialogs.layeralignmentdialog.keypointalign import KeypointAlignmentModel, Constraint
 import numpy
 import random
@@ -24,10 +25,10 @@ def setup_global(self):
     for i in self.kps:
         p.imagery.add_keypoint(i)
 
-    self.il = ImageLayer(self.p, "foo", b"")
+    self.il = ImageLayer(self.p, p.unique_id_registry.generate(PersistentIDClass.KeyPoint), "foo", b"")
     p.imagery.add_imagelayer(self.il)
 
-    self.il2 = ImageLayer(self.p, "bar", b"")
+    self.il2 = ImageLayer(self.p, p.unique_id_registry.generate(PersistentIDClass.KeyPoint), "bar", b"")
     p.imagery.add_imagelayer(self.il2)
 
 
@@ -66,7 +67,7 @@ class test_kpalign_load(unittest.TestCase):
 class test_kpalign_initial_save(unittest.TestCase):
     def test(self):
         p = Project()
-        il = ImageLayer(p, "foo",b"")
+        il = ImageLayer(p, p.unique_id_registry.generate(PersistentIDClass.KeyPoint), "foo", b"")
         il.set_decoded_data(numpy.ndarray((800,600,3), dtype=numpy.float32))
 
 
@@ -104,7 +105,7 @@ class test_kpalign_initial_save(unittest.TestCase):
 class test_rectalign_initial_save(unittest.TestCase):
     def test(self):
         p = Project()
-        il = ImageLayer(p, "foo","b")
+        il = ImageLayer(p, p.unique_id_registry.generate(PersistentIDClass.KeyPoint), "foo","b")
         il.set_decoded_data(numpy.ndarray((800,600,3), dtype=numpy.float32))
 
         ini_align = RectAlignmentModel(il)

@@ -6,6 +6,7 @@ from pcbre.model.artwork import Artwork
 from pcbre.model.const import SIDE
 from pcbre.model.imagelayer import ImageLayer, KeyPoint
 from pcbre.model.net import Net
+from pcbre.model.serialization import PersistentIDRegistry, PersistentIDClass
 from pcbre.model.stackup import Layer, ViaPair
 from pcbre.model.util import ImmutableListProxy
 from enum import Enum
@@ -49,7 +50,16 @@ class Stackup:
 
         self.changed = TinySignal()
 
-    def add_via_pair(self, via_pair: ViaPair) -> None:
+    def add_via_pair(self, start_layer: Layer, end_layer: Layer):
+        vp = ViaPair(self._project,
+                     self._project.unique_id_registry.generate(PersistentIDClass.ViaPair),
+                     start_layer,
+                     end_layer)
+
+        self._add_via_pair_existing(vp)
+        return vp
+
+    def _add_via_pair_existing(self, via_pair: ViaPair) -> None:
         self._via_pairs.append(via_pair)
         self.changed.emit()
 
@@ -82,7 +92,12 @@ class Stackup:
         for n, i in enumerate(self._layers):
             i.number = n
 
-    def add_layer(self, layer: Layer) -> None:
+    def add_layer(self, name: str, color: Tuple[float, float, float]) -> Layer:
+        layer = Layer(self._project, self._project.unique_id_registry.generate(PersistentIDClass.Layer), name, color)
+        self._add_layer_existing(layer)
+        return layer
+
+    def _add_layer_existing(self, layer: Layer) -> None:
         self._layers.append(layer)
         self._renumber_layers()
         self.changed.emit()
@@ -200,11 +215,11 @@ class Nets:
         self.nets = ImmutableListProxy(self._nets)
 
     def new(self) -> Net:
-        n = Net()
-        self.add_net(n)
+        n = Net(self._project.unique_id_registry.generate(PersistentIDClass.Net))
+        self._add_net(n)
         return n
 
-    def add_net(self, net: Net) -> None:
+    def _add_net(self, net: Net) -> None:
         """
         Add a net to the project. Sets a transient unused net ID
         :param net: net to be added
@@ -228,7 +243,7 @@ class Nets:
 class Project:
 
     def __init__(self) -> None:
-        self.scontext = ser_capnp.SContext()
+        self.unique_id_registry = PersistentIDRegistry()
 
         self.imagery = Imagery(self)
 
@@ -276,7 +291,7 @@ class Project:
             raise ValueError("Unknown File Version")
 
         _project = ser_capnp.Project.read(fd)
-        self = ser_capnp.deserialize_project(_project)
+        self = ser_capnp.CapnpIO.deserialize_project(_project)
         return self
 
     def save(self, path: str, filetype: StorageType) -> None:
@@ -322,7 +337,7 @@ class Project:
         # (see when writing to a named temp file)
         fd.flush()
 
-        message = ser_capnp.serialize_project(self)
+        message = ser_capnp.CapnpIO.serialize_project(self)
         message.write(fd)
 
         fd.flush()
