@@ -19,7 +19,7 @@ import unittest
 class TestMerges(unittest.TestCase):
     def setUp(self):
         self.p = p = Project()
-        l = Layer("foo", [])
+        l = Layer(p, "foo", [])
         p.stackup.add_layer(l)
 
         self.l1 = Trace(Point2(-5, 0), Point2(-1, 0), thickness=1, layer=l)
@@ -34,7 +34,7 @@ class TestMerges(unittest.TestCase):
         class Dummy(Component):
             pass
 
-        cmp = Dummy(Point2(0,0), 0, SIDE.Top, side_layer_oracle=p)
+        cmp = Dummy(p, Point2(0,0), 0, SIDE.Top, side_layer_oracle=p)
         self.pad = Pad(cmp, 0, Point2(0, 0), 0, 3, 3, th_diam=1)
 
 

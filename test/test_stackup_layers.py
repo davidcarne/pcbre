@@ -12,7 +12,7 @@ class test_stackup_layers(unittest.TestCase):
         self.p = Project.create()
 
     def test_basic(self):
-        layer = Layer("foo",(1,1,1))
+        layer = Layer(self.p, "foo",(1,1,1))
         self.p.stackup.add_layer(layer)
 
         self.assertIn(layer, self.p.stackup.layers)
@@ -22,7 +22,7 @@ class test_stackup_layers(unittest.TestCase):
         self.assertNotIn(layer, self.p.stackup.layers)
 
     def test_callback_called_on_add_del(self):
-        layer = Layer("foo",(1,1,1))
+        layer = Layer(self.p, "foo",(1,1,1))
 
         call_me = Mock()
 
@@ -30,16 +30,8 @@ class test_stackup_layers(unittest.TestCase):
         self.p.stackup.add_layer(layer)
 
         self.assertTrue(call_me.called)
-        ((model_change,), _) = call_me.call_args
-        self.assertEqual(model_change.container, self.p.stackup.layers)
-        self.assertEqual(model_change.what, layer)
-        self.assertEqual(model_change.reason, ChangeType.ADD)
 
         call_me.reset_mock()
         self.p.stackup.remove_layer(layer)
 
         self.assertTrue(call_me.called)
-        ((model_change,), _) = call_me.call_args
-        self.assertEqual(model_change.container, self.p.stackup.layers)
-        self.assertEqual(model_change.what, layer)
-        self.assertEqual(model_change.reason, ChangeType.REMOVE)

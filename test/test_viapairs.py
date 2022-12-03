@@ -16,12 +16,12 @@ class via_sanity(unittest.TestCase):
         p = self.p
 
         color = (1,1,1,0)
-        l1 = S.Layer(name="Top", color=color)
-        l2 = S.Layer(name="L2", color=color)
-        l3 = S.Layer(name="L3", color=color)
-        l4 = S.Layer(name="L4", color=color)
-        l5 = S.Layer(name="L5", color=color)
-        l6 = S.Layer(name="Bottom", color = color)
+        l1 = S.Layer(p, name="Top", color=color)
+        l2 = S.Layer(p, name="L2", color=color)
+        l3 = S.Layer(p, name="L3", color=color)
+        l4 = S.Layer(p, name="L4", color=color)
+        l5 = S.Layer(p, name="L5", color=color)
+        l6 = S.Layer(p, name="Bottom", color = color)
 
         p.stackup.add_layer(l1)
         p.stackup.add_layer(l2)
@@ -30,8 +30,8 @@ class via_sanity(unittest.TestCase):
         p.stackup.add_layer(l5)
         p.stackup.add_layer(l6)
 
-        vp1 = S.ViaPair(l1, l6)
-        vp2 = S.ViaPair(l5, l2)
+        vp1 = S.ViaPair(p, l1, l6)
+        vp2 = S.ViaPair(p, l5, l2)
 
         p.stackup.add_via_pair(vp1)
         p.stackup.add_via_pair(vp2)
@@ -45,17 +45,15 @@ class via_sanity(unittest.TestCase):
 
     def test_add_via(self):
         p = self.p
-        l1 = S.Layer(name="Top", color=(1,1,1,0))
-        l2 = S.Layer(name="Bot", color=(1,1,1,0))
+        l1 = S.Layer(self.p, name="Top", color=(1,1,1))
+        l2 = S.Layer(self.p, name="Bot", color=(1,1,1))
 
-        vp = S.ViaPair(l1, l2)
+        vp = S.ViaPair(p, l1, l2)
 
         p.stackup.add_layer(l1)
         p.stackup.add_layer(l2)
 
         p.stackup.add_via_pair(vp)
-
-
 
         n = Net()
         p.nets.add_net(n)

@@ -39,12 +39,16 @@ class test_save_restore(unittest.TestCase):
         p = Project.create()
         for i, name in zip(range(n), names):
             color = (random.random(), random.random(), random.random())
-            l0 = Layer(name, color)
+            l0 = Layer(p, name, color)
             p.stackup.add_layer(l0)
 
         return p
 
     def check_obj(self, new_p, new_o, old_o):
+        self.assertTrue(new_o is not old_o)
+        self.assertEqual(new_o.project, new_p)
+
+    def check_obj_(self, new_p, new_o, old_o):
         self.assertTrue(new_o is not old_o)
         self.assertEqual(new_o._project, new_p)
 
@@ -65,8 +69,8 @@ class test_save_restore(unittest.TestCase):
 
         l0, l1, l2, l3 = p.stackup.layers
 
-        vp1 = ViaPair(l0, l3)
-        vp2 = ViaPair(l1, l2)
+        vp1 = ViaPair(p, l0, l3)
+        vp2 = ViaPair(p, l1, l2)
 
         p.stackup.add_via_pair(vp1)
         p.stackup.add_via_pair(vp2)
@@ -91,9 +95,9 @@ class test_save_restore(unittest.TestCase):
 
     def setup_i3(self):
         p = self.__setup_via_pairs_layers()
-        il1 = ImageLayer("foo", bytes(b"12344"))
-        il2 = ImageLayer("bar", bytes(b"12345"))
-        il3 = ImageLayer("quux", bytes(b"12346"))
+        il1 = ImageLayer(p, "foo", bytes(b"12344"))
+        il2 = ImageLayer(p, "bar", bytes(b"12345"))
+        il3 = ImageLayer(p, "quux", bytes(b"12346"))
         p.imagery.add_imagelayer(il1)
         p.imagery.add_imagelayer(il2)
         p.imagery.add_imagelayer(il3)
@@ -107,7 +111,7 @@ class test_save_restore(unittest.TestCase):
 
         self.assertEqual(len(p.imagery.imagelayers), len(p_new.imagery.imagelayers))
         for il_old, il_new in zip(p.imagery.imagelayers, p_new.imagery.imagelayers):
-            self.check_obj(p_new, il_new, il_old)
+            self.check_obj_(p_new, il_new, il_old)
             self.assertEqual(il_new.data, il_old.data)
             self.assertEqual(il_new.name, il_old.name)
 
@@ -120,8 +124,8 @@ class test_save_restore(unittest.TestCase):
 
     def test_keypoints(self):
         p = self.setup_i3()
-        kp1 = KeyPoint(Point2(3,6))
-        kp2 = KeyPoint(Point2(5,5))
+        kp1 = KeyPoint(p, Point2(3,6))
+        kp2 = KeyPoint(p, Point2(5,5))
         p.imagery.add_keypoint(kp1)
         p.imagery.add_keypoint(kp2)
 
@@ -136,7 +140,7 @@ class test_save_restore(unittest.TestCase):
         # Verify Keypoints saved/restored
         self.assertEqual(len(p_new.imagery.keypoints), len(p.imagery.keypoints))
         for kp_old, kp_new in zip(p.imagery.keypoints, p_new.imagery.keypoints):
-            self.check_obj(p_new, kp_new, kp_old)
+            self.check_obj_(p_new, kp_new, kp_old)
 
             self.cmpMat(kp_new.world_position, kp_old.world_position)
 

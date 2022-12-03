@@ -24,7 +24,6 @@ from pcbre.units import MM
 from typing import List, Optional, Any, TYPE_CHECKING, TypeVar, \
     Sequence, Tuple, cast, Dict
 from pcbre.ui.tool_action import ToolActionShortcut, ToolActionDescription, EventID, Modifier
-import pcbre.ui.dialogs.layeralignmentdialog.dialog
 
 import enum
 
@@ -46,6 +45,7 @@ DimHandleType = Tuple[Vec2, Vec2, Vec2, Vec2]
 
 U = TypeVar('U')
 if TYPE_CHECKING:
+    import pcbre.ui.dialogs.layeralignmentdialog.dialog
     from pcbre.ui.dialogs.layeralignmentdialog.dialog import LayerAlignmentDialog
     from pcbre.model.project import Project
     import numpy.typing as npt

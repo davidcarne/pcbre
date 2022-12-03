@@ -208,7 +208,7 @@ enum Side {
 }
 
 struct CmpGeneral {
-	sid @0 :ID;
+	sidUNUSED @0 :ID;
 	refdes @1 :Text;
 
 	center @2 :Point2;

@@ -113,7 +113,7 @@
             name = "pcbre";
             src = self;
             propagatedBuildInputs = with pkgs.python3Packages; [
-              opencv4 qtpy numpy scipy freetype-py shapely Rtree pyopengl cython pyqt5 pip setuptools cffi mypy setuptools-rust typed-ast psutil mypy-extensions typing-extensions p2t pycapnp8 qtconsole matplotlib pypotrace
+              opencv4 qtpy numpy scipy freetype-py shapely Rtree pyopengl cython pyqt5 pip setuptools cffi mypy setuptools-rust typed-ast psutil mypy-extensions typing-extensions p2t pycapnp8 qtconsole matplotlib pypotrace nose
             ];
             doCheck = false;
 

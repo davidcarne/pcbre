@@ -26,9 +26,9 @@ class test_ser_cmp_restore(unittest.TestCase):
 
     def test_save_pin_names_nets(self):
         p = Project()
-        l = Layer("test", [1,1,1])
+        l = Layer(p, "test", (1, 1, 1))
         p.stackup.add_layer(l)
-        d = DIPComponent(Point2(64, 54), 33.5, SIDE.Top, p, 12, 512, 640, 1111)
+        d = DIPComponent(p, Point2(64, 54), 33.5, SIDE.Top, p, 12, 512, 640, 1111)
         d.refdes = "UFOO"
         d.partno = "BLAH"
 
@@ -57,9 +57,9 @@ class test_ser_cmp_restore(unittest.TestCase):
 
     def test_save_dip(self):
         p = Project()
-        l = Layer("test", [1,1,1])
+        l = Layer(p, "test", [1,1,1])
         p.stackup.add_layer(l)
-        d = DIPComponent(Point2(64, 54), 33.5, SIDE.Top, p, 12, 512, 640, 1111)
+        d = DIPComponent(p, Point2(64, 54), 33.5, SIDE.Top, p, 12, 512, 640, 1111)
         d.refdes = "UFOO"
 
         p.artwork.merge_component(d)
@@ -81,9 +81,10 @@ class test_ser_cmp_restore(unittest.TestCase):
     
     def test_save_smd(self):
         p = Project()
-        l = Layer("test", [1,1,1])
+        l = Layer(p, "test", (1,1,1))
         p.stackup.add_layer(l)
-        d = SMD4Component(Point2(64, 54), 33.5, SIDE.Top, p,
+        d = SMD4Component(p,
+                          Point2(64, 54), 33.5, SIDE.Top, p,
                           32, 46,17,55, 801,914,3232, 604, 123, 456, 17)
                           
         d.refdes = "UFOO"

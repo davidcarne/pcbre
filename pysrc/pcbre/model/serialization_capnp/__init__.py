@@ -475,7 +475,7 @@ def serialize_component_common(component: 'pcbre.model.component.Component', cmp
 
     cmp_msg.center = serialize_point2(component.center)
     cmp_msg.theta = float(component.theta)
-    cmp_msg.sid = component._project.scontext.sid_for(component)
+    cmp_msg.sidUNUSED = 0
 
     cmp_msg.init("pininfo", len(component.get_pads()))
     for n, p in enumerate(component.get_pads()):
@@ -503,8 +503,6 @@ def deserialize_component_common(project: 'pcbre.model.project.Project', msg: 'C
     target.center = deserialize_point2(msg.center)
     target.refdes = msg.refdes
     target.partno = msg.partno
-
-    project.scontext.set_sid(msg.sid, target)
 
     target.name_mapping = {}
     target.net_mapping = defaultdict(lambda: None)
@@ -688,13 +686,13 @@ def serialize_artwork(artwork: 'pcbre.model.artwork.Artwork') -> Artwork.Builder
         p_repr = i_poly.get_poly_repr()
         p.init("exterior", len(p_repr.exterior.coords))
         for nn, ii in enumerate(p_repr.exterior.coords):
-            p.exterior[nn] = serialize_point2(Point2(ii[0], ii[1]))
+            p.exterior[nn] = serialize_point2(pcbre.matrix.Point2(ii[0], ii[1]))
 
         p.init("interiors", len(p_repr.interiors))
         for n_interior, interior in enumerate(p_repr.interiors):
             p.interiors.init(n_interior, len(interior.coords))
             for nn, ii in enumerate(interior.coords):
-                p.interiors[n_interior][nn] = serialize_point2(Point2(ii[0], ii[1]))
+                p.interiors[n_interior][nn] = serialize_point2(pcbre.matrix.Point2(ii[0], ii[1]))
 
         p.layerSid = artwork._project.scontext.sid_for(i_poly.layer)
         p.netSid = artwork._project.scontext.sid_for(i_poly.net)

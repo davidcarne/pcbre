@@ -1,6 +1,5 @@
 __author__ = 'davidc'
 
-from pcbre.matrix import RectSize
 import pcbre.algo.skyline as S
 import unittest
 import numpy

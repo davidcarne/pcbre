@@ -37,12 +37,12 @@ class test_aw_queries(unittest.TestCase):
         world = Project()
 
         for i in range(4):
-            world.stackup.add_layer(Layer("l%d" % i, None))
+            world.stackup.add_layer(Layer(world, "l%d" % i, (0.2*i,0,0)))
 
-        world.stackup.add_via_pair(ViaPair(world.stackup.layers[0], world.stackup.layers[1]))
-        world.stackup.add_via_pair(ViaPair(world.stackup.layers[2], world.stackup.layers[3]))
-        world.stackup.add_via_pair(ViaPair(world.stackup.layers[0], world.stackup.layers[3]))
-        world.stackup.add_via_pair(ViaPair(world.stackup.layers[1], world.stackup.layers[2]))
+        world.stackup.add_via_pair(ViaPair(world, world.stackup.layers[0], world.stackup.layers[1]))
+        world.stackup.add_via_pair(ViaPair(world, world.stackup.layers[2], world.stackup.layers[3]))
+        world.stackup.add_via_pair(ViaPair(world, world.stackup.layers[0], world.stackup.layers[3]))
+        world.stackup.add_via_pair(ViaPair(world, world.stackup.layers[1], world.stackup.layers[2]))
 
         #   0 1 2 3
         # 0 x   x x
@@ -103,11 +103,11 @@ class test_aw_queries(unittest.TestCase):
 class test_sequence(unittest.TestCase):
     def test_point_insert(self):
         p = Project()
-        l1 = Layer("l1", None)
-        l2 = Layer("l2", None)
+        l1 = Layer(p, "l1", None)
+        l2 = Layer(p, "l2", None)
         p.stackup.add_layer(l1)
         p.stackup.add_layer(l2)
-        vp = ViaPair(l1, l2)
+        vp = ViaPair(p, l1, l2)
         p.stackup.add_via_pair(vp)
 
         t1 = Trace(Point2(200,1000), Point2(2000, 1000), 10, l1)

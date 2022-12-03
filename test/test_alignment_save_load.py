@@ -1,7 +1,7 @@
 from pcbre.matrix import Point2
 from pcbre.model.imagelayer import KeyPointAlignment, ImageLayer, KeyPoint, RectAlignment
 from pcbre.model.project import Project
-from pcbre.ui.dialogs.layeralignmentdialog.keypointalign import KeypointAlignmentModel, CONS_PERSPECTIVE
+from pcbre.ui.dialogs.layeralignmentdialog.keypointalign import KeypointAlignmentModel, Constraint
 import numpy
 import random
 import unittest
@@ -17,17 +17,17 @@ def setup_global(self):
     p = Project()
     self.p = p
     self.kps = [
-        KeyPoint(random_point())
+        KeyPoint(self.p, random_point())
         for i in range(0,4)
     ]
 
     for i in self.kps:
         p.imagery.add_keypoint(i)
 
-    self.il = ImageLayer("foo", b"")
+    self.il = ImageLayer(self.p, "foo", b"")
     p.imagery.add_imagelayer(self.il)
 
-    self.il2 = ImageLayer("bar", b"")
+    self.il2 = ImageLayer(self.p, "bar", b"")
     p.imagery.add_imagelayer(self.il2)
 
 
@@ -66,7 +66,7 @@ class test_kpalign_load(unittest.TestCase):
 class test_kpalign_initial_save(unittest.TestCase):
     def test(self):
         p = Project()
-        il = ImageLayer("foo",b"")
+        il = ImageLayer(p, "foo",b"")
         il.set_decoded_data(numpy.ndarray((800,600,3), dtype=numpy.float32))
 
 
@@ -81,7 +81,7 @@ class test_kpalign_initial_save(unittest.TestCase):
         ini_align.save(p)
 
         # Make sure we're constrained to perspective
-        self.assertEqual(ini_align.constraint_info, CONS_PERSPECTIVE)
+        self.assertEqual(ini_align.constraint_info, Constraint.Perspective)
 
         kpa = il.alignment
         self.assertIsInstance(kpa, KeyPointAlignment)
@@ -104,7 +104,7 @@ class test_kpalign_initial_save(unittest.TestCase):
 class test_rectalign_initial_save(unittest.TestCase):
     def test(self):
         p = Project()
-        il = ImageLayer("foo","b")
+        il = ImageLayer(p, "foo","b")
         il.set_decoded_data(numpy.ndarray((800,600,3), dtype=numpy.float32))
 
         ini_align = RectAlignmentModel(il)
@@ -112,8 +112,7 @@ class test_rectalign_initial_save(unittest.TestCase):
         # Setup dimensions
         ini_align.dims_locked = False
 
-        ini_align.dim_values[0] = random.randint(1, 512)
-        ini_align.dim_values[1] = random.randint(1, 512)
+        ini_align.set_dim_values(random.randint(1, 512), random.randint(1, 512))
 
         for i in range(0, 4):
             ini_align.move_handle(i, random_point())

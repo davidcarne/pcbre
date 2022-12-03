@@ -13,7 +13,7 @@ class test_regressions(unittest.TestCase):
         # Attempt to
         p = Project()
 
-        l = Layer("t1", (1,1,1))
+        l = Layer(p, "t1", (1,1,1))
 
         p.stackup.add_layer(l)
 
@@ -40,12 +40,10 @@ class test_regressions(unittest.TestCase):
 
         self.assertIsNotNone(t0.net)
 
-        p.save('/tmp/wtf.pcbre', False)
-
     def test_fixup_broken_nets(self):
         p = Project()
 
-        l = Layer("t1", (1,1,1))
+        l = Layer(p, "t1", (1,1,1))
 
         p.stackup.add_layer(l)
 
