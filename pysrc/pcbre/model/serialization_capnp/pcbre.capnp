@@ -209,17 +209,18 @@ enum Side {
 
 struct CmpGeneral {
 	sidUNUSED @0 :ID;
-	refdes @1 :Text;
+	refdes @1 :Text;    # Placement
 
-	center @2 :Point2;
-	theta @3 :Float32;
-	side @4 :Side;
+	center @2 :Point2;  # Placement
+	theta @3 :Float32;  # Placement
+	side @4 :Side;      # Placement
 
-	pininfo @5 :List(PinInfo);
+	pininfo @5 :List(PinInfo);  # Symbol
 
-	partno @6 :Text;
+	partno @6 :Text;        # Placement (override) / Symbol
 }
 
+# All component definition
 struct DipComponent {
 	pinCount @0 :DIM;
 	pinSpace @1 :DIM;
@@ -227,12 +228,14 @@ struct DipComponent {
 	padSize  @3 :DIM;
 }
 
+# All component definition
 struct SipComponent {
 	pinCount @0 :DIM;
 	pinSpace @1 :DIM;
 	padSize  @2 :DIM;
 }
 
+# All component definition
 struct SMD4Component {
 	dim1Body @0: DIM;
 	dim1PinEdge @1: DIM;
@@ -251,7 +254,7 @@ struct SMD4Component {
 # Not just passive components.
 #   Tracks any 2-terminal axial, radial, or chip-type component
 #
-
+# All component definition
 struct Passive2Component {
 		enum SymType {
 		    res @0;

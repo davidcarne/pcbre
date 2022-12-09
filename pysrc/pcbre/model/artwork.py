@@ -2,7 +2,7 @@ import itertools
 import operator
 import weakref
 from collections import defaultdict
-from typing import Dict, Any, Callable, List, Tuple, Iterable, Union, Sequence, Optional, Set, Generator
+from typing import Dict, Any, Callable, List, Tuple, Iterable, Union, Sequence, Optional, Set, Generator, FrozenSet
 
 from rtree import index  # type: ignore
 
@@ -432,13 +432,17 @@ class Artwork:
 
     def rebuild_connectivity(self, progress_cb: Callable[[int, int], None] = lambda x, y: None) -> None:
         connectivity = self.compute_connected(self.get_all_artwork(), progress_cb=progress_cb)
+        connectivity = [frozenset(i) for i in connectivity]
 
         # First, for each existing net, we identify which groups are owned by the net
         # and remove the groups having the smaller amounts of geometry (by count)
-        nets_to_groups: Dict[Net, List[Set[Geom]]] = defaultdict(list)
+        # TODO: Change to by (ranked)
+        # Most pads on section
+        # Largest area
+        nets_to_groups: Dict[Net, Set[FrozenSet[Geom]]] = defaultdict(set)
         for g in connectivity:
             for i in g:
-                nets_to_groups[i.net].append(g)
+                nets_to_groups[i.net].add(g)
 
         for net, groups in nets_to_groups.items():
             groups_sorted = sorted(groups, key=len)
@@ -450,12 +454,13 @@ class Artwork:
         # Second, now for all groups, we build a list of all nets on the group. We choose the
         # highest priority net and assign it to the whole group
         for group in connectivity:
-            nets = set(i.net for i in group if i.net is not None)
-            # TODO: Prioritize net
+            nets : Set[Net] = set(i.net for i in group if i.net is not None)
+
             if len(nets) == 0:
                 n0 = self._project.nets.new()
             else:
-                n0 = nets.pop()
+                ranked_nets = sorted(nets, key=lambda x: (x.has_assigned_name, x.net_class != ""))
+                n0 = ranked_nets[-1]
 
             for i in group:
                 i.net = n0

@@ -1,37 +1,30 @@
 import numpy
-from tempfile import TemporaryFile
+from tempfile import TemporaryFile, TemporaryDirectory
 from pcbre.matrix import Point2
 from pcbre.model.artwork_geom import Trace, Via, Polygon, Airwire
 from pcbre.model.imagelayer import ImageLayer, KeyPoint, KeyPointAlignment, RectAlignment
-from pcbre.model.project import Project
+from pcbre.model.project import Project, StorageType
 from pcbre.model.serialization import PersistentIDClass
 from pcbre.model.serialization_capnp import CapnpIO
 import random
+from test.common import StorageTestMeta, saverestore
+import unittest
+
 __author__ = 'davidc'
 
 
-import unittest
-
-class test_save_restore(unittest.TestCase):
-    def __saverestore(self, p):
-        with TemporaryFile(buffering=0) as fd:
-
-            p.save_fd_capnp(fd)
-            fd.seek(0)
-
-            p_new = Project.open_fd_capnp(fd)
-        return p_new
-
-    def test_basic_save_restore(self):
+class test_save_restore(unittest.TestCase, metaclass=StorageTestMeta):
+    def PARAM_test_basic_save_restore(self, storage_type: StorageType):
         p = Project.create()
-        p_new = self.__saverestore(p)
+        p_new = saverestore(p, storage_type)
 
     def compare_tuple(self, a, b):
         self.assertEqual(len(a), len(b))
         for i, j in zip(a, b):
-            self.assertAlmostEqual(i, j)
+            self.assertAlmostEqual(i, j, 5)
 
-    def __setup_layers(self, n):
+    @staticmethod
+    def __setup_layers(n):
         names = ["foo","bar","quux", "sed","a"] + list("abcdefghijklmnop")
         p = Project.create()
         for i, name in zip(range(n), names):
@@ -48,10 +41,10 @@ class test_save_restore(unittest.TestCase):
         self.assertTrue(new_o is not old_o)
         self.assertEqual(new_o._project, new_p)
 
-    def test_layer_save_restore(self):
+    def PARAM_test_layer_save_restore(self, storage_type: StorageType):
         p = self.__setup_layers(2)
 
-        p_new = self.__saverestore(p)
+        p_new = saverestore(p, storage_type)
 
         self.assertEqual(len(p_new.stackup.layers), len(p.stackup.layers))
 
@@ -70,10 +63,10 @@ class test_save_restore(unittest.TestCase):
 
         return p
 
-    def test_via_pairs(self):
+    def PARAM_test_via_pairs(self, storage_type: StorageType):
         p = self.__setup_via_pairs_layers()
 
-        p_new = self.__saverestore(p)
+        p_new = saverestore(p, storage_type)
 
         self.assertEqual(len(p.stackup.via_pairs), len(p_new.stackup.via_pairs))
         for vp_old, vp_new in zip(p.stackup.via_pairs, p_new.stackup.via_pairs):
@@ -84,7 +77,6 @@ class test_save_restore(unittest.TestCase):
 
             self.assertEqual(new_first_i, old_first_i)
             self.assertEqual(new_second_i, old_second_i)
-
 
     def setup_i3(self):
         p = self.__setup_via_pairs_layers()
@@ -98,9 +90,9 @@ class test_save_restore(unittest.TestCase):
         p.stackup.layers[1].imagelayers = [il3]
         return p
 
-    def test_image_layers(self):
+    def PARAM_test_image_layers(self, storage_type: StorageType):
         p = self.setup_i3()
-        p_new = self.__saverestore(p)
+        p_new = saverestore(p, storage_type)
 
         self.assertEqual(len(p.imagery.imagelayers), len(p_new.imagery.imagelayers))
         for il_old, il_new in zip(p.imagery.imagelayers, p_new.imagery.imagelayers):
@@ -115,7 +107,7 @@ class test_save_restore(unittest.TestCase):
         eps = numpy.absolute(b-a).max()
         self.assertLess(eps, 0.00001, "CmpMat: %s %s" % (a, b))
 
-    def test_keypoints(self):
+    def PARAM_test_keypoints(self, storage_type: StorageType):
         p = self.setup_i3()
         kp1 = KeyPoint(p, Point2(3, 6))
         kp2 = KeyPoint(p, Point2(5, 5))
@@ -128,7 +120,7 @@ class test_save_restore(unittest.TestCase):
         align.set_keypoint_position(kp1, Point2(-7,13))
         align.set_keypoint_position(kp2, Point2(4, 5))
 
-        p_new = self.__saverestore(p)
+        p_new = saverestore(p, storage_type)
 
         # Verify Keypoints saved/restored
         self.assertEqual(len(p_new.imagery.keypoints), len(p.imagery.keypoints))
@@ -148,7 +140,7 @@ class test_save_restore(unittest.TestCase):
         self.cmpMat(new_kpl[0].image_pos, old_kpl[0].image_pos)
         self.cmpMat(new_kpl[1].image_pos, old_kpl[1].image_pos)
 
-    def test_rectalign(self):
+    def PARAM_test_rectalign(self, storage_type: StorageType):
         p = self.setup_i3()
         align = RectAlignment(
             [Point2(3,3), Point2(7,3), Point2(7,7), Point2(3, 7), None, None, None, None, Point2(4, 7), None, None, None],
@@ -161,7 +153,7 @@ class test_save_restore(unittest.TestCase):
             False)
         p.imagery.imagelayers[0].set_alignment(align)
 
-        p_new = self.__saverestore(p)
+        p_new = saverestore(p, storage_type)
 
         new_align = p_new.imagery.imagelayers[0].alignment
         """:type : RectAlignment"""
@@ -179,28 +171,28 @@ class test_save_restore(unittest.TestCase):
                 self.assertIsNone(b)
             else:
                 self.assertIsNotNone(b)
-                self.cmpMat(a,b)
+                self.cmpMat(a, b)
 
         for a,b in zip(align.dim_handles, new_align.dim_handles):
             if a is None:
                 self.assertIsNone(b)
             else:
                 self.assertIsNotNone(b)
-                self.cmpMat(a,b)
+                self.cmpMat(a, b)
 
-    def test_vias(self):
+    def PARAM_test_vias(self, storage_type: StorageType):
         p = self.__setup_via_pairs_layers()
 
         n1 = p.nets.new()
         n2 = p.nets.new()
 
-        v = Via(Point2(3700, 2100), p.stackup.via_pairs[0], 31337, n1)
-        v2 = Via(Point2(1234, 5678), p.stackup.via_pairs[1], 31339, n2)
+        v = Via(Point2(3700, 2100), p.stackup.via_pairs[0], 100, n1)
+        v2 = Via(Point2(1234, 5678), p.stackup.via_pairs[1], 101, n2)
 
         p.artwork.add_artwork(v)
         p.artwork.add_artwork(v2)
 
-        p_new = self.__saverestore(p)
+        p_new = saverestore(p, storage_type)
 
         v2_new = sorted(p_new.artwork.vias, key=lambda x: x.pt.x)[0]
         v_new = sorted(p_new.artwork.vias, key=lambda x: x.pt.x)[1]
@@ -214,7 +206,7 @@ class test_save_restore(unittest.TestCase):
             self.assertEqual(a.r, b.r)
             self.assertEqual(p.nets.nets.index(a.net), p_new.nets.nets.index(b.net))
 
-    def test_airwires(self):
+    def PARAM_test_airwires(self, storage_type: StorageType):
         p = self.__setup_via_pairs_layers()
 
         n1 = p.nets.new()
@@ -228,7 +220,7 @@ class test_save_restore(unittest.TestCase):
         p.artwork.add_artwork(v2)
         p.artwork.add_artwork(airwire)
 
-        p_new = self.__saverestore(p)
+        p_new = saverestore(p, storage_type)
 
         aw_new = list(p_new.artwork.airwires)[0]
 
@@ -242,21 +234,19 @@ class test_save_restore(unittest.TestCase):
         self.assertEqual(aw_new.p1_layer, v2_new.viapair.layers[0])
         self.assertEqual(aw_new.net, v_new.net)
 
-    def test_polyons(self):
+    def PARAM_test_polyons(self, storage_type: StorageType):
         p = self.__setup_via_pairs_layers()
         n1 = p.nets.new()
-        n2 = p.nets.new()
 
-        ext = [Point2(0,0), Point2(10,0), Point2(10,10), Point2(0, 10)]
-        int1 = [Point2(1,1), Point2(2,1), Point2(2,2), Point2(1,2)]
-        int2 = [Point2(4,1), Point2(5,1), Point2(5,2), Point2(4,2)]
-
+        ext = [Point2(0, 0), Point2(10, 0), Point2(10, 10), Point2(0, 10)]
+        int1 = [Point2(1, 1), Point2(2, 1), Point2(2, 2), Point2(1, 2)]
+        int2 = [Point2(4, 1), Point2(5, 1), Point2(5, 2), Point2(4, 2)]
 
         po = Polygon(p.stackup.layers[0], ext, [int1, int2], n1)
 
         p.artwork.add_artwork(po)
 
-        p_new = self.__saverestore(p)
+        p_new = saverestore(p, storage_type)
 
         pols = p_new.artwork.polygons
 
@@ -278,7 +268,7 @@ class test_save_restore(unittest.TestCase):
         self.assertIsNotNone(pol_new.net)
         self.assertIsNotNone(pol_new.layer)
 
-    def test_trace(self):
+    def PARAM_test_trace(self, storage_type: StorageType):
         p = self.__setup_via_pairs_layers()
 
         n1 = p.nets.new()
@@ -292,7 +282,7 @@ class test_save_restore(unittest.TestCase):
 
         self.assertEqual(t1._project, p)
 
-        p_new = self.__saverestore(p)
+        p_new = saverestore(p, storage_type)
 
         self.assertEqual(len(p_new.artwork.traces), 2)
         self.assertIs(list(p_new.artwork.traces)[0]._project, p_new)
@@ -310,10 +300,11 @@ class test_save_restore(unittest.TestCase):
             self.assertEqual(p.stackup.layers.index(t_old.layer),
                              p_new.stackup.layers.index(t_new.layer))
 
+
 class test_save_mats(unittest.TestCase):
     def __test_shape(self, n):
 
-        mat = numpy.random.rand(n,n)
+        mat = numpy.random.rand(n, n)
 
         msg = CapnpIO.serialize_matrix(mat)
 
@@ -327,6 +318,7 @@ class test_save_mats(unittest.TestCase):
 
     def test_mat_4_4(self):
         self.__test_shape(4)
+
 
 class test_save_point2(unittest.TestCase):
     def test_point2(self):

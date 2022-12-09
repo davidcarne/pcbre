@@ -6,6 +6,7 @@ import tempfile
 from qtpy import QtCore, QtGui, QtWidgets
 
 import pcbre.model.project as P
+import pcbre.model.serialization_capnp as ser_capnp
 from pcbre.model.project import Project
 from pcbre.model.stackup import Layer
 from pcbre.ui.actions.add import AddImageDialogAction
@@ -40,7 +41,8 @@ class MainWindowActions:
         # File actions
         self.file_add_image = AddImageDialogAction(window)
         self.file_save = SaveAction(window)
-        self.file_save_as = SaveAsDialogAction(window)
+        self.file_save_as_packed = SaveAsDialogAction(window, P.StorageType.Packed)
+        self.file_save_as_dir = SaveAsDialogAction(window, P.StorageType.Dir)
         self.file_exit = ExitAction(window)
 
         # View actions
@@ -84,7 +86,7 @@ class MainWindowActions:
 class MainWindow(QtWidgets.QMainWindow):
     # Emitted when something changes the currently selected layer
 
-    def __init__(self, filepath: Optional[str], p: Project) -> None:
+    def __init__(self, filepath: Optional[str], storage_type: P.StorageType, p: Project) -> None:
         super(MainWindow, self).__init__()
 
         self.project: Project = p
@@ -111,6 +113,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.current_controller: Optional[BaseToolController] = None
 
         self.filepath = filepath
+        self.storage_type = storage_type
 
     @property
     def can_save(self) -> bool:
@@ -233,12 +236,14 @@ def main() -> None:
     if args.project is None:
         p = P.Project.create()
         filepath = None
+        storage_type = P.StorageType.Packed
     else:
         filepath = args.project
         if os.path.exists(args.project):
-            p = P.Project.open(args.project)
+            p, storage_type = P.Project.open_detect(args.project)
         elif args.create_if_not_exists:
             p = P.Project.create()
+            storage_type = P.StorageType.Packed
         else:
             print("File not found")
             exit()
@@ -248,7 +253,7 @@ def main() -> None:
     f = app.font()
     gl_version = probe()
 
-    window = MainWindow(filepath, p)
+    window = MainWindow(filepath, storage_type, p)
 
     old_excepthook = sys.excepthook
     def excepthook(type, value, traceback):
@@ -276,7 +281,7 @@ def main() -> None:
                 suffix=".pcbre", prefix="pcbre_unnamed_emergency_save", delete=False)
             emerge_save_path = emerge_save_fd.name
 
-        p.save_fd_capnp(emerge_save_fd)
+        ser_capnp.CapnpIO.save_fd(window.project, emerge_save_fd)
         emerge_save_fd.close()
         print("Saved emergency save to %s" % emerge_save_path)
         old_excepthook(type, value, traceback)

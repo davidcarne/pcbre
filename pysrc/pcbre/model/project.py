@@ -1,7 +1,9 @@
 import os
-from typing import List, Tuple, Sequence, Optional, BinaryIO
+from enum import Enum
+from typing import List, Tuple, Sequence, Optional
 
 import pcbre.model.serialization_capnp as ser_capnp
+import pcbre.model.serialization_dirtext as ser_dirtext
 from pcbre.model.artwork import Artwork
 from pcbre.model.const import SIDE
 from pcbre.model.imagelayer import ImageLayer, KeyPoint
@@ -9,19 +11,14 @@ from pcbre.model.net import Net
 from pcbre.model.serialization import PersistentIDRegistry, PersistentIDClass
 from pcbre.model.stackup import Layer, ViaPair
 from pcbre.model.util import ImmutableListProxy
-from enum import Enum
-
 from pcbre.ui.uimodel import TinySignal
 
 
 class StorageType(Enum):
     Packed = 0
     Dir = 1
-    AutoDetect = 2
 
 
-MAGIC = b"PCBRE\x00"
-VERSION_MAGIC = b"\x01\x00"
 
 
 class ProjectIsBadException(Exception):
@@ -257,90 +254,38 @@ class Project:
         return Project()
 
     @staticmethod
-    def open(path: str, filetype: StorageType = StorageType.AutoDetect) -> 'Optional[Project]':
-        if filetype == StorageType.AutoDetect:
-            if not os.path.exists(path):
-                return None
-            if os.path.isdir(path):
-                filetype = StorageType.Dir
-            else:
-                filetype = StorageType.Packed
-
+    def open(path: os.PathLike, filetype: StorageType) -> 'Project':
         if filetype == StorageType.Packed:
-            f = open(path, "rb", buffering=0)
-            self = Project.open_fd_capnp(f)
+            self = ser_capnp.CapnpIO.open_path(path)
         elif filetype == StorageType.Dir:
-            self = Project.open_dir(path)
+            self = ser_dirtext.DirTextIO.open_path(path)
         else:
             raise ValueError("Unknown serialization file type %s" % repr(filetype))
-
         return self
 
     @staticmethod
-    def open_dir(path: str) -> 'Optional[Project]':
-        raise NotImplementedError()
+    def open_detect(path: os.PathLike) -> 'Tuple[Project, StorageType]':
+        if not os.path.exists(path):
+            raise IOError("Path not found")
 
-    @staticmethod
-    def open_fd_capnp(fd: BinaryIO) -> 'Project':
-        magic = fd.read(8)
-        if magic[:6] != MAGIC:
-            raise ValueError("Unknown File Type")
+        if os.path.isdir(path):
+            storage_type = StorageType.Dir
+        else:
+            storage_type = StorageType.Packed
 
-        vers = magic[6:8]
-        if vers != VERSION_MAGIC:
-            raise ValueError("Unknown File Version")
+        return Project.open(path, storage_type), storage_type
 
-        _project = ser_capnp.Project.read(fd)
-        self = ser_capnp.CapnpIO.deserialize_project(_project)
-        return self
 
     def save(self, path: str, filetype: StorageType) -> None:
         if path is None:
             raise ValueError("Must have either a filename, or a save-as path")
 
         if filetype == StorageType.Packed:
-            self.save_capnp(path)
+            ser_capnp.CapnpIO.save_path(self, path)
         elif filetype == StorageType.Dir:
-            self.save_dir(path)
+            ser_dirtext.DirTextIO.save_path(path, self)
         else:
-            raise ValueError("Storage Type must be specified")
-
-    def save_dir(self, path: str) -> None:
-        raise NotImplementedError("Dir serialization not implemented")
-
-    def save_capnp(self, path):
-        try:
-            bakname = path + ".bak"
-
-            if os.path.exists(bakname):
-                os.unlink(bakname)
-
-            if os.path.exists(path):
-                os.rename(path, bakname)
-        except (IOError, OSError):
-            raise IOError("Couldn't manipulate backup file")
-
-        f = open(path, "w+b", buffering=0)
-        try:
-            self.save_fd_capnp(f)
-        except Exception as e:
-            os.unlink(path)
-            os.rename(bakname, path)
-            raise e
-
-        f.close()
-
-    def save_fd_capnp(self, fd: BinaryIO) -> None:
-        fd.write(MAGIC + VERSION_MAGIC)
-        # This appears to be necessary for some IO types
-        # CAPNP may not reflect already buffer contents
-        # (see when writing to a named temp file)
-        fd.flush()
-
-        message = ser_capnp.CapnpIO.serialize_project(self)
-        message.write(fd)
-
-        fd.flush()
+            raise ValueError("Storage Type not supported")
 
     def close(self) -> None:
         pass

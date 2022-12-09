@@ -4,6 +4,7 @@ import secrets
 
 from typing import Set
 
+SERIALIZATION_VERSION = 0x0001
 
 # When we serialize a project to disk, we need to reference one object from another,
 # for example, a Net from geometry that is connected to that Net. We could generate
@@ -61,6 +62,9 @@ class PersistentID:
 
     def __hash__(self):
         return self.__numeric_value
+
+    def __lt__(self, other):
+        return self.__numeric_value < other.__numeric_value
 
     def __eq__(self, other: 'PersistentID') -> bool:
         return self.__numeric_value == other.__numeric_value

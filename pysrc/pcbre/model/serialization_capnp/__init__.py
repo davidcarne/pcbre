@@ -9,10 +9,13 @@ from .pcbre_capnp import Project, Stackup, ViaPair, Layer, Color3f, Artwork, Ima
     Net, Nets, Image as ImageMsg, ImageTransform as ImageTransformMsg, Matrix3x3, Matrix4x4, Point2, Point2f, \
     Keypoint as KeypointMsg, ImageTransform, Component as ComponentMsg, Handle as HandleMsg
 
-from typing import Tuple, Union, Dict, TYPE_CHECKING, Optional
+from typing import Tuple, Union, Dict, TYPE_CHECKING, Optional, BinaryIO
 
 import pcbre.matrix
 import numpy
+import os
+
+from pcbre.model.serialization import SERIALIZATION_VERSION
 
 if TYPE_CHECKING:
     from pcbre.model.serialization import PersistentID
@@ -27,6 +30,9 @@ if TYPE_CHECKING:
     import pcbre.model.component
     import pcbre.model.net
 
+
+MAGIC = b"PCBRE\x00"
+VERSION_MAGIC = SERIALIZATION_VERSION.to_bytes(2, 'little')
 
 class CapnpIO:
     project: 'pcbre.model.project.Project'
@@ -184,7 +190,7 @@ class CapnpIO:
 
     def deserialize_keypoint(self, msg: KeypointMsg) -> 'pcbre.model.imagelayer.KeyPoint':
         import pcbre.model.imagelayer
-        world_position = self.serialize_point2(msg.worldPosition)
+        world_position = self.deserialize_point2(msg.worldPosition)
 
         unique_id = self.project.unique_id_registry.decode_add_from_uint32(msg.sid)
         obj = pcbre.model.imagelayer.KeyPoint(self.project, world_position, unique_id)
@@ -716,3 +722,59 @@ class CapnpIO:
                 raise NotImplementedError()
 
             self.project.artwork.add_component(cmp)
+
+
+    @staticmethod
+    def open_path(path: os.PathLike) -> 'pcbre.model.project.Project':
+        with open(path, "rb", buffering=0) as f:
+            return CapnpIO.open_fd(f)
+
+    @staticmethod
+    def open_fd(fd: BinaryIO) -> 'pcbre.model.project.Project':
+        magic = fd.read(8)
+        if magic[:6] != MAGIC:
+            raise ValueError("Unknown File Type")
+
+        vers = magic[6:8]
+        if vers != VERSION_MAGIC:
+            raise ValueError("Unknown File Version")
+
+        _project = Project.read(fd)
+        self = CapnpIO.deserialize_project(_project)
+        return self
+
+    @staticmethod
+    def save_path(project, path) -> None:
+        try:
+            bakname = path + ".bak"
+
+            if os.path.exists(bakname):
+                os.unlink(bakname)
+
+            if os.path.exists(path):
+                os.rename(path, bakname)
+        except (IOError, OSError):
+            raise IOError("Couldn't manipulate backup file")
+
+        f = open(path, "w+b", buffering=0)
+        try:
+            CapnpIO.save_fd(project, f)
+        except Exception as e:
+            os.unlink(path)
+            os.rename(bakname, path)
+            raise e
+
+        f.close()
+
+    @staticmethod
+    def save_fd(project, fd: BinaryIO) -> None:
+        fd.write(MAGIC + VERSION_MAGIC)
+        # This appears to be necessary for some IO types
+        # CAPNP may not reflect already buffer contents
+        # (see when writing to a named temp file)
+        fd.flush()
+
+        message = CapnpIO.serialize_project(project)
+        message.write(fd)
+
+        fd.flush()

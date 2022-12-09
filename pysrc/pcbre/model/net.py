@@ -29,11 +29,17 @@ class Net:
             return "N$%d" % self._id
 
     @name.setter
-    def name(self, value: str) -> None:
-        if Net.__net_class_match.match(value) or value.strip() == "":
+    def name(self, value: Optional[str]) -> None:
+        if value is None:
+            self._name = None
+        elif value.strip() == "":
             self._name = None
         else:
             self._name = value
+
+    @property
+    def has_assigned_name(self):
+        return self._name is not None
 
     def __repr__(self) -> str:
         return "<Net %s %s %s>" % (self._id, self.name, ("(%s)" % self.net_class) if self.net_class else "")

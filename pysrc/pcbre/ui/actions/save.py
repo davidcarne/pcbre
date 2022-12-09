@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 pcbre_filter = "PCBRE Project Files (*.pcbre)"
 
-pcbre_filter = "PCBRE Project Files (*.pcbre)"
+pcbre_dir_filter = "PCBRE VCS Dir"
 
 class SaveAction(QtWidgets.QAction):
     def __init__(self, window: 'MainWindow') -> None:
@@ -20,21 +20,28 @@ class SaveAction(QtWidgets.QAction):
         self.triggered.connect(self.__action)
 
     def __action(self) -> None:
-        self.window.project.save(self.window.filepath, StorageType.Packed)
+        self.window.project.save(self.window.filepath, self.window.storage_type)
 
 
 class SaveAsDialogAction(QtWidgets.QAction):
-    def __init__(self, window: 'MainWindow') -> None:
+    def __init__(self, window: 'MainWindow', st: StorageType) -> None:
         self.window = window
-        QtWidgets.QAction.__init__(self, "Save-As", self.window)
+        QtWidgets.QAction.__init__(self, "%s" % st.name, self.window)
         self.triggered.connect(self.__action)
-        self.setShortcut("Ctrl+Shift+S")
+
+        self.storage_type = st
 
     def __action(self) -> None:
-        filepath, _ = QtWidgets.QFileDialog.getSaveFileName(self.window, "Save project as....", filter=pcbre_filter)
+        if self.storage_type == StorageType.Packed:
+            filter = pcbre_filter
+        else:
+            filter = pcbre_dir_filter
+
+        filepath, _ = QtWidgets.QFileDialog.getSaveFileName(self.window, "Save project as....", filter=filter)
 
         if filepath:
-            self.window.project.save(filepath, StorageType.Packed)
+            self.window.project.save(filepath, self.storage_type)
+            self.window.storage_type = self.storage_type
             self.window.filepath = filepath
 
 

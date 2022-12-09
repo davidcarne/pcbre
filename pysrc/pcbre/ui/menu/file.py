@@ -21,7 +21,10 @@ class FileMenu(QtWidgets.QMenu):
         # Add the rest of the actions
         self.addSeparator()
         self.addAction(mw.pcbre_actions.file_save)
-        self.addAction(mw.pcbre_actions.file_save_as)
+
+        self.__menu_save_as = self.addMenu("Save As")
+        self.__menu_save_as.addAction(mw.pcbre_actions.file_save_as_packed)
+        self.__menu_save_as.addAction(mw.pcbre_actions.file_save_as_dir)
         self.addSeparator()
         self.addAction(mw.pcbre_actions.file_exit)
 
